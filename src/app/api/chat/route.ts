@@ -30,18 +30,17 @@ FLUX RULES:
 - Keep prompts under 50 words unless the scene is truly complex
 - Use phrases like "with emphasis on" or "focus on" instead of weights
 - Never use "white background" — it causes blur in FLUX
-- Describe lighting by what it DOES, not just its name (e.g. "warm light streaming through the window casting long shadows" not just "golden hour")
+- Describe lighting by what it DOES, not just its name
 - For photorealism: mention the camera/lens ("shot on Hasselblad", "35mm lens", "f/1.8 aperture")
 
-STRUCTURE TO FOLLOW:
-[Subject + key details], [setting/context], [lighting description], [style/mood], [camera/medium if relevant]
+STRUCTURE: [Subject + key details], [setting/context], [lighting], [style/mood], [camera if relevant]
 
-EXAMPLES OF GOOD FLUX PROMPTS:
-- "A woman in a red silk dress standing on a rooftop at dusk, warm orange light behind her casting a long shadow, editorial fashion photography, shot on Leica M, f/2 aperture"
-- "Minimalist creative studio interior, concrete floors and tall windows, soft diffused daylight filling the room, calm and professional atmosphere, Kinfolk magazine aesthetic"
-- "Close-up of a glass of red wine on a wooden table outdoors, warm afternoon light, vineyard in soft focus background, Italian countryside, film photography"
+EXAMPLES:
+- "A woman in a red silk dress standing on a rooftop at dusk, warm orange light casting a long shadow, editorial fashion photography, shot on Leica M, f/2 aperture"
+- "Minimalist creative studio interior, concrete floors and tall windows, soft diffused daylight, calm professional atmosphere, Kinfolk magazine aesthetic"
+- "Close-up of a glass of red wine on a wooden table outdoors, warm afternoon light, vineyard in soft focus background, film photography"
 
-OUTPUT: Write ONLY the prompt. No explanations, no preamble. In English. Max 60 words.`
+OUTPUT: Write ONLY the prompt. No explanations. In English. Max 60 words.`
 
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
@@ -68,6 +67,14 @@ function buildImageUrl(expandedPrompt: string): string {
   return `https://image.pollinations.ai/prompt/${encoded}?${params.toString()}`
 }
 
+async function saveToHistory(rows: { role: string; content: string; image_url?: string }[]) {
+  try {
+    await supabase.from('chat_history').insert(rows)
+  } catch {
+    // non bloccare se fallisce
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { message, history = [] } = await req.json()
@@ -82,10 +89,10 @@ export async function POST(req: NextRequest) {
       const imageUrl = buildImageUrl(expandedPrompt)
       const responseText = `Ecco la tua immagine! 🎨\n\n**Prompt:** ${expandedPrompt}`
 
-      await supabase.from('chat_history').insert([
+      await saveToHistory([
         { role: 'user', content: message },
         { role: 'assistant', content: responseText, image_url: imageUrl }
-      ]).catch(() => {})
+      ])
 
       return NextResponse.json({
         type: 'image',
@@ -118,10 +125,10 @@ Aiuti con: strategia creativa, copywriting, social media, branding, design, AI g
 
     const responseText = completion.choices[0]?.message?.content || 'Nessuna risposta.'
 
-    await supabase.from('chat_history').insert([
+    await saveToHistory([
       { role: 'user', content: message },
       { role: 'assistant', content: responseText }
-    ]).catch(() => {})
+    ])
 
     return NextResponse.json({ type: 'text', text: responseText })
 
