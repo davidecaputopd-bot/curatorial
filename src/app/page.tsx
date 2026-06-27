@@ -187,6 +187,7 @@ function HeroCard({
           src={getImage(item)}
           alt={item.title}
           className="h-[280px] w-full object-cover sm:h-[300px]"
+          onError={(e) => { (e.target as HTMLImageElement).src = categoryPlaceholders[item.category] || categoryPlaceholders.lifestyle }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-5">
@@ -236,6 +237,7 @@ function FeedItemCard({
           src={getImage(item)}
           alt=""
           className="h-20 w-20 shrink-0 rounded-xl object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).src = categoryPlaceholders[item.category] || categoryPlaceholders.lifestyle }}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
