@@ -15,23 +15,33 @@ function isImageRequest(msg: string): boolean {
     'generate', 'create', 'draw', 'image', 'picture', 'visual',
     'mostrami', 'show me', 'visualizza', 'dipingi', 'render'
   ]
-  const lower = msg.toLowerCase()
-  return triggers.some(t => lower.includes(t))
+  return triggers.some(t => msg.toLowerCase().includes(t))
 }
 
 async function expandImagePrompt(userPrompt: string): Promise<string> {
-  const systemMsg = `Sei un esperto di prompt engineering per generazione immagini AI (FLUX / Stable Diffusion).
-Trasforma la richiesta dell'utente in un prompt immagine professionale.
+  const systemMsg = `You are an expert at writing prompts for FLUX, a text-to-image AI model.
 
-REGOLE:
-- Scrivi SOLO il prompt, niente spiegazioni
-- Sempre in inglese
-- Includi: soggetto, stile visivo, illuminazione, composizione, qualità
-- Usa termini tecnici: "cinematic lighting", "shallow depth of field", "8k ultra detailed", ecc.
-- Per editoriale/fashion: aggiungi "editorial photography, high fashion, clean background"
-- Per paesaggi: aggiungi "golden hour, dramatic sky, architectural photography"
-- Per arte: specifica il medium (oil painting, digital art, watercolor, ecc.)
-- Massimo 150 parole`
+FLUX is fundamentally different from Stable Diffusion. Follow these rules strictly:
+
+FLUX RULES:
+- Write in natural, descriptive language — NOT keyword lists
+- Never use weight syntax like (word:1.5) or (emphasis)++ — FLUX ignores them
+- Put the most important information FIRST (subject, then context, then style)
+- Keep prompts under 50 words unless the scene is truly complex
+- Use phrases like "with emphasis on" or "focus on" instead of weights
+- Never use "white background" — it causes blur in FLUX
+- Describe lighting by what it DOES, not just its name (e.g. "warm light streaming through the window casting long shadows" not just "golden hour")
+- For photorealism: mention the camera/lens ("shot on Hasselblad", "35mm lens", "f/1.8 aperture")
+
+STRUCTURE TO FOLLOW:
+[Subject + key details], [setting/context], [lighting description], [style/mood], [camera/medium if relevant]
+
+EXAMPLES OF GOOD FLUX PROMPTS:
+- "A woman in a red silk dress standing on a rooftop at dusk, warm orange light behind her casting a long shadow, editorial fashion photography, shot on Leica M, f/2 aperture"
+- "Minimalist creative studio interior, concrete floors and tall windows, soft diffused daylight filling the room, calm and professional atmosphere, Kinfolk magazine aesthetic"
+- "Close-up of a glass of red wine on a wooden table outdoors, warm afternoon light, vineyard in soft focus background, Italian countryside, film photography"
+
+OUTPUT: Write ONLY the prompt. No explanations, no preamble. In English. Max 60 words.`
 
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
@@ -39,8 +49,8 @@ REGOLE:
       { role: 'system', content: systemMsg },
       { role: 'user', content: userPrompt }
     ],
-    max_tokens: 250,
-    temperature: 0.7
+    max_tokens: 200,
+    temperature: 0.75
   })
 
   return completion.choices[0]?.message?.content?.trim() || userPrompt
@@ -51,7 +61,6 @@ function buildImageUrl(expandedPrompt: string): string {
     model: 'flux',
     width: '1024',
     height: '1024',
-    enhance: 'true',
     nologo: 'true',
     seed: String(Math.floor(Math.random() * 999999999))
   })
@@ -71,7 +80,6 @@ export async function POST(req: NextRequest) {
     if (isImageRequest(message)) {
       const expandedPrompt = await expandImagePrompt(message)
       const imageUrl = buildImageUrl(expandedPrompt)
-
       const responseText = `Ecco la tua immagine! 🎨\n\n**Prompt:** ${expandedPrompt}`
 
       await supabase.from('chat_history').insert([
@@ -115,10 +123,7 @@ Aiuti con: strategia creativa, copywriting, social media, branding, design, AI g
       { role: 'assistant', content: responseText }
     ]).catch(() => {})
 
-    return NextResponse.json({
-      type: 'text',
-      text: responseText
-    })
+    return NextResponse.json({ type: 'text', text: responseText })
 
   } catch (error) {
     console.error('Chat API error:', error)
