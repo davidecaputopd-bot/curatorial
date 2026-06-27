@@ -77,18 +77,10 @@ export default function ScopriPage() {
           <p className="mt-1 text-sm text-grow-muted">Contenuti selezionati per te.</p>
         </header>
 
-        {/* Category chips */}
         <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 pb-4">
           {categories.map(c => (
-            <button
-              key={c.key ?? 'all'}
-              onClick={() => load(c.key)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                active === c.key
-                  ? 'bg-grow-yellow text-grow-text'
-                  : 'border border-grow-border bg-grow-soft text-grow-text'
-              }`}
-            >
+            <button key={c.key ?? 'all'} onClick={() => load(c.key)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${active === c.key ? 'bg-grow-yellow text-grow-text' : 'border border-grow-border bg-grow-soft text-grow-text'}`}>
               {c.label}
             </button>
           ))}
@@ -101,30 +93,14 @@ export default function ScopriPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filtered.map((item, idx) => (
-              
-                key={item.id}
-                href={item.url === '#' ? undefined : item.url}
-                target={item.url !== '#' ? '_blank' : undefined}
-                rel="noopener noreferrer"
-                className={`group block overflow-hidden rounded-[16px] border border-grow-border bg-grow-card ${
-                  idx === 0 ? 'col-span-2' : ''
-                }`}
-              >
-                <img
-                  src={item.image_url || placeholders[item.category] || placeholders.lifestyle}
-                  alt=""
-                  className={`w-full object-cover ${idx === 0 ? 'h-48' : 'h-32'}`}
-                />
+              <a key={item.id} href={item.url === '#' ? undefined : item.url} target={item.url !== '#' ? '_blank' : undefined} rel="noopener noreferrer" className={`group block overflow-hidden rounded-[16px] border border-grow-border bg-grow-card ${idx === 0 ? 'col-span-2' : ''}`}>
+                <img src={item.image_url || placeholders[item.category] || placeholders.lifestyle} alt="" className={`w-full object-cover ${idx === 0 ? 'h-48' : 'h-32'}`} />
                 <div className="p-3">
                   <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-grow-yellow">
                     {categoryLabels[item.category] || item.category?.toUpperCase()}
                   </span>
-                  <h3 className="mt-1 text-sm font-bold leading-snug text-grow-text line-clamp-2">
-                    {item.title}
-                  </h3>
-                  <p className="mt-1.5 text-[11px] text-grow-muted">
-                    {item.sources?.name} · {timeAgo(item.published_at)}
-                  </p>
+                  <h3 className="mt-1 text-sm font-bold leading-snug text-grow-text line-clamp-2">{item.title}</h3>
+                  <p className="mt-1.5 text-[11px] text-grow-muted">{item.sources?.name} · {timeAgo(item.published_at)}</p>
                 </div>
               </a>
             ))}
