@@ -1,63 +1,131 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import Groq from 'groq-sdk'
+import { createClient } from '@supabase/supabase-js'
 
-export const maxDuration = 60
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-const SYSTEM = `Sei un assistente creativo specializzato in: grafica, comunicazione visiva, art direction, moda, design editoriale, social media, branding, AI generativa, prompting, stampa 3D, arredamento, scenografia, marketing creativo.
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_PUBLISHABLE_KEY!
+)
 
-COME RISPONDI:
-- Italiano sempre salvo richiesta
-- Diretto e immediatamente utilizzabile — niente intro né conclusioni
-- Copy e caption: scrivi subito senza spiegazioni
-- Hook Reels: 3 varianti (provocazione, domanda, dato concreto)
-- Idee: 3 concrete non 10 vaghe
-- Prompt AI: ottimizzati, tecnici, pronti all'uso
-- Mai: autentico, storytelling, straordinario, percorso, viaggio, ecosistema
-- Mai liste infinite
-- Per immagini: una frase introduttiva concisa, poi obbligatoriamente [GENERA_IMMAGINE: prompt dettagliato in inglese, stile fotografico preciso, lighting specifico, mood, composizione, riferimenti estetici]`
-
-function buildImageUrl(prompt: string): string {
-  const enhanced = `${prompt}, editorial photography, cinematic lighting, high resolution, professional color grading, sharp focus, film grain, 8K quality`
-  const encoded = encodeURIComponent(enhanced)
-  return `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed=${Math.floor(Math.random() * 999999)}`
+function isImageRequest(msg: string): boolean {
+  const triggers = [
+    'genera', 'crea', 'disegna', 'immagine', 'foto', 'illustra',
+    'generate', 'create', 'draw', 'image', 'picture', 'visual',
+    'mostrami', 'show me', 'visualizza', 'dipingi', 'render'
+  ]
+  const lower = msg.toLowerCase()
+  return triggers.some(t => lower.includes(t))
 }
 
-export async function POST(request: Request) {
-  const { message, history } = await request.json()
-  if (!message) return NextResponse.json({ error: 'No message' }, { status: 400 })
+async function expandImagePrompt(userPrompt: string): Promise<string> {
+  const systemMsg = `Sei un esperto di prompt engineering per generazione immagini AI (FLUX / Stable Diffusion).
+Trasforma la richiesta dell'utente in un prompt immagine professionale.
 
-  const groqKey = process.env.GROQ_API_KEY
-  if (!groqKey) return NextResponse.json({ error: 'No Groq key' }, { status: 500 })
+REGOLE:
+- Scrivi SOLO il prompt, niente spiegazioni
+- Sempre in inglese
+- Includi: soggetto, stile visivo, illuminazione, composizione, qualità
+- Usa termini tecnici: "cinematic lighting", "shallow depth of field", "8k ultra detailed", ecc.
+- Per editoriale/fashion: aggiungi "editorial photography, high fashion, clean background"
+- Per paesaggi: aggiungi "golden hour, dramatic sky, architectural photography"
+- Per arte: specifica il medium (oil painting, digital art, watercolor, ecc.)
+- Massimo 150 parole`
 
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      { role: 'system', content: systemMsg },
+      { role: 'user', content: userPrompt }
+    ],
+    max_tokens: 250,
+    temperature: 0.7
+  })
+
+  return completion.choices[0]?.message?.content?.trim() || userPrompt
+}
+
+function buildImageUrl(expandedPrompt: string): string {
+  const params = new URLSearchParams({
+    model: 'flux',
+    width: '1024',
+    height: '1024',
+    enhance: 'true',
+    nologo: 'true',
+    seed: String(Math.floor(Math.random() * 999999999))
+  })
+  const encoded = encodeURIComponent(expandedPrompt)
+  return `https://image.pollinations.ai/prompt/${encoded}?${params.toString()}`
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 1024,
-        temperature: 0.82,
-        messages: [
-          { role: 'system', content: SYSTEM },
-          ...(history || []).slice(-12).map((m: any) => ({ role: m.role, content: m.content })),
-          { role: 'user', content: message },
-        ],
-      }),
-    })
+    const { message, history = [] } = await req.json()
 
-    if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: 500 })
-
-    const data = await res.json()
-    const reply = data.choices?.[0]?.message?.content || ''
-
-    const match = reply.match(/\[GENERA_IMMAGINE:\s*([\s\S]+?)\]/)
-    if (match) {
-      const imageUrl = buildImageUrl(match[1].trim())
-      const cleanReply = reply.replace(/\[GENERA_IMMAGINE:[\s\S]+?\]/, '').trim() || 'Ecco.'
-      return NextResponse.json({ reply: cleanReply, imageUrl })
+    if (!message) {
+      return NextResponse.json({ error: 'Message required' }, { status: 400 })
     }
 
-    return NextResponse.json({ reply: reply || 'Nessuna risposta.' })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    // --- Immagine ---
+    if (isImageRequest(message)) {
+      const expandedPrompt = await expandImagePrompt(message)
+      const imageUrl = buildImageUrl(expandedPrompt)
+
+      const responseText = `Ecco la tua immagine! 🎨\n\n**Prompt:** ${expandedPrompt}`
+
+      await supabase.from('chat_history').insert([
+        { role: 'user', content: message },
+        { role: 'assistant', content: responseText, image_url: imageUrl }
+      ]).catch(() => {})
+
+      return NextResponse.json({
+        type: 'image',
+        text: responseText,
+        imageUrl,
+        expandedPrompt
+      })
+    }
+
+    // --- Testo ---
+    const systemPrompt = `Sei GROW AI, assistente personale di Davide Caputo — art director e creative director freelance in Salento.
+Tono: diretto, creativo, concreto. Zero fluff. Rispondi in italiano salvo richiesta diversa.
+Aiuti con: strategia creativa, copywriting, social media, branding, design, AI generativa, business creativo.`
+
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
+      ...history.slice(-10).map((h: { role: string; content: string }) => ({
+        role: h.role as 'user' | 'assistant',
+        content: h.content
+      })),
+      { role: 'user' as const, content: message }
+    ]
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages,
+      max_tokens: 1024,
+      temperature: 0.8
+    })
+
+    const responseText = completion.choices[0]?.message?.content || 'Nessuna risposta.'
+
+    await supabase.from('chat_history').insert([
+      { role: 'user', content: message },
+      { role: 'assistant', content: responseText }
+    ]).catch(() => {})
+
+    return NextResponse.json({
+      type: 'text',
+      text: responseText
+    })
+
+  } catch (error) {
+    console.error('Chat API error:', error)
+    return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ status: 'ok' })
 }
