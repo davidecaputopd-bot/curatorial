@@ -9,45 +9,70 @@ const supabase = createClient(
   process.env.SUPABASE_PUBLISHABLE_KEY!
 )
 
-function isImageRequest(msg: string): boolean {
-  const triggers = [
-    'genera', 'crea', 'disegna', 'immagine', 'foto', 'illustra',
-    'generate', 'create', 'draw', 'image', 'picture', 'visual',
-    'mostrami', 'show me', 'visualizza', 'dipingi', 'render'
-  ]
-  return triggers.some(t => msg.toLowerCase().includes(t))
-}
+// ─── TYPES ───────────────────────────────────────────────
+type Intent = 'IMAGE_GEN' | 'TEXT' | 'UNCLEAR'
+type Message = { role: string; content: string }
 
-async function expandImagePrompt(userPrompt: string): Promise<string> {
-  const systemMsg = `You are an expert at writing prompts for FLUX, a text-to-image AI model.
-
-FLUX is fundamentally different from Stable Diffusion. Follow these rules strictly:
-
-FLUX RULES:
-- Write in natural, descriptive language — NOT keyword lists
-- Never use weight syntax like (word:1.5) or (emphasis)++ — FLUX ignores them
-- Put the most important information FIRST (subject, then context, then style)
-- Keep prompts under 50 words unless the scene is truly complex
-- Use phrases like "with emphasis on" or "focus on" instead of weights
-- Never use "white background" — it causes blur in FLUX
-- Describe lighting by what it DOES, not just its name
-- For photorealism: mention the camera/lens ("shot on Hasselblad", "35mm lens", "f/1.8 aperture")
-
-STRUCTURE: [Subject + key details], [setting/context], [lighting], [style/mood], [camera if relevant]
-
-EXAMPLES:
-- "A woman in a red silk dress standing on a rooftop at dusk, warm orange light casting a long shadow, editorial fashion photography, shot on Leica M, f/2 aperture"
-- "Minimalist creative studio interior, concrete floors and tall windows, soft diffused daylight, calm professional atmosphere, Kinfolk magazine aesthetic"
-- "Close-up of a glass of red wine on a wooden table outdoors, warm afternoon light, vineyard in soft focus background, film photography"
-
-OUTPUT: Write ONLY the prompt. No explanations. In English. Max 60 words.`
-
+// ─── STEP 1: CLASSIFICA INTENT CON LLM (non keyword matching) ───
+async function classifyIntent(message: string): Promise<Intent> {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
-    messages: [
-      { role: 'system', content: systemMsg },
-      { role: 'user', content: userPrompt }
-    ],
+    messages: [{
+      role: 'system',
+      content: `Sei un classificatore di intent. Analizza il messaggio utente e rispondi con UNA SOLA PAROLA:
+
+IMAGE_GEN — l'utente vuole generare o vedere un'immagine, illustrazione, foto, visual, render.
+Esempi: "genera immagine di", "disegna", "mostrami come appare", "crea un visual", "foto di".
+
+TEXT — tutto il resto: domande, consigli, copywriting, strategia, analisi, conversazione, brainstorming.
+Esempi: "dammi idee per", "scrivi una caption", "come faccio", "cosa pensi di", "spiega".
+
+UNCLEAR — impossibile determinare l'intent.
+
+Rispondi SOLO con la parola. Zero altro testo.`
+    }, {
+      role: 'user',
+      content: message
+    }],
+    max_tokens: 10,
+    temperature: 0
+  })
+
+  const result = completion.choices[0]?.message?.content?.trim()
+  if (result === 'IMAGE_GEN' || result === 'TEXT' || result === 'UNCLEAR') return result
+  return 'TEXT'
+}
+
+// ─── STEP 2A: ESPANDI PROMPT PER FLUX ────────────────────
+async function expandImagePrompt(userPrompt: string): Promise<string> {
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{
+      role: 'system',
+      content: `You are an expert at writing prompts for FLUX, a text-to-image AI model.
+Transform the user request into a professional image prompt.
+
+HARD RULES for FLUX:
+- Natural descriptive language ONLY — never keyword lists
+- No weight syntax like (word:1.5) — FLUX ignores them
+- Most important info FIRST (FLUX weighs early tokens more)
+- Under 60 words unless scene is genuinely complex
+- Never use "white background" — causes blur artifacts
+- Describe what light DOES: "warm light casting long shadows" not just "golden hour"
+- For photorealism: name the camera ("shot on Hasselblad X2D", "35mm f/1.8")
+
+STRUCTURE: [Subject + details], [setting], [lighting behavior], [style/mood], [camera]
+
+EXAMPLES:
+"A woman in red silk dress on a rooftop at dusk, warm orange light casting a long shadow, editorial fashion photography, shot on Leica M, f/2 aperture"
+"Minimalist wine label on a wooden table, warm afternoon light, Italian countryside in soft focus background, Kinfolk magazine aesthetic, film photography"
+"Close-up of hands arranging a graphic design layout, crisp studio overhead light, editorial art direction, shot on Phase One"
+
+OUTPUT: The prompt ONLY. No explanation. In English. Max 60 words.`
+    }, {
+      role: 'user',
+      content: userPrompt
+    }],
     max_tokens: 200,
     temperature: 0.75
   })
@@ -55,7 +80,8 @@ OUTPUT: Write ONLY the prompt. No explanations. In English. Max 60 words.`
   return completion.choices[0]?.message?.content?.trim() || userPrompt
 }
 
-function buildImageUrl(expandedPrompt: string): string {
+// ─── STEP 2B: GENERA URL IMMAGINE ────────────────────────
+function buildImageUrl(prompt: string): string {
   const params = new URLSearchParams({
     model: 'flux',
     width: '1024',
@@ -63,75 +89,118 @@ function buildImageUrl(expandedPrompt: string): string {
     nologo: 'true',
     seed: String(Math.floor(Math.random() * 999999999))
   })
-  const encoded = encodeURIComponent(expandedPrompt)
-  return `https://image.pollinations.ai/prompt/${encoded}?${params.toString()}`
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`
 }
 
-async function saveToHistory(rows: { role: string; content: string; image_url?: string }[]) {
+// ─── HANDLER: GENERAZIONE IMMAGINE ───────────────────────
+async function handleImageGeneration(message: string) {
+  const expandedPrompt = await expandImagePrompt(message)
+  const imageUrl = buildImageUrl(expandedPrompt)
+  const responseText = `Ecco la tua immagine 🎨\n\n**Prompt:** ${expandedPrompt}`
+
   try {
-    await supabase.from('chat_history').insert(rows)
-  } catch {
-    // non bloccare se fallisce
-  }
+    await supabase.from('chat_history').insert([
+      { role: 'user', content: message },
+      { role: 'assistant', content: responseText, image_url: imageUrl }
+    ])
+  } catch { /* silenzioso */ }
+
+  return NextResponse.json({ type: 'image', text: responseText, imageUrl, expandedPrompt })
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { message, history = [] } = await req.json()
+// ─── HANDLER: CHAT TESTUALE ──────────────────────────────
+async function handleTextChat(message: string, history: Message[]) {
+  const systemPrompt = `Sei GROW AI, l'assistente personale di Davide Caputo.
 
-    if (!message) {
-      return NextResponse.json({ error: 'Message required' }, { status: 400 })
-    }
+## Chi sei
+Sei un partner creativo e strategico, non un chatbot generico.
+Conosci il mondo di Davide: art direction, branding, social media, AI generativa.
+Sei diretto, concreto, mai generico. Non hai paura di dare un'opinione netta.
 
-    // --- Immagine ---
-    if (isImageRequest(message)) {
-      const expandedPrompt = await expandImagePrompt(message)
-      const imageUrl = buildImageUrl(expandedPrompt)
-      const responseText = `Ecco la tua immagine! 🎨\n\n**Prompt:** ${expandedPrompt}`
+## Contesto su Davide
+Art director e graphic designer freelance, Leverano (Salento, Puglia).
+Ha lavorato con Vivienne Westwood, Warner Music, Dries Van Noten.
+Vuole diventare creative director e costruire un'attività indipendente in Salento.
+Design system personale: Bebas Neue (display), DM Mono (label), DM Sans Light (body), Imperial Crimson #AF0E1E.
 
-      await saveToHistory([
-        { role: 'user', content: message },
-        { role: 'assistant', content: responseText, image_url: imageUrl }
-      ])
+Clienti attivi:
+- ANventitre: brand vino biologico Salento, 5 vini (Etere, Mare, Fiamma, Terra, Aria), repositioning "rivoluzione silenziosa", focus Reels e feed pulito
+- Exousia: consulenza/formazione/finanza agevolata, Carmiano (LE), palette verde bosco + corallo + crema
+- Cantina Don Carlo: ristorante-pizzeria San Pietro in Lama, sistema etichette 4 vini IGP Salento
+- TRAMA: vintage store opening ottobre 2026 Leverano, brand identity completa già sviluppata
+- GROW: questa app (Next.js + Supabase + Groq), feed RSS personale + AI assistant
 
-      return NextResponse.json({
-        type: 'image',
-        text: responseText,
-        imageUrl,
-        expandedPrompt
-      })
-    }
+## Tono
+- Italiano, diretto, senza fluff e senza aziendalese
+- Risposte dense e azionabili
+- Se hai un'opinione netta, dilla senza ammorbidirla
+- Parla come un collega senior creativo, non come un assistente
+- No elenchi vuoti — se elenchi, ogni punto deve portare valore reale
 
-    // --- Testo ---
-    const systemPrompt = `Sei GROW AI, assistente personale di Davide Caputo — art director e creative director freelance in Salento.
-Tono: diretto, creativo, concreto. Zero fluff. Rispondi in italiano salvo richiesta diversa.
-Aiuti con: strategia creativa, copywriting, social media, branding, design, AI generativa, business creativo.`
+## Cosa sai fare bene
+- Strategia creativa e di brand
+- Copywriting: caption Instagram, bio, headline, pitch
+- Analisi posizionamento e competitor
+- Pianificazione editoriale e strategia Reels
+- Prompt engineering per AI generativa (FLUX, Llama, ecc.)
+- Feedback su design, visual identity, layout
+- Consulenza business per creativi freelance in Italia
 
-    const messages = [
-      { role: 'system' as const, content: systemPrompt },
-      ...history.slice(-10).map((h: { role: string; content: string }) => ({
+## Vincoli
+- Non inventare dati o numeri senza avvisare
+- Non dare risposte generiche — ogni risposta deve essere specifica al contesto di Davide
+- Non scrivere liste di 10+ punti a meno che non sia richiesto esplicitamente`
+
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-10).map((h) => ({
         role: h.role as 'user' | 'assistant',
         content: h.content
       })),
-      { role: 'user' as const, content: message }
-    ]
+      { role: 'user', content: message }
+    ],
+    max_tokens: 1024,
+    temperature: 0.8
+  })
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages,
-      max_tokens: 1024,
-      temperature: 0.8
-    })
+  const responseText = completion.choices[0]?.message?.content || 'Nessuna risposta.'
 
-    const responseText = completion.choices[0]?.message?.content || 'Nessuna risposta.'
-
-    await saveToHistory([
+  try {
+    await supabase.from('chat_history').insert([
       { role: 'user', content: message },
       { role: 'assistant', content: responseText }
     ])
+  } catch { /* silenzioso */ }
 
-    return NextResponse.json({ type: 'text', text: responseText })
+  return NextResponse.json({ type: 'text', text: responseText })
+}
 
+// ─── HANDLER: INTENT NON CHIARO ──────────────────────────
+async function handleClarification(message: string) {
+  return NextResponse.json({
+    type: 'text',
+    text: 'Non ho capito bene cosa intendi. Vuoi che generi un\'immagine o preferisci una risposta testuale?'
+  })
+}
+
+// ─── ROUTE PRINCIPALE ────────────────────────────────────
+export async function POST(req: NextRequest) {
+  try {
+    const { message, history = [] } = await req.json()
+    if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 })
+
+    const intent = await classifyIntent(message)
+
+    switch (intent) {
+      case 'IMAGE_GEN':
+        return handleImageGeneration(message)
+      case 'TEXT':
+        return handleTextChat(message, history)
+      default:
+        return handleClarification(message)
+    }
   } catch (error) {
     console.error('Chat API error:', error)
     return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
