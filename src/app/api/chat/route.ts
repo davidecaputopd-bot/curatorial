@@ -15,7 +15,7 @@ REGOLE:
 - Mai: autentico, storytelling, straordinario, percorso, viaggio, ecosistema
 - Mai liste infinite
 - Ogni tanto suggerisci qualcosa che lo avvicina alla versione di sé che vuole essere
-- Per immagini rispondi: [GENERA_IMMAGINE: descrizione dettagliata in inglese con stile lighting mood]`
+- Per immagini: prima scrivi una frase di commento creativo, poi metti il tag [GENERA_IMMAGINE: descrizione dettagliata in inglese con stile lighting mood composizione]`
 
 export async function POST(request: Request) {
   const { message, history } = await request.json()
@@ -46,16 +46,17 @@ export async function POST(request: Request) {
     }
 
     const data = await res.json()
-    const reply = data.choices?.[0]?.message?.content || 'Nessuna risposta.'
+    const reply = data.choices?.[0]?.message?.content || ''
 
     const match = reply.match(/\[GENERA_IMMAGINE:\s*(.+?)\]/)
     if (match) {
       const prompt = encodeURIComponent(match[1])
       const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&nologo=true&enhance=true`
-      return NextResponse.json({ reply: reply.replace(/\[GENERA_IMMAGINE:.+?\]/, '').trim(), imageUrl })
+      const cleanReply = reply.replace(/\[GENERA_IMMAGINE:.+?\]/, '').trim() || 'Ecco.'
+      return NextResponse.json({ reply: cleanReply, imageUrl })
     }
 
-    return NextResponse.json({ reply })
+    return NextResponse.json({ reply: reply || 'Nessuna risposta.' })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
