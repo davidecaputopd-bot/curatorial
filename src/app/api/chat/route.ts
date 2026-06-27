@@ -1,33 +1,34 @@
 import { NextResponse } from 'next/server'
 
-const SYSTEM = `Sei l'assistente creativo e strategico personale di Davide Caputo. Art director e graphic designer freelance, basato a Leverano (Salento). Ha lavorato con brand internazionali di moda e musica. Gestisce comunicazione per clienti locali mentre costruisce una carriera da creative director. Ama grafica, comunicazione, arte, moda, design, stampa 3D, arredamento, scenografia. Vuole diventare una figura dirigenziale nella comunicazione creativa e avere una sua attività. Ha fame autentica di crescere e imparare.
+const SYSTEM = `Sei un assistente creativo specializzato in: grafica, comunicazione visiva, art direction, moda, design editoriale, social media, branding, AI generativa, prompting, stampa 3D, arredamento, scenografia, marketing creativo.
 
-CLIENTI: ANventitre (vino naturale salentino, 5 vini: Etere Mare Fiamma Terra Aria, posizionamento silenzioso, Reels e Instagram), Exousia (consulenza formazione finanza agevolata, Carmiano LE, colori forest green cream coral).
-
-SISTEMA VISIVO: Bebas Neue, DM Mono, DM Sans Light, grain, Imperial Crimson #AF0E1E.
-
-REGOLE:
+COME RISPONDI:
 - Italiano sempre salvo richiesta
-- Diretto, niente intro né conclusioni retoriche
+- Diretto e immediatamente utilizzabile — niente intro né conclusioni
 - Copy e caption: scrivi subito senza spiegazioni
-- Hook Reels: 3 varianti (provocazione, domanda, dato)
+- Hook Reels: 3 varianti (provocazione, domanda, dato concreto)
 - Idee: 3 concrete non 10 vaghe
+- Prompt AI: ottimizzati, tecnici, pronti all'uso
 - Mai: autentico, storytelling, straordinario, percorso, viaggio, ecosistema
 - Mai liste infinite
-- Ogni tanto suggerisci qualcosa che lo avvicina alla versione di sé che vuole essere
-- Per immagini: prima scrivi una frase di commento creativo, poi metti il tag [GENERA_IMMAGINE: descrizione dettagliata in inglese con stile lighting mood composizione]`
+- Per immagini: una frase introduttiva, poi [GENERA_IMMAGINE: prompt dettagliato in inglese, stile fotografico, lighting, mood, composizione cinematografica]`
+
+function enhancePrompt(prompt: string): string {
+  return `${prompt}, editorial photography, cinematic lighting, high resolution, professional color grading, sharp focus, authentic mood, 8K quality`
+}
 
 export async function POST(request: Request) {
   const { message, history } = await request.json()
   if (!message) return NextResponse.json({ error: 'No message' }, { status: 400 })
 
-  const key = process.env.GROQ_API_KEY
-  if (!key) return NextResponse.json({ error: 'No key' }, { status: 500 })
+  const groqKey = process.env.GROQ_API_KEY
+  const hfToken = process.env.HF_TOKEN
+  if (!groqKey) return NextResponse.json({ error: 'No Groq key' }, { status: 500 })
 
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         max_tokens: 1024,
@@ -40,19 +41,38 @@ export async function POST(request: Request) {
       }),
     })
 
-    if (!res.ok) {
-      const err = await res.text()
-      return NextResponse.json({ error: err }, { status: 500 })
-    }
+    if (!chatRes.ok) return NextResponse.json({ error: await chatRes.text() }, { status: 500 })
 
-    const data = await res.json()
-    const reply = data.choices?.[0]?.message?.content || ''
+    const chatData = await chatRes.json()
+    const reply = chatData.choices?.[0]?.message?.content || ''
 
     const match = reply.match(/\[GENERA_IMMAGINE:\s*(.+?)\]/)
     if (match) {
-      const prompt = encodeURIComponent(match[1])
-      const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&nologo=true&enhance=true`
+      const enhanced = enhancePrompt(match[1])
       const cleanReply = reply.replace(/\[GENERA_IMMAGINE:.+?\]/, '').trim() || 'Ecco.'
+
+      if (hfToken) {
+        try {
+          const imgRes = await fetch(
+            'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev/v1/text-to-image',
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${hfToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                inputs: enhanced,
+                parameters: { width: 1024, height: 1024, num_inference_steps: 28, guidance_scale: 3.5 },
+              }),
+            }
+          )
+          if (imgRes.ok) {
+            const buffer = Buffer.from(await (await imgRes.blob()).arrayBuffer())
+            const imageUrl = `data:image/png;base64,${buffer.toString('base64')}`
+            return NextResponse.json({ reply: cleanReply, imageUrl })
+          }
+        } catch {}
+      }
+
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhanced)}?width=1024&height=1024&nologo=true&enhance=true&model=flux`
       return NextResponse.json({ reply: cleanReply, imageUrl })
     }
 
