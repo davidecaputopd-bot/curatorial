@@ -52,6 +52,16 @@ type Reference = {
   url?: string
 }
 
+type AIHealthResult = {
+  provider: string
+  label?: string
+  model: string
+  mode?: string
+  ok: boolean
+  latency_ms: number
+  error?: string
+}
+
 function messageId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -119,6 +129,8 @@ export default function AiPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [healthLoading, setHealthLoading] = useState(false)
+  const [healthResults, setHealthResults] = useState<AIHealthResult[] | null>(null)
 
   const referenceContext = useMemo(() => buildReferenceContext(reference), [reference])
   const selectedReference = useMemo(() => referenceSummary(reference), [reference])
@@ -295,6 +307,34 @@ export default function AiPage() {
     setMessages([initialMessage(reference)])
   }
 
+  async function testAIProviders() {
+    setHealthLoading(true)
+    setHealthResults(null)
+
+    try {
+      const response = await fetch('/api/ai/health', { method: 'POST' })
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.error || 'Health check failed')
+      setHealthResults([
+        ...(data.results || []),
+        ...(data.pollinations ? [data.pollinations] : []),
+      ])
+    } catch {
+      setHealthResults([
+        {
+          provider: 'grow-ai',
+          model: 'health-check',
+          ok: false,
+          latency_ms: 0,
+          error: 'Controllo non disponibile. Verifica la sessione e riprova.',
+        },
+      ])
+    } finally {
+      setHealthLoading(false)
+    }
+  }
+
   const quickActions = reference
     ? [
         'Crea un reel AN23 da questa reference',
@@ -324,13 +364,23 @@ export default function AiPage() {
               Dal brief alla produzione<span className="text-grow-yellow">.</span>
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={clear}
-            className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
-          >
-            Reset
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => void testAIProviders()}
+              disabled={healthLoading}
+              className="rounded-full bg-[#0F0F10] px-3 py-2 text-[10px] font-black uppercase tracking-tight text-white disabled:opacity-40"
+            >
+              {healthLoading ? 'Test…' : 'Test AI'}
+            </button>
+            <button
+              type="button"
+              onClick={clear}
+              className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
+            >
+              Reset
+            </button>
+          </div>
         </header>
 
         <section className="mb-5 grid grid-cols-3 overflow-hidden rounded-[1.4rem] border border-black/10 bg-white/70">
@@ -350,6 +400,54 @@ export default function AiPage() {
             </div>
           ))}
         </section>
+
+        {healthResults && (
+          <section className="mb-5 rounded-[1.4rem] bg-[#0F0F10] p-4 text-white">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em]">
+                Stato motori
+              </p>
+              <button
+                type="button"
+                onClick={() => setHealthResults(null)}
+                className="text-[10px] font-black uppercase text-white/40"
+              >
+                Chiudi
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {healthResults.map((result) => (
+                <div
+                  key={result.provider}
+                  className="flex items-start justify-between gap-3 rounded-xl bg-white/[0.07] px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase">
+                      {result.label || result.provider}
+                    </p>
+                    <p className="mt-0.5 truncate text-[10px] text-white/40">
+                      {result.model} · {result.latency_ms} ms
+                    </p>
+                    {result.error && (
+                      <p className="mt-1 text-[10px] leading-relaxed text-red-300/80">
+                        {result.error}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${
+                      result.ok
+                        ? 'bg-grow-yellow text-black'
+                        : 'bg-red-400/15 text-red-200'
+                    }`}
+                  >
+                    {result.ok ? 'Online' : 'Errore'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {reference && (
           <section className="mb-5 overflow-hidden rounded-[2rem] border border-black/10 bg-white/70 shadow-sm">

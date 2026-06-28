@@ -22,10 +22,8 @@ function hasKey(value: string | undefined) {
   return Boolean(value && value.trim().length > 0)
 }
 
-export function getAIProviders(taskType: AITaskType = 'text'): AIProviderConfig[] {
-  const mode = process.env.AI_ROUTER_MODE || 'free-first'
-
-  const providers: AIProviderConfig[] = [
+function configuredProviders(): AIProviderConfig[] {
+  return [
     {
       id: 'gemini',
       label: 'Gemini',
@@ -81,10 +79,21 @@ export function getAIProviders(taskType: AITaskType = 'text'): AIProviderConfig[
       taskTypes: ['text', 'prompt', 'code', 'strategy'],
     },
   ]
+}
 
-  return providers
+export function getAllConfiguredAIProviders(
+  taskType: AITaskType = 'text'
+): AIProviderConfig[] {
+  return configuredProviders()
     .filter((provider) => provider.enabled)
     .filter((provider) => provider.taskTypes.includes(taskType))
+    .sort((a, b) => a.priority - b.priority)
+}
+
+export function getAIProviders(taskType: AITaskType = 'text'): AIProviderConfig[] {
+  const mode = process.env.AI_ROUTER_MODE || 'free-first'
+
+  return getAllConfiguredAIProviders(taskType)
     .filter((provider) => {
       if (mode === 'free-only') return provider.mode === 'free'
       if (mode === 'free-first') return provider.mode === 'free' || provider.mode === 'cheap'

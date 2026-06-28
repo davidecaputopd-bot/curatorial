@@ -13,22 +13,50 @@ export type AIRouterResult = {
   providerLabel: string
   model: string
   mode: string
-  attempts: {
-    provider: string
-    model: string
-    ok: boolean
-    error?: string
-    status?: number
-  }[]
+  attempts: ProviderAttempt[]
 }
 
-type RouterInput = {
+export type ProviderAttempt = {
+  provider: string
+  model: string
+  ok: boolean
+  error?: string
+  status?: number
+  retryAfter?: number
+  remainingRequests?: number
+  remainingTokens?: number
+}
+
+export type RouterInput = {
   system: string
   message: string
   history?: AIChatMessage[]
   temperature?: number
   maxTokens?: number
   taskType?: AITaskType
+  providerId?: string
+  bypassCooldown?: boolean
+}
+
+const PROVIDER_COOLDOWN_MS = 3 * 60 * 1000
+const providerCooldowns = new Map<string, number>()
+
+class ProviderHttpError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+type OpenAIMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+type OpenAIChatResponse = {
+  choices?: { message?: { content?: string } }[]
 }
 
 function cleanError(error: unknown) {
@@ -36,7 +64,11 @@ function cleanError(error: unknown) {
   return String(error).slice(0, 700)
 }
 
-function openAiMessages(system: string, history: AIChatMessage[], message: string) {
+function openAiMessages(
+  system: string,
+  history: AIChatMessage[],
+  message: string
+): OpenAIMessage[] {
   return [
     { role: 'system', content: system },
     ...history.slice(-10).map((item) => ({
@@ -45,6 +77,35 @@ function openAiMessages(system: string, history: AIChatMessage[], message: strin
     })),
     { role: 'user', content: message },
   ]
+}
+
+function errorStatus(error: unknown) {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'status' in error &&
+    typeof error.status === 'number'
+  ) {
+    return error.status
+  }
+  return undefined
+}
+
+function geminiHistory(history: AIChatMessage[]) {
+  const normalized: AIChatMessage[] = []
+
+  for (const item of history.slice(-10)) {
+    if (!normalized.length && item.role !== 'user') continue
+    const previous = normalized.at(-1)
+
+    if (previous?.role === item.role) {
+      previous.content = `${previous.content}\n\n${item.content}`
+    } else {
+      normalized.push({ role: item.role, content: item.content })
+    }
+  }
+
+  return normalized
 }
 
 function isQuotaLikeError(error: unknown) {
@@ -67,10 +128,14 @@ async function callGemini(input: RouterInput, provider: AIProviderConfig) {
   const model = gemini.getGenerativeModel({
     model: provider.model,
     systemInstruction: input.system,
+    generationConfig: {
+      temperature: input.temperature ?? 0.75,
+      maxOutputTokens: input.maxTokens || 1200,
+    },
   })
 
   const chat = model.startChat({
-    history: (input.history || []).slice(-10).map((item) => ({
+    history: geminiHistory(input.history || []).map((item) => ({
       role: item.role === 'user' ? 'user' : 'model',
       parts: [{ text: item.content }],
     })),
@@ -89,7 +154,7 @@ async function callGroq(input: RouterInput, provider: AIProviderConfig) {
 
   const completion = await groq.chat.completions.create({
     model: provider.model,
-    messages: openAiMessages(input.system, input.history || [], input.message) as any,
+    messages: openAiMessages(input.system, input.history || [], input.message),
     max_tokens: input.maxTokens || 1200,
     temperature: input.temperature ?? 0.75,
   })
@@ -118,12 +183,13 @@ async function callOpenRouter(input: RouterInput, provider: AIProviderConfig) {
     }),
   })
 
-  const data = await res.json().catch(() => null)
+  const data = (await res.json().catch(() => null)) as OpenAIChatResponse | null
 
   if (!res.ok) {
-    const error = new Error(`OpenRouter ${res.status}: ${JSON.stringify(data).slice(0, 500)}`)
-    ;(error as any).status = res.status
-    throw error
+    throw new ProviderHttpError(
+      `OpenRouter ${res.status}: ${JSON.stringify(data).slice(0, 500)}`,
+      res.status
+    )
   }
 
   const text = data?.choices?.[0]?.message?.content?.trim()
@@ -148,12 +214,13 @@ async function callTogether(input: RouterInput, provider: AIProviderConfig) {
     }),
   })
 
-  const data = await res.json().catch(() => null)
+  const data = (await res.json().catch(() => null)) as OpenAIChatResponse | null
 
   if (!res.ok) {
-    const error = new Error(`Together ${res.status}: ${JSON.stringify(data).slice(0, 500)}`)
-    ;(error as any).status = res.status
-    throw error
+    throw new ProviderHttpError(
+      `Together ${res.status}: ${JSON.stringify(data).slice(0, 500)}`,
+      res.status
+    )
   }
 
   const text = data?.choices?.[0]?.message?.content?.trim()
@@ -174,7 +241,9 @@ async function callProvider(input: RouterInput, provider: AIProviderConfig) {
 
 export async function routeAI(input: RouterInput): Promise<AIRouterResult> {
   const taskType = input.taskType || 'text'
-  const providers = getAIProviders(taskType)
+  const providers = getAIProviders(taskType).filter(
+    (provider) => !input.providerId || provider.id === input.providerId
+  )
 
   const attempts: AIRouterResult['attempts'] = []
 
@@ -183,6 +252,21 @@ export async function routeAI(input: RouterInput): Promise<AIRouterResult> {
   }
 
   for (const provider of providers) {
+    const cooldownUntil = providerCooldowns.get(provider.id) || 0
+    if (!input.bypassCooldown && cooldownUntil > Date.now()) {
+      attempts.push({
+        provider: provider.id,
+        model: provider.model,
+        ok: false,
+        status: 429,
+        retryAfter: Math.ceil((cooldownUntil - Date.now()) / 1000),
+        error: 'Provider in cooldown after rate limit',
+      })
+      continue
+    }
+
+    if (cooldownUntil) providerCooldowns.delete(provider.id)
+
     try {
       const reply = await callProvider(input, provider)
 
@@ -201,7 +285,12 @@ export async function routeAI(input: RouterInput): Promise<AIRouterResult> {
         attempts,
       }
     } catch (error) {
-      const status = (error as any)?.status
+      const status = errorStatus(error)
+      const quotaLike = isQuotaLikeError(error)
+
+      if (quotaLike || status === 429) {
+        providerCooldowns.set(provider.id, Date.now() + PROVIDER_COOLDOWN_MS)
+      }
 
       attempts.push({
         provider: provider.id,
@@ -214,7 +303,7 @@ export async function routeAI(input: RouterInput): Promise<AIRouterResult> {
       console.warn('[AI ROUTER FALLBACK]', {
         provider: provider.id,
         model: provider.model,
-        quotaLike: isQuotaLikeError(error),
+        quotaLike,
         error: cleanError(error),
       })
     }
