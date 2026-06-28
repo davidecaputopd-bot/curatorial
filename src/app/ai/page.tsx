@@ -50,21 +50,10 @@ export default function AIPage() {
     setHistoryLoaded(true)
   }
 
-  const saveMessage = async (msg: Omit<Message, 'imageLoading'>) => {
-    try {
-      await fetch('/api/chat-history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: msg.role, content: msg.content, imageUrl: msg.imageUrl }),
-      })
-    } catch {}
-  }
-
   const send = async (text: string) => {
     if (!text.trim() || loading) return
     const userMsg: Message = { role: 'user', content: text }
     setMessages(prev => [...prev, userMsg])
-    saveMessage(userMsg)
     setInput('')
     setLoading(true)
 
@@ -83,7 +72,6 @@ export default function AIPage() {
           imageLoading: true,
         }
         setMessages(prev => [...prev, assistantMsg])
-        saveMessage({ role: 'assistant', content: data.reply || 'Ecco.', imageUrl: data.imageUrl })
 
         const img = new Image()
         img.onload = () => {
@@ -100,7 +88,6 @@ export default function AIPage() {
       } else {
         const assistantMsg: Message = { role: 'assistant', content: data.reply || 'Nessuna risposta.' }
         setMessages(prev => [...prev, assistantMsg])
-        saveMessage(assistantMsg)
       }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Errore. Riprova.' }])
