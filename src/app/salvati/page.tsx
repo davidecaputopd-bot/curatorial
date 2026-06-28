@@ -33,7 +33,7 @@ export default function SalvatiPage() {
   useEffect(() => {
     const fetch_ = async () => {
       try {
-        const res = await fetch('/api/feed?saved=true&limit=50')
+        const res = await fetch('/api/saved')
         const data = await res.json()
         setSaved(data.items || [])
       } catch {
@@ -48,9 +48,9 @@ export default function SalvatiPage() {
   const remove = (id: string) => {
     setSaved(prev => prev.filter(i => i.id !== id))
     fetch('/api/interact', {
-      method: 'POST',
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_id: id, action: 'unsave' }),
+      body: JSON.stringify({ content_id: id }),
     })
   }
 
