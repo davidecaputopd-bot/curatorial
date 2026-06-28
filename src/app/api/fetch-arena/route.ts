@@ -1,65 +1,84 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
-const CHANNELS = [
-  { slug: 'typography-references', cat: 'typography' },
-  { slug: 'fashion-references', cat: 'fashion' },
-  { slug: 'editorial-design', cat: 'branding' },
-  { slug: 'graphic-design-inspiration', cat: 'branding' },
-  { slug: 'brutalist-architecture', cat: 'interior_design' },
-  { slug: 'art-direction', cat: 'branding' },
-  { slug: 'poster-design', cat: 'branding' },
-  { slug: 'photography-references', cat: 'art' },
-  { slug: 'fashion-editorial', cat: 'fashion' },
-  { slug: 'minimal-design', cat: 'design' },
-  { slug: 'packaging-design', cat: 'branding' },
-  { slug: 'contemporary-art', cat: 'art' },
-  { slug: 'web-design-inspiration', cat: 'web' },
-  { slug: 'color-palette', cat: 'design' },
+const SEARCHES = [
+  { q: 'fashion editorial', cat: 'fashion' },
+  { q: 'typography poster', cat: 'typography' },
+  { q: 'graphic design', cat: 'branding' },
+  { q: 'interior architecture', cat: 'interior_design' },
+  { q: 'art direction', cat: 'branding' },
+  { q: 'photography', cat: 'art' },
+  { q: 'packaging design', cat: 'branding' },
+  { q: 'minimal design', cat: 'design' },
+  { q: 'contemporary art', cat: 'art' },
+  { q: 'web design', cat: 'web' },
+  { q: 'color palette', cat: 'design' },
+  { q: 'brutalist', cat: 'interior_design' },
 ]
 
 export async function GET() {
   let totalSaved = 0
 
-  for (const channel of CHANNELS) {
+  for (const search of SEARCHES) {
     try {
-      const res = await fetch(
-        'https://api.are.na/v2/channels/' + channel.slug + '/contents?per=20&page=1',
+      // Cerca canali pubblici per keyword
+      const searchRes = await fetch(
+        'https://api.are.na/v2/search/channels?q=' + encodeURIComponent(search.q) + '&per=5',
         { headers: { 'Content-Type': 'application/json' } }
       )
-      if (!res.ok) continue
+      if (!searchRes.ok) continue
 
-      const data = await res.json()
-      const blocks = (data.contents || []).filter((b: any) => b.class === 'Image' && b.image)
+      const searchData = await searchRes.json()
+      const channels = searchData.channels?.slice(0, 3) || []
 
-      for (const block of blocks) {
-        const imageUrl = block.image?.display?.url || block.image?.large?.url || block.image?.original?.url
-        if (!imageUrl) continue
+      for (const channel of channels) {
+        try {
+          const contRes = await fetch(
+            'https://api.are.na/v2/channels/' + channel.slug + '/contents?per=15&page=1',
+            { headers: { 'Content-Type': 'application/json' } }
+          )
+          if (!contRes.ok) continue
 
-        const { error } = await supabase.from('content_items').upsert({
-          source_id: null,
-          title: block.title || block.description || channel.slug,
-          url: 'https://www.are.na/block/' + block.id,
-          image_url: imageUrl,
-          summary: block.description || null,
-          author: block.user?.username || null,
-          artist_name: block.user?.username || null,
-          published_at: block.created_at || new Date().toISOString(),
-          category: channel.cat,
-          type: 'image',
-          platform: 'arena',
-          dominant_color: null,
-          width: block.image?.original?.width || null,
-          height: block.image?.original?.height || null,
-          read_time_minutes: null,
-        }, { onConflict: 'url' })
+          const contData = await contRes.json()
+          const blocks = (contData.contents || []).filter(
+            (b: any) => b.class === 'Image' && b.image
+          )
 
-        if (!error) totalSaved++
+          for (const block of blocks) {
+            const imageUrl =
+              block.image?.display?.url ||
+              block.image?.large?.url ||
+              block.image?.original?.url
+            if (!imageUrl) continue
+
+            const { error } = await supabase.from('content_items').upsert({
+              source_id: null,
+              title: block.title || block.description || channel.title || search.q,
+              url: 'https://www.are.na/block/' + block.id,
+              image_url: imageUrl,
+              summary: block.description || null,
+              author: block.user?.username || null,
+              artist_name: block.user?.username || null,
+              published_at: block.created_at || new Date().toISOString(),
+              category: search.cat,
+              type: 'image',
+              platform: 'arena',
+              dominant_color: null,
+              width: block.image?.original?.width || null,
+              height: block.image?.original?.height || null,
+              read_time_minutes: null,
+            }, { onConflict: 'url' })
+
+            if (!error) totalSaved++
+          }
+
+          await new Promise(r => setTimeout(r, 400))
+        } catch {}
       }
 
-      await new Promise(r => setTimeout(r, 500))
+      await new Promise(r => setTimeout(r, 600))
     } catch (err) {
-      console.error('Errore canale ' + channel.slug)
+      console.error('Errore search:', search.q)
     }
   }
 
