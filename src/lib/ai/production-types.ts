@@ -45,6 +45,7 @@ export const PRODUCTION_ENGINES = [
   'groq',
   'openrouter-free',
   'openrouter-cheap',
+  'pollinations',
   'comfyui',
   'ltx-local',
   'higgsfield',

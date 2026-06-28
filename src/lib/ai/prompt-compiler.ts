@@ -71,6 +71,37 @@ function compileForEngine(
 ): PromptParts {
   const { project, assetType, brief, reference, format, rules } = commonContext(input)
 
+  if (engine === 'pollinations') {
+    return {
+      title: 'GROW FLUX · generazione interna',
+      prompt: `
+Create a client-ready ${assetType} for ${project}, formatted as ${format}.
+
+SUBJECT AND OBJECTIVE
+${brief}
+
+REFERENCE AND CONSTRAINTS
+${reference}
+
+ART DIRECTION
+Premium editorial composition, intentional negative space, realistic materials, controlled natural light, coherent perspective, refined Mediterranean color palette, tactile detail, clean commercial finish. Preserve the subject proportions and leave protected space for original brand assets.
+
+PROJECT RULES
+${rules}
+`.trim(),
+      negative_prompt:
+        'invented logo, fake label, unreadable text, warped typography, deformed product, duplicate objects, plastic materials, generic stock photo, clutter, watermark, low resolution, AI artifacts',
+      workflow_note:
+        'GROW esegue questo prompt internamente con FLUX. Verifica sempre testo, logo ed etichette prima dell’uso cliente.',
+      checklist: [
+        'Composizione specifica e non generica.',
+        'Prodotto e materiali credibili.',
+        'Nessun marchio o testo inventato usato come definitivo.',
+        'Output adatto al formato richiesto.',
+      ],
+    }
+  }
+
   if (engine === 'higgsfield') {
     return {
       title: 'Higgsfield · social video',

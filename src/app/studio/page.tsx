@@ -67,11 +67,11 @@ const QUICK_ACTIONS: {
 ]
 
 const MODES = [
-  { label: 'Free/API', state: 'Eseguibile ora' },
+  { label: 'GROW FLUX', state: 'Immagini interne' },
+  { label: 'GROW AI', state: 'Testo interno' },
   { label: 'Local worker', state: 'Richiede il Mac' },
-  { label: 'Manual tool', state: 'Tool esterno' },
-  { label: 'Cheap API', state: 'Future-ready' },
-  { label: 'Premium', state: 'Conferma costo' },
+  { label: 'Job', state: 'Salvataggio locale' },
+  { label: 'Premium API', state: 'Solo con conferma' },
 ]
 
 const INITIAL_BRIEF = QUICK_ACTIONS[0].defaultBrief
@@ -105,7 +105,7 @@ function readPlanFromBrowser() {
 
 function accessLabel(prompt: CompiledPrompt) {
   if (prompt.access === 'local') return 'Richiede worker locale sul Mac'
-  if (prompt.access === 'manual') return 'Richiede tool esterno'
+  if (prompt.access === 'manual') return 'Non disponibile dentro GROW'
   return 'GROW può eseguirlo direttamente'
 }
 
@@ -114,6 +114,14 @@ function costLabel(plan: ProductionPlan) {
   if (plan.cost_mode === 'free-tier') return 'Free-tier'
   if (plan.cost_mode === 'cheap') return 'API economica'
   return 'Potrebbe costare'
+}
+
+type GeneratedOutput = {
+  loading?: boolean
+  type?: 'image' | 'text'
+  imageUrl?: string
+  text?: string
+  error?: string
 }
 
 export default function StudioPage() {
@@ -128,6 +136,9 @@ export default function StudioPage() {
   const [saving, setSaving] = useState<CompiledPrompt['engine'] | null>(null)
   const [localJobCount, setLocalJobCount] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
+  const [generated, setGenerated] = useState<
+    Partial<Record<CompiledPrompt['engine'], GeneratedOutput>>
+  >({})
 
   useEffect(() => {
     const plan = readPlanFromBrowser()
@@ -304,6 +315,60 @@ export default function StudioPage() {
     }
   }
 
+  function canRunInsideGrow(prompt: CompiledPrompt) {
+    if (!activePlan) return false
+    if (activePlan.asset_type === 'image' || activePlan.asset_type === 'mockup') {
+      return prompt.engine === 'pollinations'
+    }
+    if (activePlan.asset_type === 'video') return false
+    return prompt.access === 'api'
+  }
+
+  async function runInsideGrow(prompt: CompiledPrompt) {
+    if (!activePlan || !canRunInsideGrow(prompt)) return
+    setGenerated((current) => ({
+      ...current,
+      [prompt.engine]: { loading: true },
+    }))
+
+    try {
+      const response = await fetch('/api/studio/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_type: activePlan.asset_type,
+          project,
+          format,
+          prompt: prompt.prompt,
+          negative_prompt: prompt.negative_prompt,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Generazione non disponibile')
+      }
+
+      setGenerated((current) => ({
+        ...current,
+        [prompt.engine]:
+          data.type === 'image'
+            ? { type: 'image', imageUrl: data.imageUrl }
+            : { type: 'text', text: data.output },
+      }))
+    } catch (error) {
+      setGenerated((current) => ({
+        ...current,
+        [prompt.engine]: {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Generazione interna non disponibile',
+        },
+      }))
+    }
+  }
+
   return (
     <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-8 text-grow-text">
       <section className="mx-auto max-w-5xl">
@@ -316,8 +381,8 @@ export default function StudioPage() {
           </h1>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-grow-muted">
             Trasforma idee, reference e prompt in asset producibili. GROW prepara
-            il percorso; tu vedi subito cosa può eseguire, cosa richiede il Mac e
-            cosa avviene in un tool esterno.
+            il percorso ed esegue immagini e contenuti senza farti uscire
+            dall’app. Il video resta bloccato finché il worker locale non è pronto.
           </p>
           <p className="mt-3 text-[10px] font-black uppercase tracking-[0.14em] text-grow-muted">
             {localJobCount} job locali salvati
@@ -602,6 +667,36 @@ export default function StudioPage() {
                     </p>
                   )}
 
+                  {generated[prompt.engine]?.loading && (
+                    <div className="mt-3 rounded-xl bg-grow-yellow p-3 text-xs font-black text-black">
+                      GROW sta producendo l’output…
+                    </div>
+                  )}
+
+                  {generated[prompt.engine]?.imageUrl && (
+                    <div className="mt-3 overflow-hidden rounded-[1.2rem] bg-white/10">
+                      {/* Generated URLs are dynamic and cannot use a fixed Next Image allowlist. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={generated[prompt.engine]?.imageUrl}
+                        alt={`Output ${prompt.title}`}
+                        className="h-auto w-full"
+                      />
+                    </div>
+                  )}
+
+                  {generated[prompt.engine]?.text && (
+                    <pre className="mt-3 whitespace-pre-wrap rounded-[1.2rem] bg-grow-yellow p-4 font-sans text-xs leading-relaxed text-black">
+                      {generated[prompt.engine]?.text}
+                    </pre>
+                  )}
+
+                  {generated[prompt.engine]?.error && (
+                    <p className="mt-3 rounded-xl bg-red-400/10 p-3 text-xs leading-relaxed text-red-200">
+                      {generated[prompt.engine]?.error}
+                    </p>
+                  )}
+
                   <div className="mt-4">
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
                       Checklist qualità
@@ -617,23 +712,31 @@ export default function StudioPage() {
                   </div>
 
                   <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                    {canRunInsideGrow(prompt) ? (
+                      <button
+                        type="button"
+                        onClick={() => void runInsideGrow(prompt)}
+                        disabled={generated[prompt.engine]?.loading}
+                        className="rounded-full bg-grow-yellow px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-black disabled:opacity-40"
+                      >
+                        {generated[prompt.engine]?.loading
+                          ? 'Produzione…'
+                          : 'Esegui in GROW'}
+                      </button>
+                    ) : (
+                      <span className="rounded-full border border-white/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-white/40">
+                        {prompt.access === 'local'
+                          ? 'Worker locale non configurato'
+                          : 'Non eseguibile in GROW'}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => void copyPrompt(prompt)}
-                      className="rounded-full bg-grow-yellow px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-black"
+                      className="rounded-full border border-white/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-white"
                     >
                       {copied === prompt.engine ? 'Copiato' : prompt.copy_button_label}
                     </button>
-                    {prompt.url && (
-                      <a
-                        href={prompt.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-full border border-white/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-white"
-                      >
-                        {prompt.open_button_label}
-                      </a>
-                    )}
                     <button
                       type="button"
                       onClick={() => void saveJob(prompt)}

@@ -3,14 +3,12 @@ import {
   PRODUCTION_ASSET_TYPES,
   PRODUCTION_ENGINES,
   PRODUCTION_INTENTS,
-  PRODUCTION_MODES,
   PRODUCTION_PROJECTS,
   type LocalWorkerStatus,
   type ProductionAssetType,
   type ProductionCostMode,
   type ProductionEngine,
   type ProductionIntent,
-  type ProductionMode,
   type ProductionPlan,
   type ProductionProject,
 } from './production-types'
@@ -226,34 +224,34 @@ export function buildFallbackProductionPlan(
       title: `Video ${project}`,
       project,
       asset_type: 'video',
-      production_mode: 'manual_tool',
-      recommended_engine: 'higgsfield',
-      alternatives: ['luma', 'ltx-local', 'runway'],
+      production_mode: 'local_worker',
+      recommended_engine: 'ltx-local',
+      alternatives: ['fal', 'replicate'],
       needs_reference: !hasReference,
       should_create_job: true,
       should_compile_prompts: true,
       should_compile_workflow: false,
       should_use_archive: true,
       can_execute_now: false,
-      requires_manual_tool: true,
-      requires_local_worker: false,
+      requires_manual_tool: false,
+      requires_local_worker: true,
       local_worker_status: 'not_configured',
-      cost_mode: 'premium',
+      cost_mode: 'free',
       confidence: 0.9,
       risk_notes: [
-        'Higgsfield è un tool esterno credit-based: GROW prepara il lavoro ma non esegue la generazione.',
+        'LTX richiede il worker locale: finché non è collegato GROW non può eseguire il video.',
         'Logo, etichetta e soggetto possono deformarsi durante la generazione video.',
-        'Per test gratuiti usare LTX locale quando il worker sarà configurato.',
+        'Le API video future richiedono configurazione e conferma del costo.',
       ],
       production_path: [
         'Seleziona reference di soggetto, bottiglia e logo.',
-        'Compila il prompt Higgsfield in formato 9:16.',
-        'Genera la clip nel tool esterno.',
+        'Compila un prompt LTX semplice in formato 9:16.',
+        'Invia il job al worker locale quando configurato.',
         'Controlla stabilità del soggetto, logo ed etichetta.',
         'Importa l’output in Archivio.',
       ],
-      prompts_to_compile: ['higgsfield', 'luma', 'ltx-local', 'runway'],
-      workflow_targets: ['social-video-9x16', 'image-to-video', 'ltx-local-test'],
+      prompts_to_compile: ['ltx-local'],
+      workflow_targets: ['ltx-local-test', 'image-to-video'],
       checklist: [
         'Soggetto coerente per tutta la clip?',
         'Logo, etichetta e testo integri?',
@@ -263,8 +261,8 @@ export function buildFallbackProductionPlan(
       ],
       next_actions: [
         hasReference ? 'Conferma la reference selezionata.' : 'Scegli una reference dall’Archivio.',
-        'Compila i prompt per i motori consigliati.',
-        'Crea il job solo dopo conferma.',
+        'Compila il prompt LTX.',
+        'Configura il worker locale prima di eseguire.',
       ],
     }
   }
@@ -282,11 +280,9 @@ export function buildFallbackProductionPlan(
       title: `${assetType === 'mockup' ? 'Mockup' : assetType === 'workflow' ? 'Workflow' : 'Immagine'} ${project}`,
       project,
       asset_type: assetType,
-      production_mode: 'local_worker',
-      recommended_engine: 'comfyui',
-      alternatives: realIdentity
-        ? ['photoshop', 'recraft', 'ideogram']
-        : ['recraft', 'ideogram', 'photoshop'],
+      production_mode: 'api_free',
+      recommended_engine: 'pollinations',
+      alternatives: ['comfyui'],
       needs_reference: !hasReference,
       should_create_job: true,
       should_compile_prompts: true,
@@ -294,26 +290,26 @@ export function buildFallbackProductionPlan(
       should_use_archive: true,
       can_execute_now: false,
       requires_manual_tool: false,
-      requires_local_worker: true,
+      requires_local_worker: false,
       local_worker_status: 'not_configured',
       cost_mode: 'free',
       confidence: 0.88,
       risk_notes: [
-        'ComfyUI richiede un worker locale: Vercel non può eseguire modelli sul Mac.',
+        'GROW FLUX può generare subito il visual, ma non garantisce marchi o testo fedeli.',
         realIdentity
           ? 'L’etichetta o il logo reale non vanno reinterpretati: usare compositing/inpainting controllato e verifica manuale.'
           : 'Testo, logo ed etichetta richiedono comunque verifica manuale.',
       ],
       production_path: [
         'Seleziona reference, asset originali e vincoli.',
-        'Scegli un workflow ComfyUI: txt2img, img2img, inpainting, ControlNet o product mockup.',
-        'Compila prompt positivo, negativo e parametri.',
-        'Esegui sul worker locale quando configurato.',
-        'Rifinisci logo ed etichetta in Photoshop se necessario.',
+        'Compila un prompt FLUX con vincoli e negative prompt.',
+        'Genera il visual direttamente in GROW.',
+        'Controlla identità, testo, logo ed etichetta.',
+        'Sostituisci gli elementi di brand con gli asset originali prima dell’uso cliente.',
         'Salva output, prompt e valutazione in Archivio.',
       ],
-      prompts_to_compile: ['comfyui', 'recraft', 'ideogram', 'photoshop'],
-      workflow_targets: ['txt2img', 'img2img', 'inpainting', 'controlnet', 'product-mockup'],
+      prompts_to_compile: ['pollinations', 'comfyui'],
+      workflow_targets: ['grow-flux', 'img2img', 'inpainting', 'product-mockup'],
       checklist: [
         'Reference rispettata?',
         'Logo ed etichetta non reinterpretati?',
@@ -323,8 +319,8 @@ export function buildFallbackProductionPlan(
       ],
       next_actions: [
         hasReference ? 'Conferma gli asset originali.' : 'Seleziona reference e file originali.',
-        'Compila prompt e workflow.',
-        'Configura il worker locale oppure usa Photoshop/Recraft manualmente.',
+        'Compila il prompt FLUX.',
+        'Genera in GROW e valuta il risultato.',
       ],
     }
   }
@@ -340,6 +336,8 @@ Trasforma la richiesta in un piano operativo strutturato. Non sei una chat gener
 IDENTITÀ E VINCOLI STABILI
 - Distingui sempre API eseguibile, tool manuale e worker locale.
 - Non promettere un’esecuzione che GROW non può fare ora.
+- Non scegliere tool manuali esterni come motore principale.
+- Per immagini eseguibili ora preferisci pollinations; per video preferisci ltx-local e dichiara il worker non configurato.
 - Preferisci free/local quando il risultato resta professionale.
 - Proponi premium solo quando serve e richiedi conferma prima di costi.
 - Non proporre account multipli, bypass, abuso di trial o scraping di tool chiusi.
