@@ -49,7 +49,7 @@ function getCardSize(idx: number, isSerendipity: boolean): string {
   return pattern[idx % pattern.length]
 }
 
-function timeAgo(date) {
+function timeAgo(date: string): string {
   const hours = Math.floor((Date.now() - new Date(date).getTime()) / 3600000)
   if (hours < 1) return 'Adesso'
   if (hours < 24) return hours + 'h fa'
