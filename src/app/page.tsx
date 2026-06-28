@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
+import SaveHeart from '@/components/SaveHeart'
 
 const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
 
@@ -45,7 +46,7 @@ function SafeImage({ src, alt, className }: { src: string; alt: string; classNam
   )
 }
 
-function VisualCard({ item, idx }: { item: any; idx: number }) {
+function VisualCard({ item, idx, saved }: { item: any; idx: number; saved: boolean }) {
   const imgSrc = item.image_url || placeholders[item.category as string] || placeholders.design
   const href = item.url === '#' ? undefined : item.url
   const tall = idx % 5 === 0 || idx % 9 === 0 || (item.height || 0) > (item.width || 0)
@@ -58,6 +59,8 @@ function VisualCard({ item, idx }: { item: any; idx: number }) {
         rel="noopener noreferrer"
         className="group relative block h-full overflow-hidden rounded-[1.35rem] bg-grow-soft"
       >
+        <SaveHeart itemId={item.id} initialSaved={saved} />
+
         <SafeImage
           src={imgSrc}
           alt={item.title || 'Reference'}
@@ -86,6 +89,7 @@ export default function Home() {
   const [active, setActive] = useState<string | null>(null)
   const [images, setImages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
 
   const load = async (cat: string | null) => {
     setActive(cat)
@@ -102,6 +106,13 @@ export default function Home() {
 
   useEffect(() => {
     load(null)
+
+    fetch('/api/saved')
+      .then((r) => r.json())
+      .then((data) => {
+        setSavedIds(new Set((data.items || []).map((item: any) => item.id)))
+      })
+      .catch(() => setSavedIds(new Set()))
   }, [])
 
   return (
@@ -213,7 +224,7 @@ export default function Home() {
           ) : (
             <div className="grid auto-rows-[118px] grid-cols-3 gap-2">
               {images.map((item, idx) => (
-                <VisualCard key={item.id} item={item} idx={idx} />
+                <VisualCard key={item.id} item={item} idx={idx} saved={savedIds.has(item.id)} />
               ))}
             </div>
           )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
+import SaveHeart from '@/components/SaveHeart'
 
 const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
 
@@ -68,9 +69,11 @@ function SafeImage({ src, alt, className }: { src: string; alt: string; classNam
 
 function ImageCard({
   item,
+  saved,
   onDwell,
 }: {
   item: any
+  saved: boolean
   onDwell: (id: string, seconds: number) => void
 }) {
   const t = useRef(0)
@@ -98,6 +101,8 @@ function ImageCard({
       onTouchStart={enter}
       onTouchEnd={leave}
     >
+      <SaveHeart itemId={item.id} initialSaved={saved} />
+
       <SafeImage
         src={imgSrc}
         alt={item.title || 'Reference'}
@@ -137,6 +142,7 @@ export default function ScopriPage() {
   const [active, setActive] = useState<string | null>(null)
   const [images, setImages] = useState<any[]>([])
   const [loadingImages, setLoadingImages] = useState(true)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
 
   const load = async (cat: string | null) => {
     setActive(cat)
@@ -153,6 +159,13 @@ export default function ScopriPage() {
 
   useEffect(() => {
     load(null)
+
+    fetch('/api/saved')
+      .then((r) => r.json())
+      .then((data) => {
+        setSavedIds(new Set((data.items || []).map((item: any) => item.id)))
+      })
+      .catch(() => setSavedIds(new Set()))
   }, [])
 
   const handleDwell = async (itemId: string, seconds: number) => {
@@ -227,7 +240,7 @@ export default function ScopriPage() {
 
               return (
                 <div key={item.id} className={isTall ? 'row-span-2' : 'row-span-1'}>
-                  <ImageCard item={item} onDwell={handleDwell} />
+                  <ImageCard item={item} saved={savedIds.has(item.id)} onDwell={handleDwell} />
                 </div>
               )
             })}

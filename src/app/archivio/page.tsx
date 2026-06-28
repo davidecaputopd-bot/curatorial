@@ -1,61 +1,143 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 
-const font = 'Inter, system-ui, sans-serif'
+const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
 
-const collections = [
-  {
-    name: 'AN23',
-    meta: 'vino, mare, shooting, reel',
-    image: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=900&q=80',
-  },
-  {
-    name: 'Exousia',
-    meta: 'consulenza, Salento, impresa',
-    image: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900&q=80',
-  },
-  {
-    name: 'Cantina Don Carlo',
-    meta: 'etichette, mockup, packaging',
-    image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=900&q=80',
-  },
-  {
-    name: 'Prompt / reference',
-    meta: 'AI, immagini, composizioni',
-    image: 'https://images.unsplash.com/photo-1542435503-956c469947f6?w=900&q=80',
-  },
-]
+const placeholders: Record<string, string> = {
+  branding: 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=900&q=80',
+  typography: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=900&q=80',
+  interior_design: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&q=80',
+  fashion: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&q=80',
+  web: 'https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?w=900&q=80',
+  ai: 'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=900&q=80',
+  art: 'https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=900&q=80',
+  social_design: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=900&q=80',
+  design: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=900&q=80',
+  lifestyle: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=900&q=80',
+}
 
 export default function ArchivioPage() {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = async () => {
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/saved')
+      const data = await res.json()
+      setItems(data.items || [])
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const remove = async (id: string) => {
+    setItems((prev) => prev.filter((item) => item.id !== id))
+
+    try {
+      await fetch('/api/interact', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_id: id, itemId: id }),
+      })
+    } catch {}
+  }
+
   return (
-    <main className="min-h-screen bg-grow-bg px-5 pb-32 pt-8 text-grow-text" style={{ fontFamily: font }}>
-      <section className="mx-auto max-w-md">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-grow-muted">GROW Archivio</p>
+    <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-10 text-grow-text" style={{ fontFamily: font }}>
+      <section className="mx-auto max-w-lg">
+        <header className="mb-7">
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
+            GROW Archivio
+          </p>
 
-        <h1 className="mt-3 text-5xl font-black uppercase leading-[0.88] tracking-tighter">
-          Memoria visiva<span className="text-grow-yellow">.</span>
-        </h1>
+          <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+            Salvati<span className="text-grow-yellow">.</span>
+          </h1>
 
-        <p className="mt-5 text-sm leading-relaxed text-grow-muted">
-          Qui GROW prende da Eagle, mymind e Are.na: reference salvate, collezioni,
-          tag, progetti e connessioni tra materiali diversi.
-        </p>
+          <p className="mt-3 text-sm leading-relaxed text-grow-muted">
+            Reference, immagini, mood e materiali che hai scelto. Qui GROW inizia a diventare memoria creativa.
+          </p>
+        </header>
 
-        <div className="mt-8 grid grid-cols-2 gap-3">
-          {collections.map((collection) => (
-            <article key={collection.name} className="overflow-hidden rounded-[1.8rem] border border-black/10 bg-white/75 shadow-sm">
-              <div className="h-32">
-                <img src={collection.image} alt={collection.name} className="h-full w-full object-cover" />
-              </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-lg font-black uppercase leading-none tracking-tight">{collection.name}</h2>
-                  <span className="text-grow-yellow">♥</span>
-                </div>
-                <p className="mt-2 text-xs font-bold leading-snug text-grow-muted">{collection.meta}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+        {loading ? (
+          <div className="grid auto-rows-[124px] grid-cols-2 gap-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className={[
+                  'animate-pulse rounded-[1.6rem] bg-grow-soft',
+                  i % 3 === 0 ? 'row-span-2' : '',
+                ].join(' ')}
+              />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="rounded-[2rem] border border-black/10 bg-white/70 px-6 py-14 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFE500] text-2xl">
+              ♥
+            </div>
+
+            <h2 className="mt-5 text-xl font-black uppercase tracking-tight">
+              Nulla salvato
+            </h2>
+
+            <p className="mt-2 text-sm leading-relaxed text-grow-muted">
+              Vai su Scopri e usa il cuore giallo sulle reference che vuoi tenere.
+            </p>
+          </div>
+        ) : (
+          <div className="grid auto-rows-[124px] grid-cols-2 gap-3">
+            {items.map((item, idx) => {
+              const img = item.image_url || placeholders[item.category] || placeholders.design
+              const tall = idx % 4 === 0 || (item.height || 0) > (item.width || 0)
+
+              return (
+                <article
+                  key={item.id}
+                  className={[
+                    'group relative overflow-hidden rounded-[1.6rem] bg-grow-soft',
+                    tall ? 'row-span-2' : 'row-span-1',
+                  ].join(' ')}
+                >
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="block h-full">
+                    <img src={img} alt={item.title || ''} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]" />
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(item.id)}
+                    className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-transform hover:scale-110"
+                    aria-label="Rimuovi dai salvati"
+                  >
+                    ♥
+                  </button>
+
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-[#FFE500]">
+                      {item.category || 'reference'}
+                    </p>
+
+                    {item.title && (
+                      <h2 className="mt-1 line-clamp-2 text-xs font-bold leading-tight text-white">
+                        {item.title}
+                      </h2>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       <BottomNav />
