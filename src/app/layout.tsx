@@ -7,7 +7,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: "GROW.",
-  description: "Il tuo feed personale per arte, design, AI e ispirazione.",
+  description: "Inbox intelligente, archivio creativo, calendario operativo e AI personale per trasformare contenuti in lavoro.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
