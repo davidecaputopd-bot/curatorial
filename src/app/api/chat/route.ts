@@ -25,31 +25,30 @@ TONO — REGOLE FERREE:
 - Mai dire "sono qui per aiutarti", "non esitare", "sono pronto", "certamente", "assolutamente"
 - Mai iniziare con "Certo!" o "Ottima domanda!"
 - Rispondi come risponderesti a un collega in una call — diretto, senza intro vuote
-- Se la domanda è vaga, interpretala e rispondi comunque — non chiedere sempre chiarimenti
+- Se la domanda è vaga, interpretala e rispondi comunque
 - Italiano. Inglese solo se Davide scrive in inglese.
-- Risposte dense. Se fai una lista, ogni punto deve portare valore reale — niente padding.
+- Risposte dense. Niente padding.
 
-ESEMPI DI COME DEVI RISPONDERE:
-
-Domanda: "cosa ti servirebbe per migliorarti?"
-SBAGLIATO: "Grazie per la domanda! Per migliorarmi avrei bisogno di maggiore accesso ai tuoi dati..."
-GIUSTO: "Il problema principale è che non ho memoria persistente — ogni conversazione riparte da zero. Se integrassimo pgvector su Supabase potrei ricordare le decisioni di brand prese per ANventitre senza che tu le rispieghi ogni volta. Seconda cosa: il system prompt funziona ma Llama ha sycophancy strutturale. Stiamo migrando a Gemini proprio per questo."
-
-Domanda: "idee per il lancio di TRAMA"
-SBAGLIATO: "Ecco alcune idee per il lancio! 1) Social media 2) Evento 3) Collaborazioni..."
-GIUSTO: "Il lancio di un vintage store a Leverano ha un problema specifico: il pubblico locale non è il tuo cliente primario, ma è quello che determina il passaparola iniziale. Farei una preview chiusa solo su invito — 20 persone selezionate, niente social prima. Il giorno dopo esplodi con il contenuto. Il mistero pre-lancio funziona solo se poi c'è qualcosa da vedere."
+ESEMPI:
 
 Domanda: "come stai?"
 SBAGLIATO: "Sto bene, grazie! Come posso aiutarti oggi?"
 GIUSTO: "Bene. Cosa c'è?"
 
-Domanda generica su AI o design: rispondi con la tua opinione netta, non una panoramica bilanciata.`
+Domanda: "cosa ti servirebbe per migliorarti?"
+SBAGLIATO: "Grazie per la domanda! Per migliorarmi avrei bisogno di maggiore accesso ai tuoi dati..."
+GIUSTO: "Non ho memoria persistente — ogni conversazione riparte da zero. Con pgvector su Supabase potrei ricordare le decisioni prese per ANventitre. E Llama ha sycophancy strutturale, per questo stiamo usando Gemini."
+
+Domanda: "idee per il lancio di TRAMA"
+SBAGLIATO: "Ecco alcune idee! 1) Social media 2) Evento 3) Collaborazioni..."
+GIUSTO: "Il pubblico locale non è il tuo cliente primario ma determina il passaparola. Preview chiusa su invito, 20 persone, niente social prima. Il giorno dopo esplodi con il contenuto."
+
+Domanda su AI o design: opinione netta, non panoramica bilanciata.`
 
 const IMAGE_TRIGGERS = [
-  'genera un\'immagine', 'genera immagine', 'generami un\'immagine',
-  'crea un\'immagine', 'crea immagine', 'disegna', 'illustra',
-  'generate an image', 'draw', 'render un\'immagine', 'render image',
-  'mostrami un\'immagine', 'foto di ', 'immagine di '
+  "genera un'immagine", "genera immagine", "generami",
+  "crea un'immagine", "crea immagine", "disegna", "illustra",
+  "generate an image", "draw", "render", "foto di ", "immagine di "
 ]
 
 function isImageRequest(msg: string): boolean {
@@ -60,11 +59,9 @@ function isImageRequest(msg: string): boolean {
 async function expandImagePrompt(userPrompt: string): Promise<string> {
   const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' })
   const result = await model.generateContent(
-    `You write image prompts for FLUX AI model. Natural descriptive language only. No keyword lists. No weight syntax like (word:1.5).
-Most important subject first. Under 60 words. Describe what light DOES not just its name. Name camera for photorealism.
-Structure: [Subject + details], [setting], [lighting], [style/mood], [camera if relevant]
+    `You write image prompts for FLUX AI. Natural language only, no keyword lists, no weight syntax.
+Subject first. Under 60 words. Describe what light DOES. Name camera for photorealism.
 Write ONLY the prompt. In English. No explanation.
-
 User request: ${userPrompt}`
   )
   return result.response.text().trim() || userPrompt
@@ -87,14 +84,12 @@ async function chatWithGemini(message: string, history: { role: string; content:
     model: 'gemini-2.5-flash',
     systemInstruction: SYSTEM_PROMPT,
   })
-
   const chat = model.startChat({
     history: history.slice(-10).map(h => ({
       role: h.role === 'user' ? 'user' : 'model',
       parts: [{ text: h.content }]
     }))
   })
-
   const result = await chat.sendMessage(message)
   return result.response.text()
 }
@@ -135,8 +130,8 @@ export async function POST(req: NextRequest) {
     let reply: string
     try {
       reply = await chatWithGemini(message, history)
-    } catch (geminiError) {
-      console.warn('Gemini fallback to Groq:', geminiError)
+    } catch (e) {
+      console.warn('Gemini fallback:', e)
       reply = await chatWithGroq(message, history)
     }
 
