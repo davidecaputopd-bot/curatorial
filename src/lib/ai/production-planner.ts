@@ -1,89 +1,58 @@
-export type ProductionIntent =
-  | 'create_generation_job'
-  | 'compile_prompt'
-  | 'analyze_reference'
-  | 'search_archive'
-  | 'create_content_plan'
-  | 'general_answer'
+import { getEngine } from './engine-registry'
+import {
+  PRODUCTION_ASSET_TYPES,
+  PRODUCTION_ENGINES,
+  PRODUCTION_INTENTS,
+  PRODUCTION_MODES,
+  PRODUCTION_PROJECTS,
+  type LocalWorkerStatus,
+  type ProductionAssetType,
+  type ProductionCostMode,
+  type ProductionEngine,
+  type ProductionIntent,
+  type ProductionMode,
+  type ProductionPlan,
+  type ProductionProject,
+} from './production-types'
 
-export type ProductionAssetType =
-  | 'image'
-  | 'video'
-  | 'carousel'
-  | 'copy'
-  | 'mockup'
-  | 'workflow'
-  | 'strategy'
+export type {
+  ProductionAssetType,
+  ProductionEngine,
+  ProductionIntent,
+  ProductionMode,
+  ProductionPlan,
+  ProductionProject,
+} from './production-types'
 
-export type ProductionMode =
-  | 'api_free'
-  | 'api_cheap'
-  | 'manual_tool'
-  | 'local_worker'
-  | 'premium_manual'
-  | 'text_only'
+export type ProductionPlannerContext = {
+  selectedReference?: unknown
+  project?: string
+  archiveItem?: unknown
+  currentRoute?: string
+}
 
-export type ProductionEngine =
-  | 'gemini'
-  | 'groq'
-  | 'openrouter-free'
-  | 'comfyui'
-  | 'ltx-local'
-  | 'higgsfield'
-  | 'luma'
-  | 'kling'
-  | 'runway'
-  | 'recraft'
-  | 'ideogram'
-  | 'photoshop'
-  | 'grow-ai'
+const COST_MODES: ProductionCostMode[] = ['free', 'free-tier', 'cheap', 'premium']
+const WORKER_STATUSES: LocalWorkerStatus[] = [
+  'not_configured',
+  'ready',
+  'running',
+  'error',
+  'completed',
+]
 
-export type ProductionProject =
-  | 'AN23'
-  | 'Cantina Don Carlo'
-  | 'Exousia'
-  | 'ACI Copertino'
-  | 'Stazione di Posta'
-  | 'Altro'
-
-export type ProductionPlan = {
-  intent: ProductionIntent
-  title: string
-  project: ProductionProject
-  asset_type: ProductionAssetType
-  production_mode: ProductionMode
-  recommended_engine: ProductionEngine
-  alternatives: ProductionEngine[]
-  needs_reference: boolean
-  should_create_job: boolean
-  should_compile_prompts: boolean
-  should_use_archive: boolean
-  cost_mode: 'free' | 'free-tier' | 'cheap' | 'premium'
-  risk_notes: string[]
-  production_path: string[]
-  prompts_to_compile: ProductionEngine[]
-  checklist: string[]
+function includesAny(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(term))
 }
 
 export function detectProject(message: string): ProductionProject {
   const text = message.toLowerCase()
 
-  if (text.includes('an23') || text.includes('an ventitre') || text.includes('ventitre')) {
-    return 'AN23'
-  }
-
-  if (
-    text.includes('cantina') ||
-    text.includes('don carlo') ||
-    text.includes('vino') ||
-    text.includes('bottiglia') ||
-    text.includes('etichetta')
-  ) {
+  if (includesAny(text, ['an23', 'an ventitre', 'anventitre', 'ventitre'])) return 'AN23'
+  if (includesAny(text, ['cantina don carlo', 'don carlo', 'cantina'])) {
     return 'Cantina Don Carlo'
   }
-
   if (text.includes('exousia')) return 'Exousia'
-  if (text.includes('aci')) return 'ACI Copertino'
+  if (includesAny(text, ['aci copertino', 'aci'])) return 'ACI Copertino'
   if (text.includes('stazione di posta')) return 'Stazione di Posta'
 
   return 'Altro'
@@ -92,259 +61,383 @@ export function detectProject(message: string): ProductionProject {
 export function detectAssetType(message: string): ProductionAssetType {
   const text = message.toLowerCase()
 
-  if (
-    text.includes('video') ||
-    text.includes('reel') ||
-    text.includes('clip') ||
-    text.includes('motion') ||
-    text.includes('animazione')
-  ) {
+  if (includesAny(text, ['calendario', 'calendar plan', 'piano editoriale'])) {
+    return 'calendar_plan'
+  }
+  if (includesAny(text, ['workflow', 'comfyui', 'comfy ui', 'pipeline'])) return 'workflow'
+  if (includesAny(text, ['mockup', 'bottiglia', 'packaging', 'etichetta'])) return 'mockup'
+  if (includesAny(text, ['video', 'reel', 'clip', 'motion', 'animazione', 'ltx', 'higgsfield', 'luma'])) {
     return 'video'
   }
-
-  if (
-    text.includes('mockup') ||
-    text.includes('bottiglia') ||
-    text.includes('packaging') ||
-    text.includes('etichetta')
-  ) {
-    return 'mockup'
-  }
-
-  if (
-    text.includes('carosello') ||
-    text.includes('carousel') ||
-    text.includes('slide')
-  ) {
-    return 'carousel'
-  }
-
-  if (
-    text.includes('immagine') ||
-    text.includes('visual') ||
-    text.includes('reference') ||
-    text.includes('foto')
-  ) {
+  if (includesAny(text, ['carosello', 'carousel', 'slide'])) return 'carousel'
+  if (includesAny(text, ['copy', 'caption', 'testo', 'headline', 'articolo'])) return 'copy'
+  if (includesAny(text, ['reference', 'riferimento', 'moodboard'])) return 'reference'
+  if (includesAny(text, ['immagine', 'visual', 'foto', 'recraft', 'ideogram', 'render'])) {
     return 'image'
-  }
-
-  if (
-    text.includes('workflow') ||
-    text.includes('comfy') ||
-    text.includes('comfyui')
-  ) {
-    return 'workflow'
   }
 
   return 'strategy'
 }
 
-export function projectRules(project: ProductionProject) {
+export function detectProductionIntent(message: string): ProductionIntent {
+  const text = message.toLowerCase()
+
+  if (includesAny(text, ['valuta asset', 'valuta output', 'quality score', 'usabile per cliente'])) {
+    return 'evaluate_asset'
+  }
+  if (includesAny(text, ['importa asset', 'importa output', 'salva output', 'porta in archivio'])) {
+    return 'import_asset'
+  }
+  if (includesAny(text, ['cerca in archivio', 'trova in archivio', 'recupera da archivio'])) {
+    return 'search_archive'
+  }
+  if (includesAny(text, ['piano editoriale', 'piano calendario', 'calendar plan'])) {
+    return 'create_calendar_plan'
+  }
+  if (includesAny(text, ['content plan', 'piano contenuti', 'strategia contenuti'])) {
+    return 'create_content_plan'
+  }
+  if (includesAny(text, ['compila workflow', 'crea workflow', 'workflow comfy'])) {
+    return 'compile_workflow'
+  }
+  if (includesAny(text, ['compila prompt', 'scrivi prompt', 'prompt per'])) return 'compile_prompt'
+  if (includesAny(text, ['analizza reference', 'analizza riferimento', 'leggi questa reference'])) {
+    return 'analyze_reference'
+  }
+  if (
+    includesAny(text, [
+      'genera',
+      'crea',
+      'realizza',
+      'produci',
+      'voglio fare',
+      'trasforma',
+      'mockup',
+      'reel',
+      'video',
+      'visual',
+    ])
+  ) {
+    return 'create_generation_job'
+  }
+
+  return 'general_answer'
+}
+
+export function projectRules(project: ProductionProject): string[] {
   if (project === 'AN23') {
     return [
-      'Rispetta il logo AN23 corretto: cerchio verde oliva/scuro, lettere bianche stilizzate AN, scritta lowercase ventitre.',
-      'Non usare scritte AN23 generiche o loghi inventati.',
-      'Tono premium, mediterraneo, classy, mai cheap.',
-      'Evitare deformazioni di bottiglia, bicchiere, etichetta o logo.',
+      'Usare il logo AN23 corretto: cerchio verde oliva/scuro, lettere bianche stilizzate AN, scritta lowercase “ventitre”.',
+      'Non usare un marchio AN23 generico o inventato.',
+      'Mantenere un tono premium, mediterraneo e classy, mai cheap.',
+      'Evitare deformazioni di bottiglia, logo ed etichetta.',
     ]
   }
 
   if (project === 'Cantina Don Carlo') {
     return [
-      'Non usare Madre Terra come nome linea.',
-      'Trattare il progetto come vino della casa / Cantina Don Carlo.',
-      'Etichette e loghi non vanno reinterpretati.',
-      'Stile mediterraneo, naturale, moderno, elegante.',
+      'Non usare “Madre Terra” come nome linea.',
+      'Usare vino della casa / Cantina Don Carlo.',
+      'Etichette e loghi reali non vanno reinterpretati.',
+      'Mantenere uno stile mediterraneo, naturale, moderno ed elegante.',
     ]
   }
 
   if (project === 'Exousia') {
     return [
-      'Tono concreto, consulenziale, professionale, locale.',
-      'Palette verde Exousia con accento rosso/arancio dosato.',
-      'Evitare look corporate generico.',
+      'Rappresentare consulenza, formazione e finanza agevolata in modo concreto.',
+      'Usare verde Exousia con accento rosso/arancio dosato.',
+      'Mantenere un tono professionale e locale, evitando il corporate generico.',
     ]
   }
 
   return [
-    'Evitare look AI generico.',
-    'Output professionale e usabile per lavoro reale.',
-    'Niente watermark o testo deformato.',
+    'Evitare un look AI generico.',
+    'Produrre un output professionale e utilizzabile nel lavoro reale.',
+    'Controllare watermark, testo, marchi e artefatti.',
   ]
 }
 
-export function buildFallbackProductionPlan(message: string): ProductionPlan {
-  const project = detectProject(message)
+function planForText(
+  message: string,
+  project: ProductionProject,
+  assetType: ProductionAssetType,
+  intent: ProductionIntent
+): ProductionPlan {
+  const shouldCreateJob = intent !== 'general_answer' && intent !== 'search_archive'
+
+  return {
+    intent,
+    title:
+      assetType === 'calendar_plan'
+        ? `Piano calendario ${project}`
+        : assetType === 'carousel'
+          ? `Carosello ${project}`
+          : `Piano produzione ${project}`,
+    project,
+    asset_type: assetType,
+    production_mode: 'text_only',
+    recommended_engine: 'grow-ai',
+    alternatives: ['gemini', 'groq', 'openrouter-free'],
+    needs_reference: includesAny(message.toLowerCase(), ['reference', 'riferimento', 'archivio']),
+    should_create_job: shouldCreateJob,
+    should_compile_prompts: intent === 'compile_prompt' || assetType === 'carousel',
+    should_compile_workflow: intent === 'compile_workflow',
+    should_use_archive: true,
+    can_execute_now: true,
+    requires_manual_tool: false,
+    requires_local_worker: false,
+    local_worker_status: 'not_configured',
+    cost_mode: 'free-tier',
+    confidence: 0.82,
+    risk_notes:
+      assetType === 'carousel'
+        ? ['Definire la struttura editoriale prima di produrre la grafica.']
+        : [],
+    production_path: [
+      'Definisci obiettivo, pubblico e vincoli.',
+      'Recupera solo le reference rilevanti dall’Archivio.',
+      'Produci una struttura operativa verificabile.',
+      'Conferma il piano prima di creare o modificare contenuti.',
+    ],
+    prompts_to_compile: assetType === 'carousel' ? ['grow-ai'] : [],
+    workflow_targets: intent === 'compile_workflow' ? ['structured-content-workflow'] : [],
+    checklist: ['Obiettivo concreto?', 'Output non generico?', ...projectRules(project)],
+    next_actions: shouldCreateJob
+      ? ['Conferma il piano.', 'Compila i prompt.', 'Crea il job solo dopo conferma.']
+      : ['Usa il piano nella conversazione corrente.'],
+  }
+}
+
+export function buildFallbackProductionPlan(
+  message: string,
+  context: ProductionPlannerContext = {}
+): ProductionPlan {
+  const detectedProject = detectProject(message)
+  const contextProject = PRODUCTION_PROJECTS.find((project) => project === context.project)
+  const project = contextProject || detectedProject
   const assetType = detectAssetType(message)
+  const intent = detectProductionIntent(message)
+  const hasReference = Boolean(context.selectedReference || context.archiveItem)
 
   if (assetType === 'video') {
     return {
-      intent: 'create_generation_job',
+      intent,
       title: `Video ${project}`,
       project,
       asset_type: 'video',
       production_mode: 'manual_tool',
       recommended_engine: 'higgsfield',
       alternatives: ['luma', 'ltx-local', 'runway'],
-      needs_reference: true,
+      needs_reference: !hasReference,
       should_create_job: true,
       should_compile_prompts: true,
+      should_compile_workflow: false,
       should_use_archive: true,
-      cost_mode: 'free-tier',
+      can_execute_now: false,
+      requires_manual_tool: true,
+      requires_local_worker: false,
+      local_worker_status: 'not_configured',
+      cost_mode: 'premium',
+      confidence: 0.9,
       risk_notes: [
-        'Higgsfield/Luma/Runway sono tool manuali o credit-based: GROW prepara il lavoro, ma l’esecuzione avviene fuori o tramite worker dedicato.',
-        'Per produzione gratuita scalabile serve LTX/ComfyUI locale.',
+        'Higgsfield è un tool esterno credit-based: GROW prepara il lavoro ma non esegue la generazione.',
+        'Logo, etichetta e soggetto possono deformarsi durante la generazione video.',
+        'Per test gratuiti usare LTX locale quando il worker sarà configurato.',
       ],
       production_path: [
-        'Recupera o carica reference principale.',
-        'Compila prompt Higgsfield per video social.',
-        'Compila alternativa Luma image-to-video.',
-        'Prepara variante LTX locale per test gratuiti.',
-        'Genera sul tool scelto.',
-        'Importa output in Archivio.',
-        'Valuta qualità, logo, coerenza e riusabilità.',
+        'Seleziona reference di soggetto, bottiglia e logo.',
+        'Compila il prompt Higgsfield in formato 9:16.',
+        'Genera la clip nel tool esterno.',
+        'Controlla stabilità del soggetto, logo ed etichetta.',
+        'Importa l’output in Archivio.',
       ],
-      prompts_to_compile: ['higgsfield', 'luma', 'ltx-local'],
+      prompts_to_compile: ['higgsfield', 'luma', 'ltx-local', 'runway'],
+      workflow_targets: ['social-video-9x16', 'image-to-video', 'ltx-local-test'],
       checklist: [
-        'Il soggetto resta coerente in tutta la clip?',
-        'Logo, etichetta e testo non si deformano?',
-        'Movimento camera controllato e non caotico?',
-        'Output senza watermark o utilizzabile per cliente?',
+        'Soggetto coerente per tutta la clip?',
+        'Logo, etichetta e testo integri?',
+        'Movimento camera controllato?',
+        'Output senza watermark e usabile per cliente?',
         ...projectRules(project),
+      ],
+      next_actions: [
+        hasReference ? 'Conferma la reference selezionata.' : 'Scegli una reference dall’Archivio.',
+        'Compila i prompt per i motori consigliati.',
+        'Crea il job solo dopo conferma.',
       ],
     }
   }
 
   if (assetType === 'image' || assetType === 'mockup' || assetType === 'workflow') {
+    const realIdentity = includesAny(message.toLowerCase(), [
+      'etichetta vera',
+      'logo vero',
+      'logo corretto',
+      'etichetta reale',
+    ])
+
     return {
-      intent: 'create_generation_job',
-      title: `${assetType === 'mockup' ? 'Mockup' : 'Immagine'} ${project}`,
+      intent: assetType === 'workflow' ? 'compile_workflow' : intent,
+      title: `${assetType === 'mockup' ? 'Mockup' : assetType === 'workflow' ? 'Workflow' : 'Immagine'} ${project}`,
       project,
       asset_type: assetType,
       production_mode: 'local_worker',
       recommended_engine: 'comfyui',
-      alternatives: ['recraft', 'ideogram', 'photoshop'],
-      needs_reference: true,
+      alternatives: realIdentity
+        ? ['photoshop', 'recraft', 'ideogram']
+        : ['recraft', 'ideogram', 'photoshop'],
+      needs_reference: !hasReference,
       should_create_job: true,
       should_compile_prompts: true,
+      should_compile_workflow: true,
       should_use_archive: true,
+      can_execute_now: false,
+      requires_manual_tool: false,
+      requires_local_worker: true,
+      local_worker_status: 'not_configured',
       cost_mode: 'free',
+      confidence: 0.88,
       risk_notes: [
-        'ComfyUI richiede worker locale: Vercel non può eseguire direttamente modelli sul Mac.',
-        'Per loghi/etichette reali serve controllo manuale o Photoshop finale.',
+        'ComfyUI richiede un worker locale: Vercel non può eseguire modelli sul Mac.',
+        realIdentity
+          ? 'L’etichetta o il logo reale non vanno reinterpretati: usare compositing/inpainting controllato e verifica manuale.'
+          : 'Testo, logo ed etichetta richiedono comunque verifica manuale.',
       ],
       production_path: [
-        'Definisci reference e vincoli visivi.',
-        'Compila prompt ComfyUI/FLUX o SDXL.',
-        'Se serve testo leggibile, prepara variante Ideogram/Recraft.',
-        'Genera output locale o manuale.',
-        'Rifinisci in Photoshop se serve precisione logo/etichetta.',
-        'Salva output e prompt in Archivio.',
+        'Seleziona reference, asset originali e vincoli.',
+        'Scegli un workflow ComfyUI: txt2img, img2img, inpainting, ControlNet o product mockup.',
+        'Compila prompt positivo, negativo e parametri.',
+        'Esegui sul worker locale quando configurato.',
+        'Rifinisci logo ed etichetta in Photoshop se necessario.',
+        'Salva output, prompt e valutazione in Archivio.',
       ],
-      prompts_to_compile: ['comfyui', 'recraft', 'ideogram'],
+      prompts_to_compile: ['comfyui', 'recraft', 'ideogram', 'photoshop'],
+      workflow_targets: ['txt2img', 'img2img', 'inpainting', 'controlnet', 'product-mockup'],
       checklist: [
-        'Reference rispettata senza copiare direttamente?',
-        'Logo o etichetta non reinterpretati?',
-        'Qualità utilizzabile per cliente?',
-        'Composizione non generica?',
+        'Reference rispettata?',
+        'Logo ed etichetta non reinterpretati?',
+        'Composizione specifica e non generica?',
+        'Output usabile per cliente?',
         ...projectRules(project),
+      ],
+      next_actions: [
+        hasReference ? 'Conferma gli asset originali.' : 'Seleziona reference e file originali.',
+        'Compila prompt e workflow.',
+        'Configura il worker locale oppure usa Photoshop/Recraft manualmente.',
       ],
     }
   }
 
-  if (assetType === 'carousel') {
-    return {
-      intent: 'create_generation_job',
-      title: `Carosello ${project}`,
-      project,
-      asset_type: 'carousel',
-      production_mode: 'text_only',
-      recommended_engine: 'grow-ai',
-      alternatives: ['gemini', 'groq'],
-      needs_reference: false,
-      should_create_job: true,
-      should_compile_prompts: true,
-      should_use_archive: true,
-      cost_mode: 'free-tier',
-      risk_notes: [
-        'Il carosello richiede struttura editoriale prima della grafica.',
-      ],
-      production_path: [
-        'Definisci obiettivo del carosello.',
-        'Genera scaletta slide-by-slide.',
-        'Crea copy breve e visual direction.',
-        'Trasforma in layout Canva/Figma.',
-        'Salva struttura in Archivio o Piano.',
-      ],
-      prompts_to_compile: ['grow-ai'],
-      checklist: [
-        'Ogni slide ha una funzione?',
-        'Copy concreto e non generico?',
-        'CTA chiara?',
-        ...projectRules(project),
-      ],
-    }
-  }
-
-  return {
-    intent: 'general_answer',
-    title: `Analisi ${project}`,
-    project,
-    asset_type: 'strategy',
-    production_mode: 'text_only',
-    recommended_engine: 'grow-ai',
-    alternatives: ['gemini', 'groq', 'openrouter-free'],
-    needs_reference: false,
-    should_create_job: false,
-    should_compile_prompts: false,
-    should_use_archive: true,
-    cost_mode: 'free-tier',
-    risk_notes: [],
-    production_path: [
-      'Analizza richiesta.',
-      'Recupera contesto progetto.',
-      'Rispondi con piano operativo.',
-    ],
-    prompts_to_compile: [],
-    checklist: projectRules(project),
-  }
+  return planForText(message, project, assetType, intent)
 }
 
 export function buildPlannerSystemPrompt() {
   return `
-Sei il Production Planner interno di GROW.
+Sei il Production Planner interno di GROW, un Creative Production OS.
+Trasforma la richiesta in un piano operativo strutturato. Non sei una chat generica.
 
-GROW è un Creative Production OS.
-Non sei una chat generica. Devi trasformare richieste creative in piani produttivi strutturati.
+IDENTITÀ E VINCOLI STABILI
+- Distingui sempre API eseguibile, tool manuale e worker locale.
+- Non promettere un’esecuzione che GROW non può fare ora.
+- Preferisci free/local quando il risultato resta professionale.
+- Proponi premium solo quando serve e richiedi conferma prima di costi.
+- Non proporre account multipli, bypass, abuso di trial o scraping di tool chiusi.
+- Usa solo il contesto minimo fornito; non inventare reference, asset o integrazioni.
 
-Devi ragionare su:
-- intento
-- progetto
-- tipo asset
-- motore consigliato
-- modalità produttiva
-- reference necessarie
-- job da creare
-- prompt da compilare
-- rischi
-- checklist qualità
-- percorso produttivo
+REGOLE PROGETTI
+AN23: logo corretto con cerchio verde oliva/scuro, lettere AN bianche stilizzate e “ventitre” lowercase; premium mediterraneo; niente deformazioni.
+Cantina Don Carlo: mai “Madre Terra” come nome linea; etichette/loghi reali non reinterpretati; mediterraneo, naturale, moderno, elegante.
+Exousia: consulenza, formazione e finanza agevolata; concreto e locale; verde con accento rosso/arancio dosato; no corporate generico.
 
-Motori disponibili:
-- gemini, groq, openrouter-free per testo/copy/strategia
-- comfyui per immagini locali gratuite e workflow
-- ltx-local per video locali/open-source
-- higgsfield, luma, kling, runway per video manuali
-- recraft, ideogram, photoshop per immagini/design/editing
-
-Regole:
-- Non promettere generazione diretta se il motore è manuale.
-- Non promettere ComfyUI/LTX se il worker locale non è configurato.
-- Preferisci free/local quando ha senso.
-- Usa premium solo se necessario.
-- Evita account multipli o abuso di free trial.
-- Output professionale, concreto, operativo.
-
-Rispondi SOLO JSON valido nel formato ProductionPlan.
+OUTPUT
+Rispondi SOLO con un oggetto JSON valido, senza markdown o testo extra.
+Campi obbligatori:
+intent, title, project, asset_type, production_mode, recommended_engine, alternatives,
+needs_reference, should_create_job, should_compile_prompts, should_compile_workflow,
+should_use_archive, can_execute_now, requires_manual_tool, requires_local_worker,
+local_worker_status, cost_mode, confidence, risk_notes, production_path,
+prompts_to_compile, workflow_targets, checklist, next_actions.
+confidence è un numero tra 0 e 1. Le liste contengono stringhe concise e operative.
 `.trim()
+}
+
+function isOneOf<T extends readonly string[]>(value: unknown, values: T): value is T[number] {
+  return typeof value === 'string' && values.includes(value as T[number])
+}
+
+function strings(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) return fallback
+  const result = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+  return result.length ? result : fallback
+}
+
+function engines(value: unknown, fallback: ProductionEngine[]) {
+  if (!Array.isArray(value)) return fallback
+  const result = value.filter((item): item is ProductionEngine =>
+    isOneOf(item, PRODUCTION_ENGINES)
+  )
+  return result.length ? [...new Set(result)] : fallback
+}
+
+function bool(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+export function normalizeProductionPlan(raw: unknown, fallback: ProductionPlan): ProductionPlan {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fallback
+  const input = raw as Record<string, unknown>
+
+  const recommendedEngine = isOneOf(input.recommended_engine, PRODUCTION_ENGINES)
+    ? input.recommended_engine
+    : fallback.recommended_engine
+  const capability = getEngine(recommendedEngine)
+  const confidence =
+    typeof input.confidence === 'number' && Number.isFinite(input.confidence)
+      ? Math.min(1, Math.max(0, input.confidence))
+      : fallback.confidence
+
+  return {
+    intent: isOneOf(input.intent, PRODUCTION_INTENTS) ? input.intent : fallback.intent,
+    title:
+      typeof input.title === 'string' && input.title.trim()
+        ? input.title.trim().slice(0, 160)
+        : fallback.title,
+    project: isOneOf(input.project, PRODUCTION_PROJECTS) ? input.project : fallback.project,
+    asset_type: isOneOf(input.asset_type, PRODUCTION_ASSET_TYPES)
+      ? input.asset_type
+      : fallback.asset_type,
+    production_mode: capability.mode,
+    recommended_engine: recommendedEngine,
+    alternatives: engines(input.alternatives, fallback.alternatives).filter(
+      (engine) => engine !== recommendedEngine
+    ),
+    needs_reference: bool(input.needs_reference, fallback.needs_reference),
+    should_create_job: bool(input.should_create_job, fallback.should_create_job),
+    should_compile_prompts: bool(
+      input.should_compile_prompts,
+      fallback.should_compile_prompts
+    ),
+    should_compile_workflow: bool(
+      input.should_compile_workflow,
+      fallback.should_compile_workflow
+    ),
+    should_use_archive: bool(input.should_use_archive, fallback.should_use_archive),
+    can_execute_now: capability.can_execute_server_side,
+    requires_manual_tool: capability.requires_manual_action,
+    requires_local_worker: capability.requires_local_worker,
+    local_worker_status: isOneOf(input.local_worker_status, WORKER_STATUSES)
+      ? input.local_worker_status
+      : fallback.local_worker_status,
+    cost_mode: isOneOf(input.cost_mode, COST_MODES)
+      ? input.cost_mode
+      : capability.cost_mode,
+    confidence,
+    risk_notes: strings(input.risk_notes, fallback.risk_notes),
+    production_path: strings(input.production_path, fallback.production_path),
+    prompts_to_compile: engines(input.prompts_to_compile, fallback.prompts_to_compile),
+    workflow_targets: strings(input.workflow_targets, fallback.workflow_targets),
+    checklist: strings(input.checklist, fallback.checklist),
+    next_actions: strings(input.next_actions, fallback.next_actions),
+  }
 }
