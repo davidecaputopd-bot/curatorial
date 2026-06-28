@@ -20,14 +20,14 @@ const categories = [
   { key: 'lifestyle', label: 'Lifestyle' },
 ]
 
-const categoryLabels = {
+const categoryLabels: Record<string, string> = {
   branding: 'Branding', typography: 'Tipografia', interior_design: 'Interni',
   fashion: 'Moda', web: 'Web', ai: 'AI', '3d_printing': '3D Print',
   art: 'Arte', social_design: 'Social Design', design: 'Design',
   lifestyle: 'Lifestyle', social: 'Social', growth: 'Crescita',
 }
 
-const placeholders = {
+const placeholders: Record<string, string> = {
   branding: 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=800&q=80',
   typography: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&q=80',
   interior_design: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80',
