@@ -43,14 +43,11 @@ const placeholders: Record<string, string> = {
   growth: 'https://images.unsplash.com/photo-1512314889357-e157c22f938d?w=800&q=80',
 }
 
-// Layout Cosmos: sequenza di pattern che si ripete
-// tall = 2 righe altezza, wide = full width, square = normale
 type CardSize = 'wide' | 'tall' | 'square'
 
 function getCardSize(idx: number, isSerendipity: boolean): CardSize {
-  // Pattern che si ripete ogni 7 card
   const pattern: CardSize[] = ['wide', 'tall', 'square', 'square', 'wide', 'square', 'tall']
-  if (isSerendipity) return 'wide' // le sorprese escono sempre full width
+  if (isSerendipity) return 'wide'
   return pattern[idx % pattern.length]
 }
 
@@ -65,9 +62,10 @@ function timeAgo(date: string) {
 
 function CardImage({ src, alt, className }: { src: string; alt: string; className: string }) {
   const [error, setError] = useState(false)
+  const fallback = placeholders.design
   return (
     <img
-      src={error ? placeholders.design : src}
+      src={error ? fallback : src}
       alt={alt}
       className={className}
       onError={() => setError(true)}
@@ -79,27 +77,31 @@ function CardImage({ src, alt, className }: { src: string; alt: string; classNam
 function FeedCard({ item, idx, onDwell }: { item: any; idx: number; onDwell: (id: string, seconds: number) => void }) {
   const enterTime = useRef<number>(0)
   const size = getCardSize(idx, item.is_serendipity)
-  const imgSrc = item.image_url || placeholders[item.category] || placeholders.design
-
+  const imgSrc = item.image_url || placeholders[item.category as string] || placeholders.design
   const imageHeight = size === 'wide' ? 'h-52' : size === 'tall' ? 'h-48' : 'h-28'
-  const colSpan = size === 'wide' ? 'col-span-2' : size === 'tall' ? 'col-span-1 row-span-2' : 'col-span-1'
+  const colSpan = size === 'wide' ? 'col-span-2' : 'col-span-1'
+
+  const handleMouseEnter = () => { enterTime.current = Date.now() }
+  const handleMouseLeave = () => {
+    const seconds = (Date.now() - enterTime.current) / 1000
+    if (seconds > 1) onDwell(item.id, seconds)
+  }
+  const handleTouchStart = () => { enterTime.current = Date.now() }
+  const handleTouchEnd = () => {
+    const seconds = (Date.now() - enterTime.current) / 1000
+    if (seconds > 1) onDwell(item.id, seconds)
+  }
 
   return (
     
       href={item.url === '#' ? undefined : item.url}
       target={item.url !== '#' ? '_blank' : undefined}
       rel="noopener noreferrer"
-      className={`group relative block overflow-hidden rounded-2xl border bg-grow-card transition-all duration-200 hover:scale-[1.01] hover:shadow-lg ${colSpan} ${item.is_serendipity ? 'border-grow-yellow/40' : 'border-grow-border'}`}
-      onMouseEnter={() => { enterTime.current = Date.now() }}
-      onMouseLeave={() => {
-        const seconds = (Date.now() - enterTime.current) / 1000
-        if (seconds > 1) onDwell(item.id, seconds)
-      }}
-      onTouchStart={() => { enterTime.current = Date.now() }}
-      onTouchEnd={() => {
-        const seconds = (Date.now() - enterTime.current) / 1000
-        if (seconds > 1) onDwell(item.id, seconds)
-      }}
+      className={`group relative block overflow-hidden rounded-2xl border bg-grow-card transition-all duration-200 hover:scale-[1.01] ${colSpan} ${item.is_serendipity ? 'border-grow-yellow/40' : 'border-grow-border'}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {item.is_serendipity && (
         <div className="absolute right-2 top-2 z-10 rounded-full bg-grow-yellow/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-grow-bg">
@@ -161,7 +163,6 @@ export default function ScopriPage() {
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text" style={{ fontFamily: font }}>
       <div className="mx-auto max-w-lg px-4 pt-12">
-
         <header className="mb-6">
           <h1 className="text-[26px] font-black uppercase tracking-tight">
             Scopri<span className="text-grow-yellow">.</span>
@@ -169,17 +170,12 @@ export default function ScopriPage() {
           <p className="mt-1 text-sm text-grow-muted">Curato per te · aggiornato ogni notte</p>
         </header>
 
-        {/* Filtri categoria */}
         <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 pb-4">
           {categories.map(c => (
             <button
               key={c.key ?? 'all'}
               onClick={() => load(c.key)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                active === c.key
-                  ? 'bg-grow-yellow text-grow-bg'
-                  : 'border border-grow-border bg-grow-soft text-grow-muted hover:text-grow-text'
-              }`}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${active === c.key ? 'bg-grow-yellow text-grow-bg' : 'border border-grow-border bg-grow-soft text-grow-muted hover:text-grow-text'}`}
             >
               {c.label}
             </button>
@@ -189,10 +185,7 @@ export default function ScopriPage() {
         {loading ? (
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className={`animate-pulse rounded-2xl bg-grow-soft ${i % 3 === 0 ? 'col-span-2 h-52' : 'h-44'}`}
-              />
+              <div key={i} className={`animate-pulse rounded-2xl bg-grow-soft ${i % 3 === 0 ? 'col-span-2 h-52' : 'h-44'}`} />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -201,14 +194,9 @@ export default function ScopriPage() {
             <p className="text-sm">Nessun contenuto per questa categoria.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 auto-rows-auto">
+          <div className="grid grid-cols-2 gap-3">
             {items.map((item, idx) => (
-              <FeedCard
-                key={item.id}
-                item={item}
-                idx={idx}
-                onDwell={handleDwell}
-              />
+              <FeedCard key={item.id} item={item} idx={idx} onDwell={handleDwell} />
             ))}
           </div>
         )}
