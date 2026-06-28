@@ -36,7 +36,11 @@ export default function AIPage() {
       const res = await fetch('/api/chat-history')
       const data = await res.json()
       if (data.messages?.length) {
-        setMessages(data.messages)
+        setMessages(data.messages.map((m: { role: 'user' | 'assistant'; content: string; image_url?: string }) => ({
+          role: m.role,
+          content: m.content,
+          imageUrl: m.image_url || undefined,
+        })))
       } else {
         setMessages([{ role: 'assistant', content: 'Ciao. Sono il tuo assistente creativo. Posso scrivere copy, generare immagini con FLUX, darti idee, analizzare brand. Cosa fai oggi?' }])
       }
