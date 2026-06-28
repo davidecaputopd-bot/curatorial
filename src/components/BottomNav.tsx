@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const items = [
-  { href: '/', label: 'Home', icon: '⌂' },
   { href: '/scopri', label: 'Scopri', icon: '◌' },
   { href: '/archivio', label: 'Archivio', icon: '♥' },
-  { href: '/calendario', label: 'Piano', icon: '□' },
+  { href: '/studio', label: 'Studio', icon: 'S' },
   { href: '/ai', label: 'AI', icon: 'AI' },
+  { href: '/calendario', label: 'Piano', icon: '□' },
 ]
 
 export default function BottomNav() {
@@ -19,9 +19,7 @@ export default function BottomNav() {
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-[1.8rem] border border-black/10 bg-[#F7F4EE]/90 p-1.5 shadow-[0_18px_50px_rgba(15,15,16,0.12)] backdrop-blur-xl">
         {items.map((item) => {
           const active =
-            item.href === '/'
-              ? pathname === '/'
-              : pathname === item.href || pathname.startsWith(`${item.href}/`)
+            pathname === item.href || pathname.startsWith(`${item.href}/`)
 
           return (
             <Link

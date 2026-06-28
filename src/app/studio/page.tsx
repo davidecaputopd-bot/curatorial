@@ -120,12 +120,15 @@ export default function StudioPage() {
   useEffect(() => {
     const plan = readPlanFromBrowser()
     if (!plan) return
+    const storedBrief = window.sessionStorage.getItem('grow-production-brief')
+    const storedReference = window.sessionStorage.getItem('grow-production-reference')
 
     const frame = window.requestAnimationFrame(() => {
       setImportedPlan(plan)
       setProject(plan.project)
       setAssetType(plan.asset_type)
-      setBrief(plan.title)
+      setBrief(storedBrief || plan.title)
+      setReference(storedReference || '')
       setFormat(plan.asset_type === 'video' ? '9:16 verticale social' : '4:5 verticale')
     })
 
@@ -166,6 +169,12 @@ export default function StudioPage() {
     setAssetType(productionPlan.asset_type)
     setNotice(null)
     window.sessionStorage.setItem('grow-production-plan', JSON.stringify(productionPlan))
+    window.sessionStorage.setItem('grow-production-brief', brief)
+    if (reference) {
+      window.sessionStorage.setItem('grow-production-reference', reference)
+    } else {
+      window.sessionStorage.removeItem('grow-production-reference')
+    }
     requestAnimationFrame(() => {
       document.getElementById('studio-output')?.scrollIntoView({
         behavior: 'smooth',
