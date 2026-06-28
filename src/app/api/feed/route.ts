@@ -23,13 +23,11 @@ export async function GET(request: Request) {
 
     const dwellWeights: Record<string, number> = profile?.dwell_weights || {}
 
-    // CORE: peso >= 0.65
     const coreCategories = Object.entries(weights)
       .filter(([, w]) => w >= 0.65)
       .sort(([, a], [, b]) => b - a)
       .map(([cat]) => cat)
 
-    // SERENDIPITY ZONE: peso 0.30–0.64
     const surpriseCategories = Object.entries(weights)
       .filter(([, w]) => w >= 0.30 && w < 0.65)
       .map(([cat]) => cat)
@@ -37,25 +35,34 @@ export async function GET(request: Request) {
     const mainLimit = Math.floor(limit * 0.80)
     const surpriseLimit = limit - mainLimit
 
-    // Fetch core
+    // Main query
     let mainQuery = supabase
       .from('content_items')
       .select('*, sources(name, category)')
       .order('published_at', { ascending: false })
       .limit(mainLimit * 3)
 
-    undefined
+    // Filtro type
+    if (typeFilter) {
+      mainQuery = mainQuery.eq('type', typeFilter)
+    }
+
+    // Filtro category
+    if (category) {
+      mainQuery = mainQuery.eq('category', category)
+    } else if (!typeFilter) {
+      mainQuery = mainQuery.in('category', coreCategories)
+    }
 
     const { data: mainRaw } = await mainQuery
 
-    // Scoring con dwell time + freshness
     const mainScored = (mainRaw || [])
       .map(item => {
         const catWeight = weights[item.category] || 0.5
         const dwellBoost = Math.min(0.25, (dwellWeights[item.category] || 0) / 60)
         const hoursAgo = (Date.now() - new Date(item.published_at).getTime()) / 3600000
         const freshness = Math.max(0.3, 1 - (hoursAgo / 72) * 0.7)
-        const hasImage = item.image_url ? 0.05 : 0 // boost per chi ha immagine
+        const hasImage = item.image_url ? 0.05 : 0
         return {
           ...item,
           _score: (catWeight + dwellBoost + hasImage) * freshness,
@@ -65,9 +72,8 @@ export async function GET(request: Request) {
       .sort((a, b) => b._score - a._score)
       .slice(0, mainLimit)
 
-    // Fetch serendipity — random genuino dalla zona grigia
     let surpriseItems: any[] = []
-    if (!category) {
+    if (!category && !typeFilter) {
       const allCategories = Object.keys(weights)
       const zonaGrigia = surpriseCategories.length > 0
         ? surpriseCategories
@@ -88,7 +94,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Interleave: sorpresa ogni ~5 card core, mai in prima posizione
     const surprisePositions = new Set([4, 9, 14, 20, 27, 33, 38])
     const combined: any[] = []
     let mainIdx = 0
@@ -102,7 +107,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Aggiungi eventuali sorprese rimaste in fondo
     while (surpriseIdx < surpriseItems.length) {
       combined.push(surpriseItems[surpriseIdx++])
     }
