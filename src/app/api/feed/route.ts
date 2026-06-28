@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
+  const typeFilter = searchParams.get('type')
   const limit = parseInt(searchParams.get('limit') || '40')
 
   try {
@@ -43,11 +44,7 @@ export async function GET(request: Request) {
       .order('published_at', { ascending: false })
       .limit(mainLimit * 3)
 
-    if (category) {
-      mainQuery = mainQuery.eq('category', category)
-    } else {
-      mainQuery = mainQuery.in('category', coreCategories)
-    }
+    undefined
 
     const { data: mainRaw } = await mainQuery
 
