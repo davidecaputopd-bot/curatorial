@@ -4,14 +4,13 @@
 - Next.js (src/ directory, App Router), Tailwind, TypeScript
 - Supabase (PostgreSQL): tabelle `content_items`, `sources`, `user_profile`, `interactions`, `chat_history`
 - Vercel deploy: `npx vercel --prod`
-- Git: https://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@github.com/davidecaputopd-bot/curatorial.git
+- Git remote: vedi configurazione locale
 
 ## Variabili d'ambiente (Vercel)
 SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SUPABASE_URL, GROQ_API_KEY, GEMINI_API_KEY, HF_TOKEN
 
 ## Struttura
 src/app/
-  (dashboard)/     — layout con BottomNav
   ai/page.tsx      — chat AI
   scopri/          — feed RSS
   salvati/         — articoli salvati (da collegare)
@@ -33,7 +32,7 @@ src/app/api/
 - Feed rotti da disabilitare su Supabase: Later Blog, Fast Company Design (404)
 - /salvati: mostra sempre vuoto, logica salvataggio da collegare
 - Cron notturno fetch-rss: aggiungere vercel.json
-- Meta title: ancora "Create Next App" in alcuni meta
+- Meta title: ancora "Create Next App"
 
 ## Design system
 - Font: Bebas Neue (display), DM Mono (label), DM Sans Light (body)
