@@ -43,12 +43,6 @@ const placeholders: Record<string, string> = {
   growth: 'https://images.unsplash.com/photo-1512314889357-e157c22f938d?w=800&q=80',
 }
 
-function getCardSize(idx: number, isSerendipity: boolean): string {
-  const pattern = ['wide', 'tall', 'square', 'square', 'wide', 'square', 'tall']
-  if (isSerendipity) return 'wide'
-  return pattern[idx % pattern.length]
-}
-
 function timeAgo(date: string): string {
   const hours = Math.floor((Date.now() - new Date(date).getTime()) / 3600000)
   if (hours < 1) return 'Adesso'
@@ -58,53 +52,81 @@ function timeAgo(date: string): string {
   return days + 'g fa'
 }
 
-function CardImage({ src, alt, className }: { src: string; alt: string; className: string }) {
-  const [error, setError] = useState(false)
+function SafeImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [err, setErr] = useState(false)
   return (
     <img
-      src={error ? placeholders.design : src}
+      src={err ? placeholders.design : src}
       alt={alt}
       className={className}
-      onError={() => setError(true)}
-      loading='lazy'
+      onError={() => setErr(true)}
+      loading="lazy"
     />
   )
 }
 
-function FeedCard({ item, idx, onDwell }: { item: any; idx: number; onDwell: (id: string, seconds: number) => void }) {
-  const enterTime = useRef(0)
-  const size = getCardSize(idx, item.is_serendipity)
-  const imgSrc = item.image_url || placeholders[item.category] || placeholders.design
-  const imageHeight = size === 'wide' ? 'h-52' : size === 'tall' ? 'h-48' : 'h-28'
-  const colSpan = size === 'wide' ? 'col-span-2' : 'col-span-1'
-
-  const handleEnter = () => { enterTime.current = Date.now() }
-  const handleLeave = () => {
-    const seconds = (Date.now() - enterTime.current) / 1000
-    if (seconds > 1) onDwell(item.id, seconds)
-  }
-
-  const href = item.url === '#' ? undefined : item.url
-  const target = item.url !== '#' ? '_blank' : undefined
-  const borderClass = item.is_serendipity ? 'border-grow-yellow/40' : 'border-grow-border'
-  const cardClass = 'group relative block overflow-hidden rounded-2xl border bg-grow-card transition-all duration-200 hover:scale-[1.01] ' + colSpan + ' ' + borderClass
-  const titleClass = 'mt-1 font-bold leading-snug text-grow-text line-clamp-2 ' + (size === 'wide' ? 'text-[15px]' : 'text-[12px]')
-  const imgClass = 'w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ' + imageHeight
-
+function ImageCard({ item, onDwell }: { item: any; onDwell: (id: string, s: number) => void }) {
+  const t = useRef(0)
+  const isPortrait = (item.height || 0) > (item.width || 0)
+  const enter = () => { t.current = Date.now() }
+  const leave = () => { const s = (Date.now() - t.current) / 1000; if (s > 1) onDwell(item.id, s) }
   return (
-    <a href={href} target={target} rel='noopener noreferrer' className={cardClass} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onTouchStart={handleEnter} onTouchEnd={handleLeave}>
-      {item.is_serendipity && (
-        <div className='absolute right-2 top-2 z-10 rounded-full bg-grow-yellow/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-grow-bg'>
-          Scopri
+    
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={'group relative block overflow-hidden rounded-xl bg-grow-soft w-full ' + (isPortrait ? 'h-full' : 'h-[120px]')}
+      onMouseEnter={enter} onMouseLeave={leave} onTouchStart={enter} onTouchEnd={leave}
+    >
+      <SafeImage
+        src={item.image_url || placeholders[item.category] || placeholders.design}
+        alt={item.title || ''}
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute bottom-0 left-0 right-0 p-2">
+          {item.artist_name && <p className="text-[10px] text-white/90 font-medium truncate">{item.artist_name}</p>}
+          {item.dominant_color && (
+            <div className="mt-1 flex items-center gap-1">
+              <div className="h-2.5 w-2.5 rounded-full border border-white/30" style={{ backgroundColor: item.dominant_color }} />
+              <span className="text-[9px] text-white/60">{item.dominant_color}</span>
+            </div>
+          )}
         </div>
+      </div>
+    </a>
+  )
+}
+
+function ArticleCard({ item, idx, onDwell }: { item: any; idx: number; onDwell: (id: string, s: number) => void }) {
+  const t = useRef(0)
+  const isWide = idx % 5 === 0
+  const enter = () => { t.current = Date.now() }
+  const leave = () => { const s = (Date.now() - t.current) / 1000; if (s > 1) onDwell(item.id, s) }
+  return (
+    
+      href={item.url === '#' ? undefined : item.url}
+      target={item.url !== '#' ? '_blank' : undefined}
+      rel="noopener noreferrer"
+      className={'group relative block overflow-hidden rounded-2xl border bg-grow-card transition-all duration-200 hover:scale-[1.01] ' + (isWide ? 'col-span-2' : 'col-span-1') + ' ' + (item.is_serendipity ? 'border-grow-yellow/40' : 'border-grow-border')}
+      onMouseEnter={enter} onMouseLeave={leave} onTouchStart={enter} onTouchEnd={leave}
+    >
+      {item.is_serendipity && (
+        <div className="absolute right-2 top-2 z-10 rounded-full bg-grow-yellow/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-grow-bg">Scopri</div>
       )}
-      <CardImage src={imgSrc} alt={item.title} className={imgClass} />
-      <div className='p-3'>
-        <span className='text-[9px] font-bold uppercase tracking-[0.15em] text-grow-yellow'>
+      <SafeImage
+        src={item.image_url || placeholders[item.category] || placeholders.design}
+        alt={item.title}
+        className={'w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ' + (isWide ? 'h-48' : 'h-28')}
+      />
+      <div className="p-3">
+        <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-grow-yellow">
           {categoryLabels[item.category] || item.category}
         </span>
-        <h3 className={titleClass}>{item.title}</h3>
-        <p className='mt-1.5 text-[10px] text-grow-muted'>{item.sources?.name} · {timeAgo(item.published_at)}</p>
+        <h3 className={'mt-1 font-bold leading-snug text-grow-text line-clamp-2 ' + (isWide ? 'text-[14px]' : 'text-[12px]')}>
+          {item.title}
+        </h3>
+        <p className="mt-1.5 text-[10px] text-grow-muted">{item.sources?.name} · {timeAgo(item.published_at)}</p>
       </div>
     </a>
   )
@@ -112,22 +134,22 @@ function FeedCard({ item, idx, onDwell }: { item: any; idx: number; onDwell: (id
 
 export default function ScopriPage() {
   const [active, setActive] = useState<string | null>(null)
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [images, setImages] = useState<any[]>([])
+  const [articles, setArticles] = useState<any[]>([])
+  const [loadingImages, setLoadingImages] = useState(true)
+  const [loadingArticles, setLoadingArticles] = useState(true)
 
   const load = async (cat: string | null) => {
     setActive(cat)
-    setLoading(true)
-    try {
-      const url = cat ? '/api/feed?category=' + cat + '&limit=40' : '/api/feed?limit=40'
-      const res = await fetch(url)
-      const data = await res.json()
-      setItems(data.items || [])
-    } catch {
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
+    setLoadingImages(true)
+    setLoadingArticles(true)
+    const catParam = cat ? '&category=' + cat : ''
+
+    fetch('/api/feed?type=image&limit=24' + catParam)
+      .then(r => r.json()).then(d => setImages(d.items || [])).catch(() => setImages([])).finally(() => setLoadingImages(false))
+
+    fetch('/api/feed?type=article&limit=20' + catParam)
+      .then(r => r.json()).then(d => setArticles(d.items || [])).catch(() => setArticles([])).finally(() => setLoadingArticles(false))
   }
 
   useEffect(() => { load(null) }, [])
@@ -143,16 +165,17 @@ export default function ScopriPage() {
   }
 
   return (
-    <main className='min-h-screen bg-grow-bg pb-28 text-grow-text' style={{ fontFamily: font }}>
-      <div className='mx-auto max-w-lg px-4 pt-12'>
-        <header className='mb-6'>
-          <h1 className='text-[26px] font-black uppercase tracking-tight'>
-            Scopri<span className='text-grow-yellow'>.</span>
+    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text" style={{ fontFamily: font }}>
+      <div className="mx-auto max-w-lg px-4 pt-12">
+
+        <header className="mb-6">
+          <h1 className="text-[26px] font-black uppercase tracking-tight">
+            Scopri<span className="text-grow-yellow">.</span>
           </h1>
-          <p className='mt-1 text-sm text-grow-muted'>Curato per te · aggiornato ogni notte</p>
+          <p className="mt-1 text-sm text-grow-muted">Curato per te · aggiornato ogni notte</p>
         </header>
 
-        <div className='scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 pb-4'>
+        <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 pb-4">
           {categories.map(c => (
             <button
               key={c.key ?? 'all'}
@@ -164,24 +187,50 @@ export default function ScopriPage() {
           ))}
         </div>
 
-        {loading ? (
-          <div className='grid grid-cols-2 gap-3'>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className={'animate-pulse rounded-2xl bg-grow-soft ' + (i % 3 === 0 ? 'col-span-2 h-52' : 'h-44')} />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className='py-20 text-center text-grow-muted'>
-            <p className='text-4xl mb-3'>○</p>
-            <p className='text-sm'>Nessun contenuto per questa categoria.</p>
-          </div>
-        ) : (
-          <div className='grid grid-cols-2 gap-3'>
-            {items.map((item, idx) => (
-              <FeedCard key={item.id} item={item} idx={idx} onDwell={handleDwell} />
-            ))}
-          </div>
-        )}
+        <section className="mb-10">
+          <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-grow-muted">Immagini</h2>
+          {loadingImages ? (
+            <div className="grid grid-cols-3 gap-2 auto-rows-[120px]">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className={'animate-pulse rounded-xl bg-grow-soft ' + (i % 4 === 0 ? 'row-span-2' : '')} />
+              ))}
+            </div>
+          ) : images.length === 0 ? (
+            <p className="py-8 text-center text-sm text-grow-muted">Nessuna immagine. Esegui /api/fetch-images per popolare.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 auto-rows-[120px]">
+              {images.map((item, idx) => {
+                const isPortrait = (item.height || 0) > (item.width || 0)
+                const isBig = idx % 6 === 0
+                return (
+                  <div key={item.id} className={isBig || isPortrait ? 'row-span-2' : 'row-span-1'}>
+                    <ImageCard item={item} onDwell={handleDwell} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-grow-muted">Articoli</h2>
+          {loadingArticles ? (
+            <div className="grid grid-cols-2 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={'animate-pulse rounded-2xl bg-grow-soft ' + (i % 5 === 0 ? 'col-span-2 h-48' : 'h-40')} />
+              ))}
+            </div>
+          ) : articles.length === 0 ? (
+            <p className="py-8 text-center text-sm text-grow-muted">Nessun articolo disponibile.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {articles.map((item, idx) => (
+                <ArticleCard key={item.id} item={item} idx={idx} onDwell={handleDwell} />
+              ))}
+            </div>
+          )}
+        </section>
+
       </div>
       <BottomNav />
     </main>
