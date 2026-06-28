@@ -27,6 +27,22 @@ function extractImage(item: any): string | null {
   return null
 }
 
+
+async function fetchOgImage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { 
+      signal: AbortSignal.timeout(4000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; GROWBot/1.0)' }
+    })
+    const html = await res.text()
+    const match = html.match(/<meta[^>]+(?:property=["']og:image["']|name=["']twitter:image["'])[^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property=["']og:image["']|name=["']twitter:image["'])/i)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
+}
+
 export async function GET() {
   try {
     const { data: sources } = await supabase
@@ -46,7 +62,10 @@ export async function GET() {
         for (const item of items) {
           if (!item.title || !item.link) continue
 
-          const imageUrl = extractImage(item)
+          let imageUrl = extractImage(item)
+          if (!imageUrl && item.link) {
+            imageUrl = await fetchOgImage(item.link)
+          }
           const wordCount = item.contentSnippet?.split(' ').length || 200
           const readTime = Math.ceil(wordCount / 200)
 
