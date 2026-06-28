@@ -79,10 +79,38 @@ async function saveHistory(rows: { role: string; content: string; image_url?: st
   try { await supabase.from('chat_history').insert(rows) } catch {}
 }
 
+async function getMemories(message: string): Promise<string> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://grow-eight-kappa.vercel.app'}/api/memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: message, action: 'search' })
+    })
+    const data = await res.json()
+    if (!data.memories?.length) return ''
+    const relevant = data.memories.filter((m: any) => m.similarity > 0.75)
+    if (!relevant.length) return ''
+    return '\n\nCONTESTO DA MEMORIA:\n' + relevant.map((m: any) => `- ${m.content}`).join('\n')
+  } catch { return '' }
+}
+
+async function saveMemory(text: string): Promise<void> {
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://grow-eight-kappa.vercel.app'}/api/memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, action: 'save' })
+    })
+  } catch {}
+}
+
 async function chatWithGemini(message: string, history: { role: string; content: string }[]): Promise<string> {
+  const memories = await getMemories(message)
+  const systemWithMemory = SYSTEM_PROMPT + memories
+
   const model = gemini.getGenerativeModel({
     model: 'gemini-2.5-flash',
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: systemWithMemory,
   })
   const chat = model.startChat({
     history: history.slice(-10).map(h => ({
@@ -91,7 +119,14 @@ async function chatWithGemini(message: string, history: { role: string; content:
     }))
   })
   const result = await chat.sendMessage(message)
-  return result.response.text()
+  const reply = result.response.text()
+
+  // Salva in memoria le conversazioni significative (>100 char)
+  if (message.length > 100 || reply.length > 200) {
+    saveMemory(`Davide ha chiesto: ${message.slice(0, 200)}. Risposta: ${reply.slice(0, 300)}`)
+  }
+
+  return reply
 }
 
 async function chatWithGroq(message: string, history: { role: string; content: string }[]): Promise<string> {
