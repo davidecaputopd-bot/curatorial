@@ -10,6 +10,10 @@ type Message = {
   content: string
   image_url?: string
   imageUrl?: string
+  provider?: string
+  providerLabel?: string
+  model?: string
+  mode?: string
 }
 
 type Reference = {
@@ -136,6 +140,10 @@ export default function AiPage() {
           role: 'assistant',
           content: data.reply || 'Errore: risposta vuota.',
           imageUrl: data.imageUrl,
+          provider: data.provider,
+          providerLabel: data.providerLabel,
+          model: data.model,
+          mode: data.mode,
         },
       ])
     } catch {
@@ -264,6 +272,12 @@ export default function AiPage() {
                     alt=""
                     className="mt-3 rounded-[1.2rem]"
                   />
+                )}
+
+                {message.role === 'assistant' && (message.provider || message.model) && (
+                  <p className="mt-3 border-t border-black/10 pt-2 text-[10px] font-black uppercase tracking-[0.12em] text-grow-muted">
+                    {(message.providerLabel || message.provider || 'AI')}{message.model ? ` · ${message.model}` : ''}{message.mode ? ` · ${message.mode}` : ''}
+                  </p>
                 )}
               </div>
             </div>

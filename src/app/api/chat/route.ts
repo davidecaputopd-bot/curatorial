@@ -207,7 +207,9 @@ export async function POST(req: NextRequest) {
       type: 'text',
       reply,
       provider: routed.provider,
+      providerLabel: routed.providerLabel,
       model: routed.model,
+      mode: routed.mode,
       attempts: routed.attempts,
     })
   } catch (error) {
