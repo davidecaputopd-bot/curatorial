@@ -1,15 +1,22 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import {
-  STUDIO_TEMPLATES,
-  compileStudioJob,
-  type StudioProject,
-  type StudioTemplateId,
-} from '@/lib/ai/studio'
+  compileProductionPrompts,
+  type CompiledPrompt,
+} from '@/lib/ai/prompt-compiler'
+import {
+  buildFallbackProductionPlan,
+  normalizeProductionPlan,
+} from '@/lib/ai/production-planner'
+import type {
+  ProductionAssetType,
+  ProductionPlan,
+  ProductionProject,
+} from '@/lib/ai/production-types'
 
-const PROJECTS: StudioProject[] = [
+const PROJECTS: ProductionProject[] = [
   'AN23',
   'Cantina Don Carlo',
   'Exousia',
@@ -18,175 +25,518 @@ const PROJECTS: StudioProject[] = [
   'Altro',
 ]
 
+const QUICK_ACTIONS: {
+  asset: ProductionAssetType
+  title: string
+  description: string
+  defaultBrief: string
+  format: string
+}[] = [
+  {
+    asset: 'video',
+    title: 'Nuovo video',
+    description: 'Reel, clip e image-to-video.',
+    defaultBrief: 'Reel premium con soggetto stabile e finale brand pulito',
+    format: '9:16 verticale social',
+  },
+  {
+    asset: 'image',
+    title: 'Nuova immagine',
+    description: 'Visual editoriale e campagna.',
+    defaultBrief: 'Visual editoriale premium pronto per una campagna',
+    format: '4:5 verticale social',
+  },
+  {
+    asset: 'mockup',
+    title: 'Nuovo mockup',
+    description: 'Prodotto, bottiglia e packaging.',
+    defaultBrief: 'Mockup prodotto realistico con asset originali protetti',
+    format: '4:5 verticale',
+  },
+  {
+    asset: 'carousel',
+    title: 'Nuovo carosello',
+    description: 'Struttura, copy e direzione visuale.',
+    defaultBrief: 'Carosello editoriale con struttura chiara e CTA finale',
+    format: '4:5 · 7 slide',
+  },
+]
+
+const MODES = [
+  { label: 'Free/API', state: 'Eseguibile ora' },
+  { label: 'Local worker', state: 'Richiede il Mac' },
+  { label: 'Manual tool', state: 'Tool esterno' },
+  { label: 'Cheap API', state: 'Future-ready' },
+  { label: 'Premium', state: 'Conferma costo' },
+]
+
+function readPlanFromBrowser() {
+  const search = new URLSearchParams(window.location.search)
+  const queryPlan = search.get('plan')
+  const storedPlan =
+    window.sessionStorage.getItem('grow-production-plan') ||
+    window.localStorage.getItem('grow-production-plan')
+  const raw = queryPlan || storedPlan
+
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    const fallback = buildFallbackProductionPlan(
+      typeof parsed === 'object' && parsed && 'title' in parsed
+        ? String((parsed as { title?: unknown }).title || '')
+        : ''
+    )
+    return normalizeProductionPlan(parsed, fallback)
+  } catch {
+    return null
+  }
+}
+
+function accessLabel(prompt: CompiledPrompt) {
+  if (prompt.access === 'local') return 'Richiede worker locale sul Mac'
+  if (prompt.access === 'manual') return 'Richiede tool esterno'
+  return 'GROW può eseguirlo direttamente'
+}
+
+function costLabel(plan: ProductionPlan) {
+  if (plan.cost_mode === 'free') return 'Free / locale'
+  if (plan.cost_mode === 'free-tier') return 'Free-tier'
+  if (plan.cost_mode === 'cheap') return 'API economica'
+  return 'Potrebbe costare'
+}
+
 export default function StudioPage() {
-  const [templateId, setTemplateId] = useState<StudioTemplateId>('social-video')
-  const [project, setProject] = useState<StudioProject>('AN23')
+  const [project, setProject] = useState<ProductionProject>('AN23')
+  const [assetType, setAssetType] = useState<ProductionAssetType>('video')
   const [format, setFormat] = useState('9:16 verticale social')
   const [brief, setBrief] = useState('')
   const [reference, setReference] = useState('')
-  const [copied, setCopied] = useState<string | null>(null)
+  const [activePlan, setActivePlan] = useState<ProductionPlan | null>(null)
+  const [importedPlan, setImportedPlan] = useState<ProductionPlan | null>(null)
+  const [copied, setCopied] = useState<CompiledPrompt['engine'] | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  const outputs = useMemo(() => {
-    return compileStudioJob({
-      templateId,
-      project,
+  useEffect(() => {
+    const plan = readPlanFromBrowser()
+    if (!plan) return
+
+    const frame = window.requestAnimationFrame(() => {
+      setImportedPlan(plan)
+      setProject(plan.project)
+      setAssetType(plan.asset_type)
+      setBrief(plan.title)
+      setFormat(plan.asset_type === 'video' ? '9:16 verticale social' : '4:5 verticale')
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  const compiled = useMemo(() => {
+    if (!activePlan) return []
+    return compileProductionPrompts({
+      plan: activePlan,
       brief,
       reference,
       format,
-    })
-  }, [templateId, project, brief, reference, format])
+    }).prompts
+  }, [activePlan, brief, reference, format])
 
-  async function copyText(id: string, text: string) {
+  function selectQuickAction(action: (typeof QUICK_ACTIONS)[number]) {
+    setAssetType(action.asset)
+    setBrief(action.defaultBrief)
+    setFormat(action.format)
+    setActivePlan(null)
+    setNotice(null)
+    document.getElementById('studio-composer')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
+  function compileCurrentPlan(plan?: ProductionPlan) {
+    const productionPlan =
+      plan ||
+      buildFallbackProductionPlan(
+        `Crea ${assetType} per ${project}. ${brief}`,
+        { project, selectedReference: reference || undefined }
+      )
+    setActivePlan(productionPlan)
+    setProject(productionPlan.project)
+    setAssetType(productionPlan.asset_type)
+    setNotice(null)
+    window.sessionStorage.setItem('grow-production-plan', JSON.stringify(productionPlan))
+    requestAnimationFrame(() => {
+      document.getElementById('studio-output')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  async function copyPrompt(prompt: CompiledPrompt) {
+    const text = [
+      prompt.prompt,
+      prompt.negative_prompt
+        ? `\n\nNEGATIVE PROMPT\n${prompt.negative_prompt}`
+        : '',
+      prompt.workflow_note ? `\n\nWORKFLOW NOTE\n${prompt.workflow_note}` : '',
+    ].join('')
     await navigator.clipboard.writeText(text)
-    setCopied(id)
-    setTimeout(() => setCopied(null), 1200)
+    setCopied(prompt.engine)
+    window.setTimeout(() => setCopied(null), 1400)
   }
 
   return (
     <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-8 text-grow-text">
-      <section className="mx-auto max-w-xl">
-        <header className="mb-6">
+      <section className="mx-auto max-w-5xl">
+        <header className="max-w-2xl">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
             GROW Studio
           </p>
-
-          <h1 className="mt-2 text-[40px] font-black uppercase leading-[0.86] tracking-tighter">
+          <h1 className="mt-2 text-[clamp(2.7rem,8vw,5rem)] font-black uppercase leading-[0.82] tracking-[-0.065em]">
             Fabbrica creativa<span className="text-grow-yellow">.</span>
           </h1>
-
-          <p className="mt-4 text-sm leading-relaxed text-grow-muted">
-            Non è una lista di AI. È un compilatore operativo: scegli il lavoro,
-            scrivi il brief, GROW prepara prompt e checklist per il tool giusto.
+          <p className="mt-5 max-w-xl text-sm leading-relaxed text-grow-muted">
+            Trasforma idee, reference e prompt in asset producibili. GROW prepara
+            il percorso; tu vedi subito cosa può eseguire, cosa richiede il Mac e
+            cosa avviene in un tool esterno.
           </p>
         </header>
 
-        <div className="rounded-[1.8rem] border border-black/10 bg-white/75 p-4 shadow-sm">
-          <label className="text-[11px] font-black uppercase tracking-[0.16em] text-grow-muted">
-            Tipo lavoro
-          </label>
-
-          <select
-            value={templateId}
-            onChange={(event) => setTemplateId(event.target.value as StudioTemplateId)}
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none"
-          >
-            {STUDIO_TEMPLATES.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.title}
-              </option>
-            ))}
-          </select>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
+        <section className="mt-8">
+          <div className="mb-3 flex items-end justify-between gap-4">
             <div>
-              <label className="text-[11px] font-black uppercase tracking-[0.16em] text-grow-muted">
-                Progetto
-              </label>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-grow-muted">
+                Avvio rapido
+              </p>
+              <h2 className="mt-1 text-xl font-black uppercase tracking-tight">
+                Cosa produciamo?
+              </h2>
+            </div>
+            <p className="hidden text-xs text-grow-muted sm:block">Un output alla volta.</p>
+          </div>
 
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {QUICK_ACTIONS.map((action, index) => (
+              <button
+                key={action.asset}
+                type="button"
+                onClick={() => selectQuickAction(action)}
+                className={`min-h-36 rounded-[1.5rem] border p-4 text-left transition ${
+                  assetType === action.asset
+                    ? 'border-black bg-grow-yellow text-black'
+                    : 'border-black/10 bg-white hover:-translate-y-0.5 hover:border-black/30'
+                }`}
+              >
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] opacity-45">
+                  0{index + 1}
+                </span>
+                <strong className="mt-7 block text-lg font-black uppercase leading-none tracking-tight">
+                  {action.title}
+                </strong>
+                <span className="mt-2 block text-xs leading-snug opacity-65">
+                  {action.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-5 overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2">
+            {MODES.map((mode) => (
+              <div
+                key={mode.label}
+                className="rounded-full border border-black/10 bg-white/70 px-4 py-2"
+              >
+                <span className="text-[10px] font-black uppercase tracking-[0.12em]">
+                  {mode.label}
+                </span>
+                <span className="ml-2 text-[10px] text-grow-muted">{mode.state}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {importedPlan && (
+          <section className="mt-7 overflow-hidden rounded-[1.8rem] bg-[#0F0F10] p-5 text-white shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-2xl">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-grow-yellow">
+                  Production Plan importato da AI
+                </p>
+                <h2 className="mt-2 text-2xl font-black uppercase tracking-tight">
+                  {importedPlan.title}
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em]">
+                  <span className="rounded-full bg-white/10 px-3 py-2">
+                    {importedPlan.project}
+                  </span>
+                  <span className="rounded-full bg-white/10 px-3 py-2">
+                    {importedPlan.asset_type}
+                  </span>
+                  <span className="rounded-full bg-grow-yellow px-3 py-2 text-black">
+                    {importedPlan.recommended_engine}
+                  </span>
+                  <span className="rounded-full border border-white/15 px-3 py-2 text-white/60">
+                    {costLabel(importedPlan)}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => compileCurrentPlan(importedPlan)}
+                className="rounded-full bg-grow-yellow px-5 py-3 text-[11px] font-black uppercase tracking-tight text-black"
+              >
+                Compila prompt
+              </button>
+            </div>
+
+            <ol className="mt-5 grid gap-2 text-xs leading-relaxed text-white/65 md:grid-cols-2">
+              {importedPlan.production_path.map((step, index) => (
+                <li key={`${step}-${index}`} className="flex gap-3 rounded-xl bg-white/5 p-3">
+                  <span className="font-black text-grow-yellow">0{index + 1}</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        <section
+          id="studio-composer"
+          className="mt-7 scroll-mt-5 rounded-[1.8rem] border border-black/10 bg-white p-5 shadow-sm"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-grow-muted">
+                Composer
+              </p>
+              <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">
+                Brief operativo
+              </h2>
+            </div>
+            <p className="text-xs text-grow-muted">Compatto, verificabile, copiabile.</p>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-grow-muted">
+              Progetto
               <select
                 value={project}
-                onChange={(event) => setProject(event.target.value as StudioProject)}
-                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none"
+                onChange={(event) => setProject(event.target.value as ProductionProject)}
+                className="mt-2 w-full rounded-xl border border-black/10 bg-grow-bg px-3 py-3 text-sm font-bold text-black outline-none focus:border-black"
               >
                 {PROJECTS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-grow-muted">
+              Tipo asset
+              <select
+                value={assetType}
+                onChange={(event) =>
+                  setAssetType(event.target.value as ProductionAssetType)
+                }
+                className="mt-2 w-full rounded-xl border border-black/10 bg-grow-bg px-3 py-3 text-sm font-bold text-black outline-none focus:border-black"
+              >
+                {QUICK_ACTIONS.map((action) => (
+                  <option key={action.asset} value={action.asset}>
+                    {action.title.replace('Nuovo ', '').replace('Nuova ', '')}
                   </option>
                 ))}
               </select>
-            </div>
+            </label>
 
-            <div>
-              <label className="text-[11px] font-black uppercase tracking-[0.16em] text-grow-muted">
-                Formato
-              </label>
-
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-grow-muted">
+              Formato
               <input
                 value={format}
                 onChange={(event) => setFormat(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-bold outline-none"
+                className="mt-2 w-full rounded-xl border border-black/10 bg-grow-bg px-3 py-3 text-sm font-bold normal-case text-black outline-none focus:border-black"
                 placeholder="9:16, 4:5, 16:9..."
               />
-            </div>
+            </label>
           </div>
 
-          <label className="mt-4 block text-[11px] font-black uppercase tracking-[0.16em] text-grow-muted">
-            Brief
-          </label>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-grow-muted">
+              Brief
+              <textarea
+                value={brief}
+                onChange={(event) => setBrief(event.target.value)}
+                rows={5}
+                className="mt-2 w-full resize-none rounded-xl border border-black/10 bg-grow-bg px-3 py-3 text-sm font-normal normal-case leading-relaxed text-black outline-none focus:border-black"
+                placeholder="Obiettivo, scena, soggetto e risultato atteso..."
+              />
+            </label>
 
-          <textarea
-            value={brief}
-            onChange={(event) => setBrief(event.target.value)}
-            rows={5}
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm leading-relaxed outline-none"
-            placeholder="Es. Reel AN23: bottiglia in pineta, vino che entra nel bicchiere, finale logo pulito..."
-          />
+            <label className="text-[10px] font-black uppercase tracking-[0.15em] text-grow-muted">
+              Reference / vincoli
+              <textarea
+                value={reference}
+                onChange={(event) => setReference(event.target.value)}
+                rows={5}
+                className="mt-2 w-full resize-none rounded-xl border border-black/10 bg-grow-bg px-3 py-3 text-sm font-normal normal-case leading-relaxed text-black outline-none focus:border-black"
+                placeholder="Asset originali, stile, cosa non deve cambiare..."
+              />
+            </label>
+          </div>
 
-          <label className="mt-4 block text-[11px] font-black uppercase tracking-[0.16em] text-grow-muted">
-            Reference / vincoli
-          </label>
-
-          <textarea
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-            rows={4}
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm leading-relaxed outline-none"
-            placeholder="Incolla qui stile, reference, colori, cosa non deve cambiare..."
-          />
-        </div>
-
-        <div className="mt-5 space-y-4">
-          {outputs.map((output) => (
-            <article
-              key={output.id}
-              className="rounded-[1.8rem] border border-black/10 bg-[#0F0F10] p-4 text-white shadow-sm"
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-lg text-xs leading-relaxed text-grow-muted">
+              GROW compila varianti specifiche per motore. Nessuna generazione a
+              pagamento parte da questo pulsante.
+            </p>
+            <button
+              type="button"
+              onClick={() => compileCurrentPlan()}
+              disabled={!brief.trim()}
+              className="rounded-full bg-[#0F0F10] px-6 py-3 text-[11px] font-black uppercase tracking-tight text-white disabled:cursor-not-allowed disabled:opacity-30"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
-                    {output.tool} · {output.access}
+              Compila prompt
+            </button>
+          </div>
+        </section>
+
+        <section id="studio-output" className="mt-8 scroll-mt-5">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-grow-muted">
+                Output
+              </p>
+              <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">
+                Tool cards
+              </h2>
+            </div>
+            {activePlan && (
+              <div className="flex gap-2 text-[10px] font-black uppercase">
+                <span className="rounded-full bg-grow-yellow px-3 py-2">
+                  Motore consigliato · {activePlan.recommended_engine}
+                </span>
+                <span className="rounded-full border border-black/10 bg-white px-3 py-2">
+                  {costLabel(activePlan)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {!activePlan ? (
+            <div className="rounded-[1.8rem] border border-dashed border-black/20 px-5 py-14 text-center">
+              <p className="text-sm font-bold">Nessun prompt compilato.</p>
+              <p className="mt-1 text-xs text-grow-muted">
+                Scegli un lavoro, completa il brief e avvia il compiler.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {compiled.map((prompt) => (
+                <article
+                  key={prompt.engine}
+                  className="flex flex-col rounded-[1.8rem] bg-[#0F0F10] p-5 text-white shadow-xl"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-yellow">
+                        {accessLabel(prompt)}
+                      </p>
+                      <h3 className="mt-2 text-xl font-black uppercase tracking-tight">
+                        {prompt.title}
+                      </h3>
+                    </div>
+                    <span className="rounded-full border border-white/15 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-white/55">
+                      {prompt.access}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 border-l-2 border-grow-yellow pl-3 text-xs leading-relaxed text-white/55">
+                    {prompt.why_this_engine}
                   </p>
 
-                  <h2 className="mt-1 text-xl font-black uppercase tracking-tight">
-                    {output.title}
-                  </h2>
-                </div>
+                  <div className="mt-4 max-h-[410px] overflow-auto rounded-[1.2rem] bg-white/[0.07] p-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
+                      Pronto da copiare
+                    </p>
+                    <pre className="mt-3 whitespace-pre-wrap font-sans text-xs leading-relaxed text-white/85">
+                      {prompt.prompt}
+                    </pre>
+                    {prompt.negative_prompt && (
+                      <>
+                        <p className="mt-5 text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
+                          Negative prompt
+                        </p>
+                        <p className="mt-2 text-xs leading-relaxed text-white/65">
+                          {prompt.negative_prompt}
+                        </p>
+                      </>
+                    )}
+                  </div>
 
-                <a
-                  href={output.url}
-                  target={output.url.startsWith('http') ? '_blank' : undefined}
-                  rel={output.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                  className="rounded-full bg-grow-yellow px-3 py-2 text-[11px] font-black uppercase tracking-tight text-[#0F0F10]"
-                >
-                  Apri
-                </a>
-              </div>
+                  {prompt.workflow_note && (
+                    <p className="mt-3 rounded-xl border border-white/10 p-3 text-xs leading-relaxed text-white/55">
+                      <strong className="text-white/80">Workflow:</strong>{' '}
+                      {prompt.workflow_note}
+                    </p>
+                  )}
 
-              <pre className="mt-4 max-h-[360px] overflow-auto whitespace-pre-wrap rounded-[1.2rem] bg-white/8 p-4 text-xs leading-relaxed text-white/85">
-                {output.prompt}
-              </pre>
+                  <div className="mt-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
+                      Checklist qualità
+                    </p>
+                    <ul className="mt-2 space-y-2 text-xs leading-relaxed text-white/65">
+                      {prompt.checklist.map((item) => (
+                        <li key={item} className="flex gap-2">
+                          <span className="text-grow-yellow">—</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <button
-                  onClick={() => copyText(output.id, output.prompt)}
-                  className="rounded-full border border-white/15 px-4 py-2 text-[11px] font-black uppercase tracking-tight"
-                >
-                  {copied === output.id ? 'Copiato' : 'Copia prompt'}
-                </button>
+                  <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                    <button
+                      type="button"
+                      onClick={() => copyPrompt(prompt)}
+                      className="rounded-full bg-grow-yellow px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-black"
+                    >
+                      {copied === prompt.engine ? 'Copiato' : prompt.copy_button_label}
+                    </button>
+                    {prompt.url && (
+                      <a
+                        href={prompt.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-full border border-white/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-white"
+                      >
+                        {prompt.open_button_label}
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotice(
+                          'La coda job non è ancora configurata. Il prompt resta pronto da usare.'
+                        )
+                      }
+                      className="rounded-full border border-white/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-white/65"
+                    >
+                      Salva come job
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
 
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">
-                  Checklist qualità
-                </p>
-              </div>
-
-              <ul className="mt-3 space-y-1 text-xs leading-relaxed text-white/65">
-                {output.checklist.map((item) => (
-                  <li key={item}>• {item}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
+          {notice && (
+            <p className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3 text-xs font-bold">
+              {notice}
+            </p>
+          )}
+        </section>
       </section>
 
       <BottomNav />
