@@ -6,7 +6,6 @@ export async function GET(request: Request) {
   const category = searchParams.get('category')
   const typeFilter = searchParams.get('type')
   const limit = parseInt(searchParams.get('limit') || '40')
-  const typeFilter = searchParams.get('type')
 
   try {
     const { data: profile } = await supabase
