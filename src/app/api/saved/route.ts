@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
+    const { supabase, user } = await getAuthenticatedSupabase()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { data, error } = await supabase
       .from('interactions')
       .select('content_id, created_at')
+      .eq('user_id', user.id)
       .eq('action', 'save')
       .order('created_at', { ascending: false })
 
@@ -37,10 +41,14 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
+    const { supabase, user } = await getAuthenticatedSupabase()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { content_id } = await request.json()
     await supabase
       .from('interactions')
       .delete()
+      .eq('user_id', user.id)
       .eq('content_id', content_id)
       .eq('action', 'save')
     return NextResponse.json({ success: true })

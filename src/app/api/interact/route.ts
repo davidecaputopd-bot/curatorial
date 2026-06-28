@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
+  const { supabase, user } = await getAuthenticatedSupabase()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { content_id, action, read_seconds } = await request.json()
 
   try {
     await supabase.from('interactions').insert({
       content_id,
       action,
-      read_seconds: read_seconds || null
+      read_seconds: read_seconds || null,
+      user_id: user.id,
     })
 
     // Aggiorna i pesi del profilo in base all'azione
@@ -23,6 +27,7 @@ export async function POST(request: Request) {
         const { data: profile } = await supabase
           .from('user_profile')
           .select('category_weights')
+          .eq('user_id', user.id)
           .single()
 
         const weights = profile?.category_weights || {}
@@ -35,7 +40,7 @@ export async function POST(request: Request) {
         await supabase
           .from('user_profile')
           .update({ category_weights: weights, updated_at: new Date().toISOString() })
-          .eq('name', 'Davide')
+          .eq('user_id', user.id)
       }
     }
 

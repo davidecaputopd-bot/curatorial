@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
-import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_PUBLISHABLE_KEY!
-)
-
 const SYSTEM_PROMPT = `Sei GROW AI. Parli con Davide Caputo, art director freelance a Leverano (Salento).
 
 CHI SEI: un collega senior creativo con opinioni nette. Non sei un assistente — sei un pari che ha già fatto quello che Davide sta cercando di fare. Quando vedi un errore lo dici. Il tuo istinto è criticare prima di elogiare.
@@ -75,8 +71,16 @@ function buildImageUrl(prompt: string): string {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`
 }
 
-async function saveHistory(rows: { role: string; content: string; image_url?: string }[]) {
-  try { await supabase.from('chat_history').insert(rows) } catch {}
+async function saveHistory(
+  supabase: SupabaseClient,
+  userId: string,
+  rows: { role: string; content: string; image_url?: string }[]
+) {
+  try {
+    await supabase.from('chat_history').insert(
+      rows.map((row) => ({ ...row, user_id: userId }))
+    )
+  } catch {}
 }
 
 async function getMemories(message: string): Promise<string> {
@@ -148,6 +152,9 @@ async function chatWithGroq(message: string, history: { role: string; content: s
 
 export async function POST(req: NextRequest) {
   try {
+    const { supabase, user } = await getAuthenticatedSupabase()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { message, history = [] } = await req.json()
     if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 })
 
@@ -155,7 +162,7 @@ export async function POST(req: NextRequest) {
       const expandedPrompt = await expandImagePrompt(message)
       const imageUrl = buildImageUrl(expandedPrompt)
       const reply = `Ecco la tua immagine 🎨\n\n**Prompt:** ${expandedPrompt}`
-      await saveHistory([
+      await saveHistory(supabase, user.id, [
         { role: 'user', content: message },
         { role: 'assistant', content: reply, image_url: imageUrl }
       ])
@@ -170,7 +177,7 @@ export async function POST(req: NextRequest) {
       reply = await chatWithGroq(message, history)
     }
 
-    await saveHistory([
+    await saveHistory(supabase, user.id, [
       { role: 'user', content: message },
       { role: 'assistant', content: reply }
     ])
@@ -183,5 +190,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const { user } = await getAuthenticatedSupabase()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   return NextResponse.json({ status: 'ok' })
 }

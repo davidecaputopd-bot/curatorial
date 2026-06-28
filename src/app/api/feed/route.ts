@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
+  const { supabase, user } = await getAuthenticatedSupabase()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
   const typeFilter = searchParams.get('type')
@@ -11,7 +14,7 @@ export async function GET(request: Request) {
     const { data: profile } = await supabase
       .from('user_profile')
       .select('*')
-      .eq('name', 'Davide')
+      .eq('user_id', user.id)
       .single()
 
     const weights: Record<string, number> = profile?.category_weights || {
