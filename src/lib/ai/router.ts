@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
+import { getAIProviders, type AITaskType, type AIProviderConfig } from './providers'
 
 export type AIChatMessage = {
   role: 'user' | 'assistant'
@@ -9,12 +10,15 @@ export type AIChatMessage = {
 export type AIRouterResult = {
   reply: string
   provider: string
+  providerLabel: string
   model: string
+  mode: string
   attempts: {
     provider: string
     model: string
     ok: boolean
     error?: string
+    status?: number
   }[]
 }
 
@@ -24,19 +28,12 @@ type RouterInput = {
   history?: AIChatMessage[]
   temperature?: number
   maxTokens?: number
+  taskType?: AITaskType
 }
 
 function cleanError(error: unknown) {
-  if (error instanceof Error) return error.message.slice(0, 500)
-  return String(error).slice(0, 500)
-}
-
-function hasKey(value: string | undefined) {
-  return Boolean(value && value.trim().length > 0)
-}
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean)))
+  if (error instanceof Error) return error.message.slice(0, 700)
+  return String(error).slice(0, 700)
 }
 
 function openAiMessages(system: string, history: AIChatMessage[], message: string) {
@@ -50,14 +47,25 @@ function openAiMessages(system: string, history: AIChatMessage[], message: strin
   ]
 }
 
-async function callGemini(input: RouterInput, modelName: string) {
-  if (!hasKey(process.env.GEMINI_API_KEY)) {
-    throw new Error('GEMINI_API_KEY missing')
-  }
+function isQuotaLikeError(error: unknown) {
+  const text = cleanError(error).toLowerCase()
 
+  return (
+    text.includes('429') ||
+    text.includes('rate limit') ||
+    text.includes('quota') ||
+    text.includes('credit') ||
+    text.includes('billing') ||
+    text.includes('insufficient') ||
+    text.includes('too many requests')
+  )
+}
+
+async function callGemini(input: RouterInput, provider: AIProviderConfig) {
   const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+
   const model = gemini.getGenerativeModel({
-    model: modelName,
+    model: provider.model,
     systemInstruction: input.system,
   })
 
@@ -76,15 +84,11 @@ async function callGemini(input: RouterInput, modelName: string) {
   return text
 }
 
-async function callGroq(input: RouterInput, modelName: string) {
-  if (!hasKey(process.env.GROQ_API_KEY)) {
-    throw new Error('GROQ_API_KEY missing')
-  }
-
+async function callGroq(input: RouterInput, provider: AIProviderConfig) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
   const completion = await groq.chat.completions.create({
-    model: modelName,
+    model: provider.model,
     messages: openAiMessages(input.system, input.history || [], input.message) as any,
     max_tokens: input.maxTokens || 1200,
     temperature: input.temperature ?? 0.75,
@@ -97,11 +101,7 @@ async function callGroq(input: RouterInput, modelName: string) {
   return text
 }
 
-async function callOpenRouter(input: RouterInput, modelName: string) {
-  if (!hasKey(process.env.OPENROUTER_API_KEY)) {
-    throw new Error('OPENROUTER_API_KEY missing')
-  }
-
+async function callOpenRouter(input: RouterInput, provider: AIProviderConfig) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -111,7 +111,7 @@ async function callOpenRouter(input: RouterInput, modelName: string) {
       'X-OpenRouter-Title': 'GROW',
     },
     body: JSON.stringify({
-      model: modelName,
+      model: provider.model,
       messages: openAiMessages(input.system, input.history || [], input.message),
       temperature: input.temperature ?? 0.75,
       max_tokens: input.maxTokens || 1200,
@@ -121,7 +121,9 @@ async function callOpenRouter(input: RouterInput, modelName: string) {
   const data = await res.json().catch(() => null)
 
   if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${JSON.stringify(data).slice(0, 400)}`)
+    const error = new Error(`OpenRouter ${res.status}: ${JSON.stringify(data).slice(0, 500)}`)
+    ;(error as any).status = res.status
+    throw error
   }
 
   const text = data?.choices?.[0]?.message?.content?.trim()
@@ -131,11 +133,7 @@ async function callOpenRouter(input: RouterInput, modelName: string) {
   return text
 }
 
-async function callTogether(input: RouterInput, modelName: string) {
-  if (!hasKey(process.env.TOGETHER_API_KEY)) {
-    throw new Error('TOGETHER_API_KEY missing')
-  }
-
+async function callTogether(input: RouterInput, provider: AIProviderConfig) {
   const res = await fetch('https://api.together.xyz/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -143,7 +141,7 @@ async function callTogether(input: RouterInput, modelName: string) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: modelName,
+      model: provider.model,
       messages: openAiMessages(input.system, input.history || [], input.message),
       temperature: input.temperature ?? 0.75,
       max_tokens: input.maxTokens || 1200,
@@ -153,7 +151,9 @@ async function callTogether(input: RouterInput, modelName: string) {
   const data = await res.json().catch(() => null)
 
   if (!res.ok) {
-    throw new Error(`Together ${res.status}: ${JSON.stringify(data).slice(0, 400)}`)
+    const error = new Error(`Together ${res.status}: ${JSON.stringify(data).slice(0, 500)}`)
+    ;(error as any).status = res.status
+    throw error
   }
 
   const text = data?.choices?.[0]?.message?.content?.trim()
@@ -163,92 +163,65 @@ async function callTogether(input: RouterInput, modelName: string) {
   return text
 }
 
+async function callProvider(input: RouterInput, provider: AIProviderConfig) {
+  if (provider.id === 'gemini') return callGemini(input, provider)
+  if (provider.id === 'groq') return callGroq(input, provider)
+  if (provider.id.startsWith('openrouter')) return callOpenRouter(input, provider)
+  if (provider.id === 'together') return callTogether(input, provider)
+
+  throw new Error(`Provider non supportato: ${provider.id}`)
+}
+
 export async function routeAI(input: RouterInput): Promise<AIRouterResult> {
-  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-  const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
-
-  const openRouterModels = unique([
-    process.env.OPENROUTER_MODEL || '',
-    '~anthropic/claude-sonnet-latest',
-    '~openai/gpt-latest',
-  ])
-
-  const togetherModels = unique([
-    process.env.TOGETHER_MODEL || '',
-  ])
-
-  const providers: {
-    provider: string
-    model: string
-    enabled: boolean
-    call: () => Promise<string>
-  }[] = [
-    {
-      provider: 'gemini',
-      model: geminiModel,
-      enabled: hasKey(process.env.GEMINI_API_KEY),
-      call: () => callGemini(input, geminiModel),
-    },
-    {
-      provider: 'groq',
-      model: groqModel,
-      enabled: hasKey(process.env.GROQ_API_KEY),
-      call: () => callGroq(input, groqModel),
-    },
-    ...openRouterModels.map((model) => ({
-      provider: 'openrouter',
-      model,
-      enabled: hasKey(process.env.OPENROUTER_API_KEY),
-      call: () => callOpenRouter(input, model),
-    })),
-    ...togetherModels.map((model) => ({
-      provider: 'together',
-      model,
-      enabled: hasKey(process.env.TOGETHER_API_KEY) && hasKey(model),
-      call: () => callTogether(input, model),
-    })),
-  ]
+  const taskType = input.taskType || 'text'
+  const providers = getAIProviders(taskType)
 
   const attempts: AIRouterResult['attempts'] = []
 
+  if (!providers.length) {
+    throw new Error(`Nessun provider AI disponibile per taskType=${taskType}`)
+  }
+
   for (const provider of providers) {
-    if (!provider.enabled) {
-      attempts.push({
-        provider: provider.provider,
-        model: provider.model,
-        ok: false,
-        error: 'disabled or missing key',
-      })
-      continue
-    }
-
     try {
-      const reply = await provider.call()
+      const reply = await callProvider(input, provider)
 
       attempts.push({
-        provider: provider.provider,
+        provider: provider.id,
         model: provider.model,
         ok: true,
       })
 
       return {
         reply,
-        provider: provider.provider,
+        provider: provider.id,
+        providerLabel: provider.label,
         model: provider.model,
+        mode: provider.mode,
         attempts,
       }
     } catch (error) {
+      const status = (error as any)?.status
+
       attempts.push({
-        provider: provider.provider,
+        provider: provider.id,
         model: provider.model,
         ok: false,
+        status,
+        error: cleanError(error),
+      })
+
+      console.warn('[AI ROUTER FALLBACK]', {
+        provider: provider.id,
+        model: provider.model,
+        quotaLike: isQuotaLikeError(error),
         error: cleanError(error),
       })
     }
   }
 
   throw new Error(
-    'All AI providers failed: ' +
+    'Tutti i provider AI hanno fallito: ' +
       attempts
         .map((attempt) => `${attempt.provider}/${attempt.model}: ${attempt.error || 'failed'}`)
         .join(' | ')
