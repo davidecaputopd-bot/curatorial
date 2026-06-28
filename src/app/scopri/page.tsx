@@ -43,7 +43,7 @@ const placeholders = {
   growth: 'https://images.unsplash.com/photo-1512314889357-e157c22f938d?w=800&q=80',
 }
 
-function getCardSize(idx, isSerendipity) {
+function getCardSize(idx: number, isSerendipity: boolean): string {
   const pattern = ['wide', 'tall', 'square', 'square', 'wide', 'square', 'tall']
   if (isSerendipity) return 'wide'
   return pattern[idx % pattern.length]
@@ -58,7 +58,7 @@ function timeAgo(date) {
   return days + 'g fa'
 }
 
-function CardImage({ src, alt, className }) {
+function CardImage({ src, alt, className }: { src: string; alt: string; className: string }) {
   const [error, setError] = useState(false)
   return (
     <img
@@ -71,7 +71,7 @@ function CardImage({ src, alt, className }) {
   )
 }
 
-function FeedCard({ item, idx, onDwell }) {
+function FeedCard({ item, idx, onDwell }: { item: any; idx: number; onDwell: (id: string, seconds: number) => void }) {
   const enterTime = useRef(0)
   const size = getCardSize(idx, item.is_serendipity)
   const imgSrc = item.image_url || placeholders[item.category] || placeholders.design
@@ -111,11 +111,11 @@ function FeedCard({ item, idx, onDwell }) {
 }
 
 export default function ScopriPage() {
-  const [active, setActive] = useState(null)
-  const [items, setItems] = useState([])
+  const [active, setActive] = useState<string | null>(null)
+  const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const load = async (cat) => {
+  const load = async (cat: string | null) => {
     setActive(cat)
     setLoading(true)
     try {
@@ -132,7 +132,7 @@ export default function ScopriPage() {
 
   useEffect(() => { load(null) }, [])
 
-  const handleDwell = async (itemId, seconds) => {
+  const handleDwell = async (itemId: string, seconds: number) => {
     try {
       await fetch('/api/interact', {
         method: 'POST',
