@@ -1,9 +1,22 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 
 const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
+
+function buildAiHref(item: any) {
+  const params = new URLSearchParams()
+
+  if (item.id) params.set('ref', item.id)
+  if (item.title) params.set('title', item.title)
+  if (item.category) params.set('category', item.category)
+  if (item.image_url) params.set('image', item.image_url)
+  if (item.url) params.set('url', item.url)
+
+  return `/ai?${params.toString()}`
+}
 
 const placeholders: Record<string, string> = {
   branding: 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=900&q=80',
@@ -113,14 +126,23 @@ export default function ArchivioPage() {
                     <img src={img} alt={item.title || ''} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]" />
                   </a>
 
-                  <button
-                    type="button"
-                    onClick={() => remove(item.id)}
-                    className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-transform hover:scale-110"
-                    aria-label="Rimuovi dai salvati"
-                  >
-                    ♥
-                  </button>
+                  <div className="absolute right-2 top-2 z-20 flex gap-2">
+                    <Link
+                      href={buildAiHref(item)}
+                      className="flex h-9 items-center justify-center rounded-full bg-white/90 px-3 text-[10px] font-black uppercase tracking-tight text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-transform hover:scale-105"
+                    >
+                      Usa
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => remove(item.id)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-transform hover:scale-110"
+                      aria-label="Rimuovi dai salvati"
+                    >
+                      ♥
+                    </button>
+                  </div>
 
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100">
                     <p className="text-[10px] font-black uppercase tracking-wider text-[#FFE500]">
