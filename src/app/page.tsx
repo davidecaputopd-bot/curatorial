@@ -5,20 +5,6 @@ import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
-const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
-
-const categories = [
-  { key: null, label: 'Tutto' },
-  { key: 'branding', label: 'Branding' },
-  { key: 'typography', label: 'Tipo' },
-  { key: 'interior_design', label: 'Interni' },
-  { key: 'fashion', label: 'Moda' },
-  { key: 'web', label: 'Web' },
-  { key: 'ai', label: 'AI' },
-  { key: 'art', label: 'Arte' },
-  { key: 'social_design', label: 'Social' },
-]
-
 const placeholders: Record<string, string> = {
   branding: 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=900&q=80',
   typography: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=900&q=80',
@@ -32,200 +18,216 @@ const placeholders: Record<string, string> = {
   lifestyle: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=900&q=80',
 }
 
-function SafeImage({ src, alt, className }: { src: string; alt: string; className: string }) {
-  const [err, setErr] = useState(false)
+const clients = [
+  { name: 'ANventitre', color: '#2D4A1E', initials: 'AN' },
+  { name: 'Exousia', color: '#1A3A2A', initials: 'EX' },
+  { name: 'Cantina Don Carlo', color: '#6B2D1A', initials: 'DC' },
+  { name: 'TRAMA', color: '#1A1A2E', initials: 'TR' },
+]
+
+const quickBriefs = [
+  'Reel AN23 bottiglia in pineta',
+  'Carosello Exousia finanza agevolata',
+  'Mockup etichetta Cantina Don Carlo',
+  'Visual TRAMA vintage opening',
+]
+
+function MiniCard({ item, saved }: { item: any; saved: boolean }) {
+  const img = item.image_url || placeholders[item.category] || placeholders.design
 
   return (
-    <img
-      src={err ? placeholders.design : src}
-      alt={alt}
-      className={className}
-      onError={() => setErr(true)}
-      loading="lazy"
-    />
-  )
-}
-
-function VisualCard({ item, idx, saved }: { item: any; idx: number; saved: boolean }) {
-  const imgSrc = item.image_url || placeholders[item.category as string] || placeholders.design
-  const href = item.url === '#' ? undefined : item.url
-  const tall = idx % 5 === 0 || idx % 9 === 0 || (item.height || 0) > (item.width || 0)
-
-  return (
-    <div className={tall ? 'row-span-2' : 'row-span-1'}>
-      <a
-        href={href}
-        target={href ? '_blank' : undefined}
-        rel="noopener noreferrer"
-        className="group relative block h-full overflow-hidden rounded-[1.35rem] bg-grow-soft"
-      >
-        <SaveHeart itemId={item.id} initialSaved={saved} />
-
-        <SafeImage
-          src={imgSrc}
-          alt={item.title || 'Reference'}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]"
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <div className="absolute bottom-0 left-0 right-0 p-3">
-            <div className="mb-2 inline-flex rounded-full bg-[#FFE500] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F0F10]">
-              {item.category || 'reference'}
-            </div>
-
-            {item.title && (
-              <p className="line-clamp-2 text-[11px] font-bold leading-tight text-white/90">
-                {item.title}
-              </p>
-            )}
-          </div>
-        </div>
-      </a>
-    </div>
+    
+      href={item.url !== '#' ? item.url : undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative block h-full overflow-hidden rounded-[1.1rem] bg-[#F1EDE5]"
+    >
+      <SaveHeart itemId={item.id} initialSaved={saved} />
+      <img
+        src={img}
+        alt={item.title || ''}
+        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+        loading="lazy"
+        onError={(e) => {
+          const t = e.target as HTMLImageElement
+          t.src = placeholders.design
+        }}
+      />
+    </a>
   )
 }
 
 export default function Home() {
-  const [active, setActive] = useState<string | null>(null)
-  const [images, setImages] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [recentImages, setRecentImages] = useState<any[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
-
-  const load = async (cat: string | null) => {
-    setActive(cat)
-    setLoading(true)
-
-    const p = cat ? '&category=' + cat : ''
-
-    fetch('/api/feed?type=image&limit=36' + p)
-      .then((r) => r.json())
-      .then((d) => setImages(d.items || []))
-      .catch(() => setImages([]))
-      .finally(() => setLoading(false))
-  }
+  const [savedCount, setSavedCount] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    load(null)
+    fetch('/api/feed?type=image&limit=9')
+      .then((r) => r.json())
+      .then((d) => setRecentImages(d.items || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
 
     fetch('/api/saved')
       .then((r) => r.json())
-      .then((data) => {
-        setSavedIds(new Set((data.items || []).map((item: any) => item.id)))
+      .then((d) => {
+        const items = d.items || []
+        setSavedCount(items.length)
+        setSavedIds(new Set(items.map((i: any) => i.id)))
       })
-      .catch(() => setSavedIds(new Set()))
+      .catch(() => {})
   }, [])
 
+  const ora = new Date().getHours()
+  const saluto = ora < 12 ? 'Buongiorno' : ora < 18 ? 'Buon pomeriggio' : 'Buonasera'
+
   return (
-    <main className="min-h-screen bg-grow-bg pb-32 text-grow-text" style={{ fontFamily: font }}>
+    <main className="min-h-screen bg-[#F7F4EE] pb-32 text-[#111111]">
       <div className="mx-auto max-w-lg px-4 pt-8">
-        <header className="mb-7">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
-                GROW Today
-              </p>
 
-              <h1 className="mt-2 text-[44px] font-black uppercase leading-[0.82] tracking-tighter">
-                GROW<span className="text-grow-yellow">.</span>
-              </h1>
-            </div>
-
-            <Link
-              href="/ai"
-              className="rounded-full bg-[#0F0F10] px-4 py-2 text-xs font-black uppercase tracking-tight text-white"
-            >
-              AI
-            </Link>
-          </div>
-
-          <p className="mt-5 max-w-sm text-sm leading-relaxed text-grow-muted">
-            Reference visive, mood, immagini e materiali da trasformare in lavoro.
-            Niente articoli in Home: qui si guarda, si salva, si usa.
+        {/* Header */}
+        <header className="mb-8">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#5F5A52]">
+            {saluto}
+          </p>
+          <h1 className="mt-1 font-display text-[52px] font-black uppercase leading-[0.85] tracking-tighter">
+            GROW<span className="text-[#FFE500]">.</span>
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-[#5F5A52]">
+            Raccogli, organizza, trasforma in lavoro.
           </p>
         </header>
 
-        <section className="mb-7 grid grid-cols-3 gap-2">
+        {/* Nav cards */}
+        <section className="mb-8 grid grid-cols-2 gap-3">
           <Link
             href="/scopri"
-            className="rounded-[1.5rem] bg-[#FFE500] p-4 text-[#0F0F10]"
+            className="group relative overflow-hidden rounded-[1.5rem] bg-[#0F0F10] p-5 text-white"
           >
-            <p className="text-[10px] font-black uppercase tracking-wider opacity-60">Apri</p>
-            <h2 className="mt-2 text-lg font-black uppercase leading-none">Scopri</h2>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-white/40">Ispirati</p>
+            <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Scopri</h2>
+            <p className="mt-1.5 text-xs leading-snug text-white/50">Reference, Are.na, mood visivi</p>
+            <div className="mt-4 inline-flex rounded-full bg-[#FFE500] px-3 py-1.5 text-[10px] font-black uppercase text-black">
+              Apri →
+            </div>
+          </Link>
+
+          <Link
+            href="/ai"
+            className="group relative overflow-hidden rounded-[1.5rem] bg-[#FFE500] p-5 text-[#0F0F10]"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-black/40">Produci</p>
+            <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">AI</h2>
+            <p className="mt-1.5 text-xs leading-snug text-black/50">Brief → piano → output</p>
+            <div className="mt-4 inline-flex rounded-full bg-[#0F0F10] px-3 py-1.5 text-[10px] font-black uppercase text-white">
+              Scrivi →
+            </div>
           </Link>
 
           <Link
             href="/archivio"
-            className="rounded-[1.5rem] border border-black/10 bg-white/70 p-4"
+            className="rounded-[1.5rem] border border-black/10 bg-white/70 p-5"
           >
-            <p className="text-[10px] font-black uppercase tracking-wider text-grow-muted">Salva</p>
-            <h2 className="mt-2 text-lg font-black uppercase leading-none">Archivio</h2>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Salvati</p>
+            <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Archivio</h2>
+            <p className="mt-1.5 text-xs text-[#5F5A52]">
+              {savedCount > 0 ? `${savedCount} reference` : 'Vuoto'}
+            </p>
           </Link>
 
           <Link
-            href="/calendario"
-            className="rounded-[1.5rem] border border-black/10 bg-white/70 p-4"
+            href="/studio"
+            className="rounded-[1.5rem] border border-black/10 bg-white/70 p-5"
           >
-            <p className="text-[10px] font-black uppercase tracking-wider text-grow-muted">Fai</p>
-            <h2 className="mt-2 text-lg font-black uppercase leading-none">Piano</h2>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Lavora</p>
+            <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Studio</h2>
+            <p className="mt-1.5 text-xs text-[#5F5A52]">Compila prompt, genera</p>
           </Link>
         </section>
 
-        <section>
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-grow-muted">
-                Visual feed
-              </p>
-              <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">
-                Scopri adesso
-              </h2>
-            </div>
+        {/* Quick AI briefs */}
+        <section className="mb-8">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">
+              Brief rapidi
+            </p>
+            <Link href="/ai" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">
+              Tutti →
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {quickBriefs.map((brief) => (
+              <Link
+                key={brief}
+                href={`/ai?brief=${encodeURIComponent(brief)}`}
+                className="flex items-center justify-between rounded-[1.1rem] border border-black/8 bg-white/60 px-4 py-3 transition hover:border-black/20 hover:bg-white"
+              >
+                <span className="text-sm font-bold">{brief}</span>
+                <span className="font-mono text-[10px] font-bold uppercase text-[#5F5A52]">→</span>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-            <Link href="/scopri" className="text-xs font-black uppercase tracking-tight text-grow-muted">
-              Vedi tutto
+        {/* Clienti */}
+        <section className="mb-8">
+          <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">
+            Clienti attivi
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {clients.map((c) => (
+              <Link
+                key={c.name}
+                href={`/ai?project=${encodeURIComponent(c.name)}`}
+                className="flex flex-col items-center gap-2 rounded-[1.1rem] border border-black/8 bg-white/60 py-4 transition hover:border-black/20 hover:bg-white"
+              >
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[10px] font-black text-white"
+                  style={{ backgroundColor: c.color }}
+                >
+                  {c.initials}
+                </div>
+                <span className="text-center text-[9px] font-black uppercase leading-tight tracking-wider text-[#5F5A52]">
+                  {c.name.split(' ')[0]}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Feed anteprima */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">
+              Ultimi arrivi
+            </p>
+            <Link href="/scopri" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">
+              Vedi tutto →
             </Link>
           </div>
 
-          <div className="scrollbar-hide -mx-4 mb-5 flex gap-2 overflow-x-auto px-4">
-            {categories.map((c) => (
-              <button
-                key={c.key ?? 'all'}
-                onClick={() => load(c.key)}
-                className={[
-                  'shrink-0 rounded-full px-4 py-2 text-sm font-black transition-colors',
-                  active === c.key
-                    ? 'bg-grow-yellow text-grow-bg'
-                    : 'border border-black/10 bg-white/60 text-grow-muted hover:text-grow-text',
-                ].join(' ')}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-
           {loading ? (
-            <div className="grid auto-rows-[118px] grid-cols-3 gap-2">
-              {Array.from({ length: 15 }).map((_, i) => (
+            <div className="grid auto-rows-[96px] grid-cols-3 gap-2">
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div
                   key={i}
-                  className={[
-                    'animate-pulse rounded-[1.35rem] bg-grow-soft',
-                    i % 5 === 0 || i % 9 === 0 ? 'row-span-2' : '',
-                  ].join(' ')}
+                  className={['animate-pulse rounded-[1.1rem] bg-[#F1EDE5]', i === 0 ? 'row-span-2' : ''].join(' ')}
                 />
               ))}
             </div>
-          ) : images.length === 0 ? (
-            <div className="rounded-[2rem] border border-black/10 bg-white/70 p-6 text-center">
-              <p className="text-sm font-bold text-grow-muted">
-                Nessuna immagine disponibile. Popola GROW con Are.na o fetch-images.
-              </p>
+          ) : recentImages.length > 0 ? (
+            <div className="grid auto-rows-[96px] grid-cols-3 gap-2">
+              {recentImages.map((item, idx) => (
+                <div key={item.id} className={idx === 0 ? 'row-span-2' : 'row-span-1'}>
+                  <MiniCard item={item} saved={savedIds.has(item.id)} />
+                </div>
+              ))}
             </div>
           ) : (
-            <div className="grid auto-rows-[118px] grid-cols-3 gap-2">
-              {images.map((item, idx) => (
-                <VisualCard key={item.id} item={item} idx={idx} saved={savedIds.has(item.id)} />
-              ))}
+            <div className="rounded-[1.5rem] border border-black/10 bg-white/60 px-5 py-10 text-center">
+              <p className="text-sm text-[#5F5A52]">Nessuna immagine ancora. Esegui fetch-images.</p>
             </div>
           )}
         </section>

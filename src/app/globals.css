@@ -1,14 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  --font-display: 'Bebas Neue', 'Arial Black', sans-serif;
+  --font-mono: 'DM Mono', 'Courier New', monospace;
+  --font-body: 'DM Sans', 'Helvetica Neue', system-ui, sans-serif;
+}
+
 body {
   background-color: #F7F4EE;
   color: #111111;
-  font-family: Inter, 'Helvetica Neue', system-ui, sans-serif;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
+
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
