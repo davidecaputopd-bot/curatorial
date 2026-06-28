@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ProductionPlan } from '@/lib/ai/production-types'
+import { saveLocalStudioJob } from '@/lib/studio/local-jobs'
 
 type ProductionPlanCardProps = {
   plan: ProductionPlan
@@ -52,41 +53,49 @@ export function ProductionPlanCard({
   async function createJob() {
     setCreatingJob(true)
     setJobMessage(null)
+    const job = {
+      title: plan.title,
+      project: plan.project,
+      job_type: plan.asset_type,
+      engine: plan.recommended_engine,
+      status: 'draft' as const,
+      brief,
+      reference: reference || null,
+      format: plan.asset_type === 'video' ? '9:16' : null,
+      prompts: [],
+      checklist: plan.checklist,
+      settings: { production_mode: plan.production_mode },
+      result: null,
+      cost_mode: plan.cost_mode,
+      quality_score: null,
+    }
 
     try {
       const response = await fetch('/api/studio/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: plan.title,
-          project: plan.project,
-          job_type: plan.asset_type,
-          engine: plan.recommended_engine,
-          status: 'draft',
-          brief,
-          reference: reference || null,
-          format: plan.asset_type === 'video' ? '9:16' : null,
-          prompts: [],
-          checklist: plan.checklist,
-          settings: { production_mode: plan.production_mode },
-          cost_mode: plan.cost_mode,
-        }),
+        body: JSON.stringify(job),
       })
       const data = await response.json().catch(() => null)
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setJobMessage('Sessione scaduta. Accedi di nuovo per creare il job.')
+          return
+        }
+        saveLocalStudioJob(job)
         setJobMessage(
-          data?.error ||
-            'La coda job non è ancora configurata su Supabase. Intanto puoi usare il piano e compilare i prompt.'
+          data?.error === 'Studio jobs table not configured yet'
+            ? 'Job salvato localmente. La tabella Supabase non è ancora configurata.'
+            : 'Job salvato localmente: la coda online non era disponibile.'
         )
         return
       }
 
       setJobMessage('Job creato in Studio.')
     } catch {
-      setJobMessage(
-        'La coda job non è ancora configurata su Supabase. Intanto puoi usare il piano e compilare i prompt.'
-      )
+      saveLocalStudioJob(job)
+      setJobMessage('Job salvato localmente: la coda online non era disponibile.')
     } finally {
       setCreatingJob(false)
     }

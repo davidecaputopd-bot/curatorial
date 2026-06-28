@@ -15,6 +15,10 @@ import type {
   ProductionPlan,
   ProductionProject,
 } from '@/lib/ai/production-types'
+import {
+  readLocalStudioJobs,
+  saveLocalStudioJob,
+} from '@/lib/studio/local-jobs'
 
 const PROJECTS: ProductionProject[] = [
   'AN23',
@@ -70,6 +74,12 @@ const MODES = [
   { label: 'Premium', state: 'Conferma costo' },
 ]
 
+const INITIAL_BRIEF = QUICK_ACTIONS[0].defaultBrief
+const INITIAL_PLAN = buildFallbackProductionPlan(
+  `Crea un video per AN23. ${INITIAL_BRIEF}`,
+  { project: 'AN23' }
+)
+
 function readPlanFromBrowser() {
   const search = new URLSearchParams(window.location.search)
   const queryPlan = search.get('plan')
@@ -110,26 +120,32 @@ export default function StudioPage() {
   const [project, setProject] = useState<ProductionProject>('AN23')
   const [assetType, setAssetType] = useState<ProductionAssetType>('video')
   const [format, setFormat] = useState('9:16 verticale social')
-  const [brief, setBrief] = useState('')
+  const [brief, setBrief] = useState(INITIAL_BRIEF)
   const [reference, setReference] = useState('')
-  const [activePlan, setActivePlan] = useState<ProductionPlan | null>(null)
+  const [activePlan, setActivePlan] = useState<ProductionPlan | null>(INITIAL_PLAN)
   const [importedPlan, setImportedPlan] = useState<ProductionPlan | null>(null)
   const [copied, setCopied] = useState<CompiledPrompt['engine'] | null>(null)
+  const [saving, setSaving] = useState<CompiledPrompt['engine'] | null>(null)
+  const [localJobCount, setLocalJobCount] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     const plan = readPlanFromBrowser()
-    if (!plan) return
     const storedBrief = window.sessionStorage.getItem('grow-production-brief')
     const storedReference = window.sessionStorage.getItem('grow-production-reference')
+    const jobs = readLocalStudioJobs()
 
     const frame = window.requestAnimationFrame(() => {
-      setImportedPlan(plan)
-      setProject(plan.project)
-      setAssetType(plan.asset_type)
-      setBrief(storedBrief || plan.title)
-      setReference(storedReference || '')
-      setFormat(plan.asset_type === 'video' ? '9:16 verticale social' : '4:5 verticale')
+      setLocalJobCount(jobs.length)
+      if (plan) {
+        setImportedPlan(plan)
+        setActivePlan(plan)
+        setProject(plan.project)
+        setAssetType(plan.asset_type)
+        setBrief(storedBrief || plan.title)
+        setReference(storedReference || '')
+        setFormat(plan.asset_type === 'video' ? '9:16 verticale social' : '4:5 verticale')
+      }
     })
 
     return () => window.cancelAnimationFrame(frame)
@@ -146,10 +162,14 @@ export default function StudioPage() {
   }, [activePlan, brief, reference, format])
 
   function selectQuickAction(action: (typeof QUICK_ACTIONS)[number]) {
+    const plan = buildFallbackProductionPlan(
+      `Crea ${action.title.toLowerCase()} per ${project}. ${action.defaultBrief}`,
+      { project, selectedReference: reference || undefined }
+    )
     setAssetType(action.asset)
     setBrief(action.defaultBrief)
     setFormat(action.format)
-    setActivePlan(null)
+    setActivePlan(plan)
     setNotice(null)
     document.getElementById('studio-composer')?.scrollIntoView({
       behavior: 'smooth',
@@ -191,9 +211,97 @@ export default function StudioPage() {
         : '',
       prompt.workflow_note ? `\n\nWORKFLOW NOTE\n${prompt.workflow_note}` : '',
     ].join('')
-    await navigator.clipboard.writeText(text)
-    setCopied(prompt.engine)
-    window.setTimeout(() => setCopied(null), 1400)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(prompt.engine)
+      window.setTimeout(() => setCopied(null), 1400)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      const copiedWithFallback = document.execCommand('copy')
+      textarea.remove()
+
+      if (copiedWithFallback) {
+        setCopied(prompt.engine)
+        window.setTimeout(() => setCopied(null), 1400)
+      } else {
+        setNotice('Copia non riuscita. Seleziona manualmente il testo del prompt.')
+      }
+    }
+  }
+
+  function saveLocally(prompt: CompiledPrompt) {
+    if (!activePlan) return
+    saveLocalStudioJob({
+      title: prompt.title,
+      project,
+      job_type: activePlan.asset_type,
+      engine: prompt.engine,
+      status: 'draft',
+      brief,
+      reference: reference || null,
+      format,
+      prompts: [prompt],
+      checklist: prompt.checklist,
+      settings: {
+        production_mode: activePlan.production_mode,
+        access: prompt.access,
+      },
+      result: null,
+      cost_mode: activePlan.cost_mode,
+      quality_score: null,
+    })
+    setLocalJobCount(readLocalStudioJobs().length)
+    setNotice('Job salvato nei bozze locali. Puoi continuare a lavorare anche senza la tabella Supabase.')
+  }
+
+  async function saveJob(prompt: CompiledPrompt) {
+    if (!activePlan) return
+    setSaving(prompt.engine)
+    setNotice(null)
+
+    try {
+      const response = await fetch('/api/studio/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: prompt.title,
+          project,
+          job_type: activePlan.asset_type,
+          engine: prompt.engine,
+          status: 'draft',
+          brief,
+          reference: reference || null,
+          format,
+          prompts: [prompt],
+          checklist: prompt.checklist,
+          settings: {
+            production_mode: activePlan.production_mode,
+            access: prompt.access,
+          },
+          result: null,
+          cost_mode: activePlan.cost_mode,
+          quality_score: null,
+        }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (response.ok && data?.ok) {
+        setNotice('Job salvato nella coda Studio.')
+      } else if (response.status === 401) {
+        setNotice('Sessione scaduta. Accedi di nuovo per salvare il job.')
+      } else {
+        saveLocally(prompt)
+      }
+    } catch {
+      saveLocally(prompt)
+    } finally {
+      setSaving(null)
+    }
   }
 
   return (
@@ -210,6 +318,9 @@ export default function StudioPage() {
             Trasforma idee, reference e prompt in asset producibili. GROW prepara
             il percorso; tu vedi subito cosa può eseguire, cosa richiede il Mac e
             cosa avviene in un tool esterno.
+          </p>
+          <p className="mt-3 text-[10px] font-black uppercase tracking-[0.14em] text-grow-muted">
+            {localJobCount} job locali salvati
           </p>
         </header>
 
@@ -508,7 +619,7 @@ export default function StudioPage() {
                   <div className="mt-auto flex flex-wrap gap-2 pt-5">
                     <button
                       type="button"
-                      onClick={() => copyPrompt(prompt)}
+                      onClick={() => void copyPrompt(prompt)}
                       className="rounded-full bg-grow-yellow px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-black"
                     >
                       {copied === prompt.engine ? 'Copiato' : prompt.copy_button_label}
@@ -525,14 +636,11 @@ export default function StudioPage() {
                     )}
                     <button
                       type="button"
-                      onClick={() =>
-                        setNotice(
-                          'La coda job non è ancora configurata. Il prompt resta pronto da usare.'
-                        )
-                      }
+                      onClick={() => void saveJob(prompt)}
+                      disabled={saving === prompt.engine}
                       className="rounded-full border border-white/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-white/65"
                     >
-                      Salva come job
+                      {saving === prompt.engine ? 'Salvataggio…' : 'Salva come job'}
                     </button>
                   </div>
                 </article>
