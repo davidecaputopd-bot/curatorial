@@ -34,26 +34,20 @@ const quickBriefs = [
 
 function MiniCard({ item, saved }: { item: any; saved: boolean }) {
   const img = item.image_url || placeholders[item.category] || placeholders.design
-
+  const href = item.url && item.url !== '#' ? item.url : undefined
   return (
-    
-      href={item.url !== '#' ? item.url : undefined}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative block h-full overflow-hidden rounded-[1.1rem] bg-[#F1EDE5]"
-    >
+    <div className="group relative block h-full overflow-hidden rounded-[1.1rem] bg-[#F1EDE5]">
       <SaveHeart itemId={item.id} initialSaved={saved} />
       <img
         src={img}
         alt={item.title || ''}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
         loading="lazy"
-        onError={(e) => {
-          const t = e.target as HTMLImageElement
-          t.src = placeholders.design
-        }}
       />
-    </a>
+      {href && (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="absolute inset-0" />
+      )}
+    </div>
   )
 }
 
@@ -87,7 +81,6 @@ export default function Home() {
     <main className="min-h-screen bg-[#F7F4EE] pb-32 text-[#111111]">
       <div className="mx-auto max-w-lg px-4 pt-8">
 
-        {/* Header */}
         <header className="mb-8">
           <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#5F5A52]">
             {saluto}
@@ -100,7 +93,6 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Nav cards */}
         <section className="mb-8 grid grid-cols-2 gap-3">
           <Link
             href="/scopri"
@@ -110,7 +102,7 @@ export default function Home() {
             <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Scopri</h2>
             <p className="mt-1.5 text-xs leading-snug text-white/50">Reference, Are.na, mood visivi</p>
             <div className="mt-4 inline-flex rounded-full bg-[#FFE500] px-3 py-1.5 text-[10px] font-black uppercase text-black">
-              Apri →
+              Apri
             </div>
           </Link>
 
@@ -120,9 +112,9 @@ export default function Home() {
           >
             <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-black/40">Produci</p>
             <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">AI</h2>
-            <p className="mt-1.5 text-xs leading-snug text-black/50">Brief → piano → output</p>
+            <p className="mt-1.5 text-xs leading-snug text-black/50">Brief, piano, output</p>
             <div className="mt-4 inline-flex rounded-full bg-[#0F0F10] px-3 py-1.5 text-[10px] font-black uppercase text-white">
-              Scrivi →
+              Scrivi
             </div>
           </Link>
 
@@ -133,7 +125,7 @@ export default function Home() {
             <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Salvati</p>
             <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Archivio</h2>
             <p className="mt-1.5 text-xs text-[#5F5A52]">
-              {savedCount > 0 ? `${savedCount} reference` : 'Vuoto'}
+              {savedCount > 0 ? savedCount + ' reference' : 'Vuoto'}
             </p>
           </Link>
 
@@ -147,41 +139,33 @@ export default function Home() {
           </Link>
         </section>
 
-        {/* Quick AI briefs */}
         <section className="mb-8">
           <div className="mb-3 flex items-center justify-between">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">
-              Brief rapidi
-            </p>
-            <Link href="/ai" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">
-              Tutti →
-            </Link>
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Brief rapidi</p>
+            <Link href="/ai" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Tutti</Link>
           </div>
           <div className="space-y-2">
             {quickBriefs.map((brief) => (
               <Link
                 key={brief}
-                href={`/ai?brief=${encodeURIComponent(brief)}`}
-                className="flex items-center justify-between rounded-[1.1rem] border border-black/8 bg-white/60 px-4 py-3 transition hover:border-black/20 hover:bg-white"
+                href={'/ai?brief=' + encodeURIComponent(brief)}
+                className="flex items-center justify-between rounded-[1.1rem] border border-black/10 bg-white/60 px-4 py-3 transition hover:border-black/20 hover:bg-white"
               >
                 <span className="text-sm font-bold">{brief}</span>
-                <span className="font-mono text-[10px] font-bold uppercase text-[#5F5A52]">→</span>
+                <span className="font-mono text-[10px] font-bold text-[#5F5A52]">→</span>
               </Link>
             ))}
           </div>
         </section>
 
-        {/* Clienti */}
         <section className="mb-8">
-          <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">
-            Clienti attivi
-          </p>
+          <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Clienti attivi</p>
           <div className="grid grid-cols-4 gap-2">
             {clients.map((c) => (
               <Link
                 key={c.name}
-                href={`/ai?project=${encodeURIComponent(c.name)}`}
-                className="flex flex-col items-center gap-2 rounded-[1.1rem] border border-black/8 bg-white/60 py-4 transition hover:border-black/20 hover:bg-white"
+                href={'/ai?project=' + encodeURIComponent(c.name)}
+                className="flex flex-col items-center gap-2 rounded-[1.1rem] border border-black/10 bg-white/60 py-4 transition hover:border-black/20 hover:bg-white"
               >
                 <div
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[10px] font-black text-white"
@@ -197,15 +181,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Feed anteprima */}
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">
-              Ultimi arrivi
-            </p>
-            <Link href="/scopri" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">
-              Vedi tutto →
-            </Link>
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Ultimi arrivi</p>
+            <Link href="/scopri" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Vedi tutto</Link>
           </div>
 
           {loading ? (
@@ -213,7 +192,7 @@ export default function Home() {
               {Array.from({ length: 9 }).map((_, i) => (
                 <div
                   key={i}
-                  className={['animate-pulse rounded-[1.1rem] bg-[#F1EDE5]', i === 0 ? 'row-span-2' : ''].join(' ')}
+                  className={'animate-pulse rounded-[1.1rem] bg-[#F1EDE5]' + (i === 0 ? ' row-span-2' : '')}
                 />
               ))}
             </div>
@@ -231,8 +210,8 @@ export default function Home() {
             </div>
           )}
         </section>
-      </div>
 
+      </div>
       <BottomNav />
     </main>
   )
