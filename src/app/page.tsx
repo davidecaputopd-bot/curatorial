@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
+import { getClientGoal, readClientGoals, setClientGoal } from '@/lib/client-goals'
 
 const placeholders: Record<string, string> = {
   branding: 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=900&q=80',
@@ -57,6 +58,9 @@ export default function Home() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [savedCount, setSavedCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [publishedThisMonth, setPublishedThisMonth] = useState<Record<string, number>>({})
+  const [goals, setGoals] = useState<Record<string, number>>({})
+  const [editingGoal, setEditingGoal] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/feed?type=image&limit=9')
@@ -73,6 +77,25 @@ export default function Home() {
         setSavedIds(new Set(items.map((i: any) => i.id)))
       })
       .catch(() => {})
+
+    fetch('/api/calendar')
+      .then((r) => r.json())
+      .then((d) => {
+        const items = d.items || []
+        const now = new Date()
+        const counts: Record<string, number> = {}
+        for (const item of items) {
+          if (item.status !== 'pubblicato' || !item.scheduled_date) continue
+          const date = new Date(item.scheduled_date)
+          if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
+            counts[item.client] = (counts[item.client] || 0) + 1
+          }
+        }
+        setPublishedThisMonth(counts)
+      })
+      .catch(() => {})
+
+    setGoals(readClientGoals())
   }, [])
 
   const ora = new Date().getHours()
@@ -179,6 +202,51 @@ export default function Home() {
                 </span>
               </Link>
             ))}
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Output del mese</p>
+          <div className="space-y-2">
+            {clients.map((c) => {
+              const goal = getClientGoal(goals, c.name)
+              const done = publishedThisMonth[c.name] || 0
+              const pct = Math.min(100, Math.round((done / goal) * 100))
+              return (
+                <div key={c.name} className="rounded-[1.1rem] border border-black/10 bg-white/60 px-4 py-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-xs font-bold">{c.name}</span>
+                    {editingGoal === c.name ? (
+                      <input
+                        type="number"
+                        autoFocus
+                        defaultValue={goal}
+                        onBlur={(e) => {
+                          const value = parseInt(e.target.value) || goal
+                          setGoals(setClientGoal(c.name, value))
+                          setEditingGoal(null)
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        className="w-14 rounded border border-black/15 px-1.5 py-0.5 text-right text-[10px]"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setEditingGoal(c.name)}
+                        className="font-mono text-[10px] font-bold text-[#5F5A52]"
+                      >
+                        {done} / {goal}
+                      </button>
+                    )}
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10">
+                    <div
+                      className="h-full rounded-full bg-[#FFE500] transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
 

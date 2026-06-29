@@ -231,12 +231,7 @@ export default function ArchivioPage() {
                     </button>
                   </div>
 
-                  <div
-                    className={[
-                      'pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 transition-opacity',
-                      item.is_studio_asset ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-                    ].join(' ')}
-                  >
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                     <p className="text-[10px] font-black uppercase tracking-wider text-[#FFE500]">
                       {item.is_studio_asset
                         ? `Studio · ${item.project || item.category}`
