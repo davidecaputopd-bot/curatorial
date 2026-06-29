@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { fetchLinkTitle } from '@/lib/link-preview'
 
 export async function GET() {
   const { supabase, user } = await getAuthenticatedSupabase()
@@ -24,9 +25,15 @@ export async function POST(request: Request) {
   if (!body.content && !body.url)
     return NextResponse.json({ error: 'content o url richiesto' }, { status: 400 })
 
+  let content = body.content
+  if (body.url && (!content || content === body.url)) {
+    const title = await fetchLinkTitle(body.url)
+    content = title || body.url
+  }
+
   const { data, error } = await supabase
     .from('inbox_items')
-    .insert({ user_id: user.id, content: body.content, url: body.url, client: body.client, source: body.source || 'manual' })
+    .insert({ user_id: user.id, content, url: body.url, client: body.client, source: body.source || 'manual' })
     .select()
     .single()
 
