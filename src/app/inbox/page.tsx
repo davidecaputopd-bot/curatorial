@@ -132,7 +132,15 @@ export default function InboxPage() {
         </header>
 
         {/* Input */}
-        <div className="mb-6 rounded-[1.5rem] border border-grow-border bg-grow-card p-4 space-y-3">
+        <div
+          className="mb-6 rounded-[1.5rem] border border-grow-border bg-grow-card p-4 space-y-3"
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => {
+            e.preventDefault()
+            const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'))
+            if (file) void uploadScreenshot(file)
+          }}
+        >
           <textarea
             autoFocus
             value={text}
@@ -143,7 +151,16 @@ export default function InboxPage() {
                 save()
               }
             }}
-            placeholder="Idea, link, nota, URL..."
+            onPaste={e => {
+              const file = Array.from(e.clipboardData.items)
+                .find(item => item.type.startsWith('image/'))
+                ?.getAsFile()
+              if (file) {
+                e.preventDefault()
+                void uploadScreenshot(file)
+              }
+            }}
+            placeholder="Idea, link, nota, URL o incolla uno screenshot..."
             rows={3}
             className="w-full resize-none bg-transparent text-sm text-grow-text placeholder:text-grow-muted focus:outline-none"
           />
