@@ -36,6 +36,7 @@ export default function InboxPage() {
   const [client, setClient] = useState('')
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => { loadItems() }, [])
 
@@ -51,9 +52,10 @@ export default function InboxPage() {
   const save = async () => {
     if (!text.trim() || saving) return
     setSaving(true)
+    setError('')
     try {
       const body = isUrl(text)
-        ? { url: text, client, source: 'manual' }
+        ? { url: text, content: text, client, source: 'manual' }
         : { content: text, client, source: 'manual' }
       const res = await fetch('/api/inbox', {
         method: 'POST',
@@ -65,8 +67,12 @@ export default function InboxPage() {
         setItems(prev => [data.item, ...prev])
         setText('')
         setClient('')
+      } else {
+        setError(data.error || 'Salvataggio non riuscito.')
       }
-    } catch {}
+    } catch {
+      setError('Errore di rete. Riprova.')
+    }
     setSaving(false)
   }
 
@@ -93,9 +99,15 @@ export default function InboxPage() {
         {/* Input */}
         <div className="mb-6 rounded-[1.5rem] border border-grow-border bg-grow-card p-4 space-y-3">
           <textarea
+            autoFocus
             value={text}
             onChange={e => setText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && e.metaKey && save()}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                save()
+              }
+            }}
             placeholder="Idea, link, nota, URL..."
             rows={3}
             className="w-full resize-none bg-transparent text-sm text-grow-text placeholder:text-grow-muted focus:outline-none"
@@ -124,6 +136,7 @@ export default function InboxPage() {
               )}
             </button>
           </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
         </div>
 
         {/* Lista */}

@@ -45,6 +45,7 @@ export default function CalendarioPage() {
   const [loading, setLoading] = useState(true)
   const [activeClient, setActiveClient] = useState('Tutti')
   const [showModal, setShowModal] = useState(false)
+  const [error, setError] = useState('')
   const [week] = useState(new Date())
   const weekDays = getWeekDays(week)
 
@@ -78,6 +79,7 @@ export default function CalendarioPage() {
 
   const addItem = async () => {
     if (!form.client || !form.title) return
+    setError('')
     try {
       const res = await fetch('/api/calendar', {
         method: 'POST',
@@ -89,8 +91,12 @@ export default function CalendarioPage() {
         setItems(prev => [data.item, ...prev])
         setShowModal(false)
         setForm({ client: '', title: '', content_type: 'reel', status: 'idea', scheduled_date: '', notes: '' })
+      } else {
+        setError(data.error || 'Salvataggio non riuscito.')
       }
-    } catch {}
+    } catch {
+      setError('Errore di rete. Riprova.')
+    }
   }
 
   const remove = async (id: string) => {
@@ -230,8 +236,8 @@ export default function CalendarioPage() {
 
       {/* Modal nuovo item */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-          <div className="w-full rounded-t-[2rem] bg-grow-card p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+          <div className="w-full rounded-t-[2rem] bg-grow-card p-6 pb-10 space-y-4" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-black uppercase">Nuovo contenuto</h2>
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
               placeholder="Titolo *" className="w-full rounded-xl border border-grow-border bg-grow-soft px-4 py-2.5 text-sm focus:outline-none" />
@@ -251,6 +257,7 @@ export default function CalendarioPage() {
             <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
               placeholder="Note..." rows={2}
               className="w-full resize-none rounded-xl border border-grow-border bg-grow-soft px-4 py-2.5 text-sm focus:outline-none" />
+            {error && <p className="text-xs text-red-500">{error}</p>}
             <div className="flex gap-2">
               <button onClick={() => setShowModal(false)}
                 className="flex-1 rounded-full border border-grow-border py-3 text-sm text-grow-muted">Annulla</button>
