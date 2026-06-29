@@ -86,6 +86,15 @@ function parseReference(): Reference | null {
   return reference
 }
 
+function parseQueryExtras() {
+  if (typeof window === 'undefined') return { project: null, brief: null }
+  const params = new URLSearchParams(window.location.search)
+  return {
+    project: params.get('project') || null,
+    brief: params.get('brief') || null,
+  }
+}
+
 function initialMessage(reference: Reference | null): Message {
   return {
     id: messageId('welcome'),
@@ -94,6 +103,26 @@ function initialMessage(reference: Reference | null): Message {
       ? 'Reference collegata. Dimmi cosa vuoi produrre e per quale progetto: preparo risposta, motore, percorso, prompt e controlli.'
       : 'Scrivi cosa devi produrre, per quale progetto e con quali vincoli. GROW risponde e, quando serve, costruisce un piano che puoi portare direttamente in Studio.',
   }
+}
+
+const CLIENT_NOTES: Record<string, string> = {
+  'ANventitre': 'Tono premium mediterraneo. Logo a cerchio verde. Vino bio.',
+  'AN23': 'Tono premium mediterraneo. Logo a cerchio verde. Vino bio.',
+  'Exousia': 'Tono professionale, radicato nel territorio locale. Colore verde #0E2B1F.',
+  'Cantina Don Carlo': 'Tono naturale ed elegante. Mai usare "Madre Terra" o cliché simili.',
+  'ACI Copertino': 'Tono istituzionale ma accessibile, comunicazione locale.',
+  'TRAMA': 'Vintage contemporaneo. Apertura store ottobre 2026, comunicazione in costruzione verso quella data.',
+}
+
+function buildProjectContext(project: string | null) {
+  if (!project) return ''
+  const notes = CLIENT_NOTES[project]
+  return [
+    `PROGETTO ATTIVO: ${project}`,
+    notes ? `Regole per questo cliente: ${notes}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 function buildReferenceContext(reference: Reference | null) {
@@ -124,6 +153,7 @@ function referenceSummary(reference: Reference | null) {
 
 export default function AiPage() {
   const [reference, setReference] = useState<Reference | null>(null)
+  const [project, setProject] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -131,14 +161,18 @@ export default function AiPage() {
   const [healthResults, setHealthResults] = useState<AIHealthResult[] | null>(null)
 
   const referenceContext = useMemo(() => buildReferenceContext(reference), [reference])
+  const projectContext = useMemo(() => buildProjectContext(project), [project])
   const selectedReference = useMemo(() => referenceSummary(reference), [reference])
 
   useEffect(() => {
     const currentReference = parseReference()
+    const { project: currentProject, brief: currentBrief } = parseQueryExtras()
     const controller = new AbortController()
 
     const frame = window.requestAnimationFrame(() => {
       setReference(currentReference)
+      if (currentProject) setProject(currentProject)
+      if (currentBrief) setInput(currentBrief)
     })
 
     async function loadHistory() {
@@ -234,8 +268,9 @@ export default function AiPage() {
     setLoading(true)
     setMessages(nextMessages)
 
-    const messageForApi = referenceContext
-      ? `${referenceContext}\n\nRICHIESTA DI DAVIDE:\n${text}`
+    const contextBlocks = [projectContext, referenceContext].filter(Boolean).join('\n\n')
+    const messageForApi = contextBlocks
+      ? `${contextBlocks}\n\nRICHIESTA DI DAVIDE:\n${text}`
       : text
 
     try {
@@ -442,6 +477,13 @@ export default function AiPage() {
               ))}
             </div>
           </section>
+        )}
+
+        {project && (
+          <div className="mb-4 flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-4 py-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">Progetto attivo</span>
+            <span className="rounded-full bg-grow-yellow px-2.5 py-0.5 text-[11px] font-black uppercase text-black">{project}</span>
+          </div>
         )}
 
         {reference && (

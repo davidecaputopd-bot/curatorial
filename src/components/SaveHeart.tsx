@@ -38,13 +38,10 @@ export default function SaveHeart({
           }),
         })
       } else {
-        await fetch('/api/interact', {
+        await fetch('/api/saved', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content_id: itemId,
-            itemId,
-          }),
+          body: JSON.stringify({ content_id: itemId }),
         })
       }
     } catch {
@@ -63,7 +60,7 @@ export default function SaveHeart({
         'absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/30 backdrop-blur-xl transition-all',
         saved
           ? 'bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)]'
-          : 'bg-black/25 text-white/85 opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.18)] group-hover:opacity-100',
+          : 'bg-black/35 text-white/90 shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
         busy ? 'scale-90 opacity-60' : 'hover:scale-110',
       ].join(' ')}
     >

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 
 const CLIENTS = ['ANventitre', 'Exousia', 'Cantina Don Carlo', 'ACI Copertino', 'TRAMA', 'Altro']
@@ -174,6 +175,14 @@ export default function InboxPage() {
                   )}
                   <span className="text-[10px] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>{timeAgo(item.created_at)}</span>
                 </div>
+                {expanded === item.id && (
+                  <Link
+                    href={`/ai?brief=${encodeURIComponent(item.content || item.url || '')}${item.client ? `&project=${encodeURIComponent(item.client)}` : ''}`}
+                    className="mt-2 inline-flex items-center gap-1 rounded-full bg-grow-black px-3 py-1.5 text-[10px] font-bold uppercase text-grow-yellow"
+                  >
+                    Invia all&apos;AI →
+                  </Link>
+                )}
               </div>
             ))}
           </div>

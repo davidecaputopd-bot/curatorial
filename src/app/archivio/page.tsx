@@ -126,10 +126,10 @@ export default function ArchivioPage() {
         return
       }
 
-      await fetch('/api/interact', {
+      await fetch('/api/saved', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content_id: id, itemId: id }),
+        body: JSON.stringify({ content_id: id }),
       })
     } catch {}
   }

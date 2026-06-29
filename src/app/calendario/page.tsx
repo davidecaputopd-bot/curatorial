@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 
 const CLIENTS = ['Tutti', 'ANventitre', 'Exousia', 'Cantina Don Carlo', 'ACI Copertino', 'TRAMA']
@@ -206,13 +207,19 @@ export default function CalendarioPage() {
                               </button>
                             </div>
                             {/* Cambia status */}
-                            <div className="mt-2 flex gap-1 flex-wrap">
+                            <div className="mt-2 flex gap-1 flex-wrap items-center">
                               {STATUSES.filter(s => s !== status).map(s => (
                                 <button key={s} onClick={() => changeStatus(item.id, s)}
                                   className="rounded-full border border-grow-border px-2 py-0.5 text-[9px] text-grow-muted hover:text-grow-text transition-colors">
                                   → {STATUS_LABELS[s]}
                                 </button>
                               ))}
+                              <Link
+                                href={`/ai?project=${encodeURIComponent(item.client)}&brief=${encodeURIComponent(item.title)}`}
+                                className="rounded-full bg-grow-black px-2 py-0.5 text-[9px] font-bold uppercase text-grow-yellow"
+                              >
+                                Lavora in AI
+                              </Link>
                             </div>
                           </div>
                         ))}
