@@ -10,9 +10,9 @@ export async function GET() {
       .from('chat_history')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(50)
-    return NextResponse.json({ messages: data || [] })
+    return NextResponse.json({ messages: (data || []).reverse() })
   } catch {
     return NextResponse.json({ messages: [] })
   }
