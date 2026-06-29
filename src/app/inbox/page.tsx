@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 const CLIENTS = ['ANventitre', 'Exousia', 'Cantina Don Carlo', 'ACI Copertino', 'TRAMA', 'Altro']
 
@@ -25,6 +26,7 @@ type Item = {
   id: string
   content?: string
   url?: string
+  image_url?: string
   client?: string
   source?: string
   created_at: string
@@ -38,6 +40,8 @@ export default function InboxPage() {
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadItems() }, [])
 
@@ -75,6 +79,36 @@ export default function InboxPage() {
       setError('Errore di rete. Riprova.')
     }
     setSaving(false)
+  }
+
+  const uploadScreenshot = async (file: File) => {
+    setUploading(true)
+    setError('')
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('inbox-images')
+        .upload(path, file, { contentType: file.type })
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('inbox-images').getPublicUrl(path)
+      const res = await fetch('/api/inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: data.publicUrl, client, source: 'manual' }),
+      })
+      const saved = await res.json()
+      if (saved.item) {
+        setItems(prev => [saved.item, ...prev])
+      } else {
+        setError(saved.error || 'Salvataggio screenshot non riuscito.')
+      }
+    } catch {
+      setError('Upload screenshot non riuscito.')
+    }
+    setUploading(false)
   }
 
   const remove = async (id: string) => {
@@ -125,6 +159,29 @@ export default function InboxPage() {
               <option value="">Nessun cliente</option>
               {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) void uploadScreenshot(file)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-grow-soft text-grow-text disabled:opacity-40"
+              aria-label="Carica screenshot"
+            >
+              {uploading ? '…' : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+                </svg>
+              )}
+            </button>
             <button
               onClick={save}
               disabled={!text.trim() || saving}
@@ -157,8 +214,16 @@ export default function InboxPage() {
                 <div className="flex items-start justify-between gap-2">
                   <button
                     onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-                    className="flex-1 text-left"
+                    className={`flex flex-1 text-left ${expanded === item.id ? 'flex-col gap-2' : 'items-start gap-3'}`}
                   >
+                    {item.image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.image_url}
+                        alt=""
+                        className={`shrink-0 rounded-lg object-cover ${expanded === item.id ? 'h-40 w-full' : 'h-12 w-12'}`}
+                      />
+                    )}
                     <p className={`text-sm text-grow-text ${expanded === item.id ? '' : 'line-clamp-2'}`}>
                       {item.content || item.url}
                     </p>

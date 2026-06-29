@@ -22,18 +22,26 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  if (!body.content && !body.url)
-    return NextResponse.json({ error: 'content o url richiesto' }, { status: 400 })
+  if (!body.content && !body.url && !body.image_url)
+    return NextResponse.json({ error: 'content, url o image_url richiesto' }, { status: 400 })
 
   let content = body.content
   if (body.url && (!content || content === body.url)) {
     const title = await fetchLinkTitle(body.url)
     content = title || body.url
   }
+  if (!content && body.image_url) content = 'Screenshot'
 
   const { data, error } = await supabase
     .from('inbox_items')
-    .insert({ user_id: user.id, content, url: body.url, client: body.client, source: body.source || 'manual' })
+    .insert({
+      user_id: user.id,
+      content,
+      url: body.url,
+      image_url: body.image_url || null,
+      client: body.client,
+      source: body.source || 'manual',
+    })
     .select()
     .single()
 
