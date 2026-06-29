@@ -86,7 +86,7 @@ export default function InboxPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text" style={{ fontFamily: "Inter, 'Helvetica Neue', system-ui, sans-serif" }}>
+    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
       <div className="mx-auto max-w-lg px-4 pt-12">
         <header className="mb-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>GROW Inbox</p>

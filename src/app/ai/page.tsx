@@ -5,8 +5,6 @@ import BottomNav from '@/components/BottomNav'
 import { ProductionPlanCard } from '@/components/ProductionPlanCard'
 import type { ProductionPlan } from '@/lib/ai/production-types'
 
-const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
-
 const PRODUCTION_TRIGGERS = [
   'video',
   'reel',
@@ -350,10 +348,7 @@ export default function AiPage() {
       ]
 
   return (
-    <main
-      className="flex min-h-screen flex-col bg-grow-bg text-grow-text"
-      style={{ fontFamily: font }}
-    >
+    <main className="flex min-h-screen flex-col bg-grow-bg text-grow-text">
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 pb-28 pt-8">
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>

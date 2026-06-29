@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import BottomNav from '@/components/BottomNav'
 
-const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
-
 /* ─── Breath game ─── */
 function BreathGame() {
   const [phase, setPhase] = useState<'idle' | 'in' | 'hold' | 'out'>('idle')
@@ -197,7 +195,7 @@ function FocusTimer() {
 
 export default function MindPage() {
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text" style={{ fontFamily: font }}>
+    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
       <div className="mx-auto max-w-lg px-4 pt-12 space-y-4">
         <header className="mb-6">
           <h1 className="text-[26px] font-black uppercase tracking-tight">

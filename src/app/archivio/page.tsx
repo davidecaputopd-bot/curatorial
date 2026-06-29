@@ -9,8 +9,6 @@ import {
   type StudioAsset,
 } from '@/lib/studio/local-assets'
 
-const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
-
 type ArchiveItem = {
   id: string
   title?: string | null
@@ -137,7 +135,7 @@ export default function ArchivioPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-10 text-grow-text" style={{ fontFamily: font }}>
+    <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-10 text-grow-text">
       <section className="mx-auto max-w-lg">
         <header className="mb-7">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">

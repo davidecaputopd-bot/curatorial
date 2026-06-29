@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
-const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
-
 const categories = [
   { key: null, label: 'Tutto' },
   { key: 'branding', label: 'Branding' },
@@ -179,7 +177,7 @@ export default function ScopriPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text" style={{ fontFamily: font }}>
+    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
       <div className="mx-auto max-w-lg px-4 pt-10">
         <header className="mb-6">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">

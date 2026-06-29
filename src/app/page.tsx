@@ -22,6 +22,7 @@ const clients = [
   { name: 'ANventitre', color: '#2D4A1E', initials: 'AN' },
   { name: 'Exousia', color: '#1A3A2A', initials: 'EX' },
   { name: 'Cantina Don Carlo', color: '#6B2D1A', initials: 'DC' },
+  { name: 'ACI Copertino', color: '#1F2D4A', initials: 'AC' },
   { name: 'TRAMA', color: '#1A1A2E', initials: 'TR' },
 ]
 
@@ -160,7 +161,7 @@ export default function Home() {
 
         <section className="mb-8">
           <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Clienti attivi</p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {clients.map((c) => (
               <Link
                 key={c.name}
