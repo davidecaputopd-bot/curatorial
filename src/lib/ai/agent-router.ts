@@ -27,23 +27,50 @@ function hasKey(value: string | undefined) {
   return Boolean(value && value.trim().length > 0)
 }
 
+function extractFailedGeneration(error: unknown): AgentToolCall[] | null {
+  const raw = JSON.stringify(error)
+  const match = raw.match(/<function=([\w_]+)(\{[^<]*\})<\/function>/)
+  if (!match) return null
+
+  try {
+    JSON.parse(match[2])
+  } catch {
+    return null
+  }
+
+  return [
+    {
+      id: `recovered-${Date.now()}`,
+      type: 'function',
+      function: { name: match[1], arguments: match[2] },
+    },
+  ]
+}
+
 async function callGroqWithTools(messages: AgentMessage[]): Promise<{
   content: string | null
   tool_calls?: AgentToolCall[]
 }> {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  const completion = await groq.chat.completions.create({
-    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    messages: messages as never,
-    tools: AGENT_TOOLS as never,
-    tool_choice: 'auto',
-    max_tokens: 1200,
-    temperature: 0.4,
-  })
-  const message = completion.choices[0]?.message
-  return {
-    content: message?.content || null,
-    tool_calls: message?.tool_calls as AgentToolCall[] | undefined,
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      messages: messages as never,
+      tools: AGENT_TOOLS as never,
+      tool_choice: 'auto',
+      max_tokens: 1200,
+      temperature: 0.4,
+    })
+    const message = completion.choices[0]?.message
+    return {
+      content: message?.content || null,
+      tool_calls: message?.tool_calls as AgentToolCall[] | undefined,
+    }
+  } catch (error) {
+    const recovered = extractFailedGeneration(error)
+    if (recovered) return { content: null, tool_calls: recovered }
+    throw error
   }
 }
 
@@ -103,7 +130,18 @@ export async function runAgent(
   const actions: AgentAction[] = []
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
-    const result = await provider.call(messages)
+    let result: { content: string | null; tool_calls?: AgentToolCall[] }
+    try {
+      result = await provider.call(messages)
+    } catch (error) {
+      return {
+        reply:
+          'Il modello AI non è riuscito a eseguire l\'azione richiesta (limite del provider gratuito). Configura OPENROUTER_API_KEY per risposte più affidabili. Dettaglio: ' +
+          (error instanceof Error ? error.message.slice(0, 200) : String(error)),
+        actions,
+        provider: provider.id,
+      }
+    }
 
     if (!result.tool_calls?.length) {
       return { reply: result.content || 'Nessuna risposta.', actions, provider: provider.id }
