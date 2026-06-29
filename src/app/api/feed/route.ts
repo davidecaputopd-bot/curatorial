@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const category = searchParams.get('category')
   const typeFilter = searchParams.get('type')
   const limit = parseInt(searchParams.get('limit') || '40')
+  const offset = parseInt(searchParams.get('offset') || '0')
 
   try {
     const { data: profile } = await supabase
@@ -35,8 +36,9 @@ export async function GET(request: Request) {
       .filter(([, w]) => w >= 0.30 && w < 0.65)
       .map(([cat]) => cat)
 
-    const mainLimit = Math.floor(limit * 0.80)
-    const surpriseLimit = limit - mainLimit
+    const totalNeeded = offset + limit
+    const mainLimit = Math.floor(totalNeeded * 0.80)
+    const surpriseLimit = totalNeeded - mainLimit
 
     // Main query
     let mainQuery = supabase
@@ -102,7 +104,7 @@ export async function GET(request: Request) {
     let mainIdx = 0
     let surpriseIdx = 0
 
-    for (let i = 0; i < limit; i++) {
+    for (let i = 0; i < totalNeeded; i++) {
       if (surprisePositions.has(i) && surpriseIdx < surpriseItems.length) {
         combined.push(surpriseItems[surpriseIdx++])
       } else if (mainIdx < mainScored.length) {
@@ -114,7 +116,9 @@ export async function GET(request: Request) {
       combined.push(surpriseItems[surpriseIdx++])
     }
 
-    return NextResponse.json({ items: combined, total: combined.length })
+    const page = combined.slice(offset, offset + limit)
+
+    return NextResponse.json({ items: page, total: combined.length, hasMore: offset + limit < combined.length })
 
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

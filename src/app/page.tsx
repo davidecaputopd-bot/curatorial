@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
-const FEED_LIMIT = 720
+const PAGE_SIZE = 60
+const FEED_CEILING = 720
 
 const categories = [
   { key: null, label: 'Tutto' },
@@ -131,17 +132,49 @@ export default function Home() {
   const [active, setActive] = useState<string | null>(null)
   const [images, setImages] = useState<any[]>([])
   const [loadingImages, setLoadingImages] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  const fetchPage = (cat: string | null, offset: number) => {
+    const p = cat ? '&category=' + cat : ''
+    return fetch(`/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}${p}`).then((r) => r.json())
+  }
 
   const load = async (cat: string | null) => {
     setActive(cat)
     setLoadingImages(true)
-    const p = cat ? '&category=' + cat : ''
-    fetch(`/api/feed?type=image&limit=${FEED_LIMIT}${p}`)
-      .then((r) => r.json())
-      .then((d) => setImages(d.items || []))
-      .catch(() => setImages([]))
-      .finally(() => setLoadingImages(false))
+    try {
+      const d = await fetchPage(cat, 0)
+      setImages(d.items || [])
+      setHasMore(Boolean(d.hasMore) && PAGE_SIZE < FEED_CEILING)
+    } catch {
+      setImages([])
+      setHasMore(false)
+    } finally {
+      setLoadingImages(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (loadingMore || loadingImages || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const offset = images.length
+      if (offset >= FEED_CEILING) {
+        setHasMore(false)
+        return
+      }
+      const d = await fetchPage(active, offset)
+      const newItems = d.items || []
+      setImages((prev) => [...prev, ...newItems])
+      setHasMore(Boolean(d.hasMore) && offset + newItems.length < FEED_CEILING && newItems.length > 0)
+    } catch {
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   useEffect(() => {
@@ -151,6 +184,19 @@ export default function Home() {
       .then((data) => setSavedIds(new Set((data.items || []).map((item: any) => item.id))))
       .catch(() => setSavedIds(new Set()))
   }, [])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore()
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [images, hasMore, loadingMore, loadingImages, active])
 
   const handleDwell = async (itemId: string, seconds: number) => {
     try {
@@ -220,6 +266,16 @@ export default function Home() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {!loadingImages && images.length > 0 && (
+          <div ref={sentinelRef} className="flex h-16 items-center justify-center">
+            {loadingMore && (
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                Carico altre reference…
+              </span>
+            )}
           </div>
         )}
       </div>
