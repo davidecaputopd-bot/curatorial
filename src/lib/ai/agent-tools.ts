@@ -101,7 +101,32 @@ export const AGENT_TOOLS = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_image',
+      description: 'Genera un\'immagine a partire da una descrizione. Usa questo quando Davide chiede di creare/generare/disegnare un\'immagine, mockup visivo o illustrazione.',
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'Descrizione visiva dettagliata in inglese, pronta per un modello text-to-image' },
+        },
+        required: ['prompt'],
+      },
+    },
+  },
 ] as const
+
+function buildImageUrl(prompt: string): string {
+  const params = new URLSearchParams({
+    model: 'flux',
+    width: '1024',
+    height: '1024',
+    nologo: 'true',
+    seed: String(Math.floor(Math.random() * 999_999_999)),
+  })
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`
+}
 
 type ToolArgs = Record<string, unknown>
 
@@ -206,6 +231,11 @@ export async function executeAgentTool(
         }
       }
       return { published_this_month: counts }
+    }
+
+    case 'generate_image': {
+      if (!args.prompt || typeof args.prompt !== 'string') return { error: 'prompt richiesto' }
+      return { image_url: buildImageUrl(args.prompt), prompt: args.prompt }
     }
 
     default:

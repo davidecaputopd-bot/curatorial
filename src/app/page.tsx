@@ -27,13 +27,6 @@ const clients = [
   { name: 'TRAMA', color: '#1A1A2E', initials: 'TR' },
 ]
 
-const quickBriefs = [
-  'Reel AN23 bottiglia in pineta',
-  'Carosello Exousia finanza agevolata',
-  'Mockup etichetta Cantina Don Carlo',
-  'Visual TRAMA vintage opening',
-]
-
 function MiniCard({ item, saved }: { item: any; saved: boolean }) {
   const img = item.image_url || placeholders[item.category] || placeholders.design
   const href = item.url && item.url !== '#' ? item.url : undefined
@@ -154,33 +147,15 @@ export default function Home() {
           </Link>
 
           <Link
-            href="/studio"
+            href="/chat"
             className="rounded-[1.5rem] border border-black/10 bg-white/70 p-5"
           >
-            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Lavora</p>
-            <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Studio</h2>
-            <p className="mt-1.5 text-xs text-[#5F5A52]">Compila prompt, genera</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Veloce</p>
+            <h2 className="mt-2 font-display text-2xl font-black uppercase leading-none">Chat</h2>
+            <p className="mt-1.5 text-xs text-[#5F5A52]">Con te stesso, telefono ↔ computer</p>
           </Link>
         </section>
 
-        <section className="mb-8">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Brief rapidi</p>
-            <Link href="/ai" className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F5A52]">Tutti</Link>
-          </div>
-          <div className="space-y-2">
-            {quickBriefs.map((brief) => (
-              <Link
-                key={brief}
-                href={'/ai?brief=' + encodeURIComponent(brief)}
-                className="flex items-center justify-between rounded-[1.1rem] border border-black/10 bg-white/60 px-4 py-3 transition hover:border-black/20 hover:bg-white"
-              >
-                <span className="text-sm font-bold">{brief}</span>
-                <span className="font-mono text-[10px] font-bold text-[#5F5A52]">→</span>
-              </Link>
-            ))}
-          </div>
-        </section>
 
         <section className="mb-8">
           <p className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#5F5A52]">Clienti attivi</p>

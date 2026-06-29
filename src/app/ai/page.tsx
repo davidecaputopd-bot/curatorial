@@ -1,45 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { ProductionPlanCard } from '@/components/ProductionPlanCard'
-import type { ProductionPlan } from '@/lib/ai/production-types'
 
-const PRODUCTION_TRIGGERS = [
-  'video',
-  'reel',
-  'clip',
-  'immagine',
-  'visual',
-  'mockup',
-  'bottiglia',
-  'etichetta',
-  'carosello',
-  'reference',
-  'comfyui',
-  'ltx',
-  'higgsfield',
-  'luma',
-  'recraft',
-  'ideogram',
-  'genera',
-  'crea',
-  'trasforma',
-]
+type Action = { tool: string; args: unknown; result: unknown }
 
 type Message = {
   id: string
   role: 'user' | 'assistant'
   content: string
-  image_url?: string
   imageUrl?: string
-  provider?: string
-  providerLabel?: string
-  model?: string
-  mode?: string
-  productionPlan?: ProductionPlan
-  productionBrief?: string
-  planLoading?: boolean
+  image_url?: string
+  actions?: Action[]
 }
 
 type Reference = {
@@ -50,23 +22,41 @@ type Reference = {
   url?: string
 }
 
-type AIHealthResult = {
-  provider: string
-  label?: string
-  model: string
-  mode?: string
-  ok: boolean
-  latency_ms: number
-  error?: string
+type Citation = {
+  type: 'archivio' | 'inbox' | 'calendario'
+  id: string
+  title: string
+  meta?: string
 }
 
-function messageId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+type Conversation = { conversation_id: string; title: string; updated_at: string }
+
+const TOOL_LABELS: Record<string, string> = {
+  list_calendar_items: 'Letto calendario',
+  create_calendar_item: 'Creato contenuto calendario',
+  update_calendar_status: 'Aggiornato stato calendario',
+  list_inbox_items: 'Letto inbox',
+  create_inbox_item: 'Creato item inbox',
+  search_saved_content: 'Cercato in archivio',
+  get_monthly_output_summary: 'Calcolato output mensile',
+  generate_image: 'Immagine generata',
 }
 
-function isProductionRequest(message: string) {
-  const text = message.toLowerCase()
-  return PRODUCTION_TRIGGERS.some((trigger) => text.includes(trigger))
+const CLIENT_NOTES: Record<string, string> = {
+  ANventitre: 'Tono premium mediterraneo. Logo a cerchio verde. Vino bio.',
+  AN23: 'Tono premium mediterraneo. Logo a cerchio verde. Vino bio.',
+  Exousia: 'Tono professionale, radicato nel territorio locale. Colore verde #0E2B1F.',
+  'Cantina Don Carlo': 'Tono naturale ed elegante. Mai usare "Madre Terra" o cliché simili.',
+  'ACI Copertino': 'Tono istituzionale ma accessibile, comunicazione locale.',
+  TRAMA: 'Vintage contemporaneo. Apertura store ottobre 2026.',
+}
+
+function messageId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function newConversationId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : messageId()
 }
 
 function parseReference(): Reference | null {
@@ -79,50 +69,20 @@ function parseReference(): Reference | null {
     image: params.get('image') || undefined,
     url: params.get('url') || undefined,
   }
-
-  if (!reference.id && !reference.title && !reference.image && !reference.url) {
-    return null
-  }
+  if (!reference.id && !reference.title && !reference.image && !reference.url) return null
   return reference
 }
 
 function parseQueryExtras() {
   if (typeof window === 'undefined') return { project: null, brief: null }
   const params = new URLSearchParams(window.location.search)
-  return {
-    project: params.get('project') || null,
-    brief: params.get('brief') || null,
-  }
-}
-
-function initialMessage(reference: Reference | null): Message {
-  return {
-    id: messageId('welcome'),
-    role: 'assistant',
-    content: reference
-      ? 'Reference collegata. Dimmi cosa vuoi produrre e per quale progetto: preparo risposta, motore, percorso, prompt e controlli.'
-      : 'Scrivi cosa devi produrre, per quale progetto e con quali vincoli. GROW risponde e, quando serve, costruisce un piano che puoi portare direttamente in Studio.',
-  }
-}
-
-const CLIENT_NOTES: Record<string, string> = {
-  'ANventitre': 'Tono premium mediterraneo. Logo a cerchio verde. Vino bio.',
-  'AN23': 'Tono premium mediterraneo. Logo a cerchio verde. Vino bio.',
-  'Exousia': 'Tono professionale, radicato nel territorio locale. Colore verde #0E2B1F.',
-  'Cantina Don Carlo': 'Tono naturale ed elegante. Mai usare "Madre Terra" o cliché simili.',
-  'ACI Copertino': 'Tono istituzionale ma accessibile, comunicazione locale.',
-  'TRAMA': 'Vintage contemporaneo. Apertura store ottobre 2026, comunicazione in costruzione verso quella data.',
+  return { project: params.get('project') || null, brief: params.get('brief') || null }
 }
 
 function buildProjectContext(project: string | null) {
   if (!project) return ''
   const notes = CLIENT_NOTES[project]
-  return [
-    `PROGETTO ATTIVO: ${project}`,
-    notes ? `Regole per questo cliente: ${notes}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
+  return [`PROGETTO ATTIVO: ${project}`, notes ? `Regole per questo cliente: ${notes}` : ''].filter(Boolean).join('\n')
 }
 
 function buildReferenceContext(reference: Reference | null) {
@@ -132,351 +92,193 @@ function buildReferenceContext(reference: Reference | null) {
     reference.title ? `Titolo: ${reference.title}` : '',
     reference.category ? `Categoria: ${reference.category}` : '',
     reference.url ? `Fonte: ${reference.url}` : '',
-    reference.image ? `Immagine: ${reference.image}` : '',
     '',
     'Usa questa reference come materiale creativo, non come semplice link.',
-  ]
-    .filter(Boolean)
-    .join('\n')
+  ].filter(Boolean).join('\n')
 }
 
-function referenceSummary(reference: Reference | null) {
-  if (!reference) return undefined
+function buildCitationsContext(citations: Citation[]) {
+  if (!citations.length) return ''
   return [
-    reference.title ? `Titolo: ${reference.title}` : '',
-    reference.category ? `Categoria: ${reference.category}` : '',
-    reference.url ? `Fonte: ${reference.url}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
+    'DAVIDE CITA QUESTI ELEMENTI SALVATI:',
+    ...citations.map((c) => `- [${c.type}] ${c.title}${c.meta ? ` (${c.meta})` : ''}`),
+  ].join('\n')
 }
 
 export default function AiPage() {
   const [reference, setReference] = useState<Reference | null>(null)
   const [project, setProject] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string>('')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [healthLoading, setHealthLoading] = useState(false)
-  const [healthResults, setHealthResults] = useState<AIHealthResult[] | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [showCitePicker, setShowCitePicker] = useState(false)
+  const [citeQuery, setCiteQuery] = useState('')
+  const [citeResults, setCiteResults] = useState<Citation[]>([])
+  const [citations, setCitations] = useState<Citation[]>([])
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   const referenceContext = useMemo(() => buildReferenceContext(reference), [reference])
   const projectContext = useMemo(() => buildProjectContext(project), [project])
-  const selectedReference = useMemo(() => referenceSummary(reference), [reference])
 
   useEffect(() => {
-    const currentReference = parseReference()
-    const { project: currentProject, brief: currentBrief } = parseQueryExtras()
-    const controller = new AbortController()
-
-    const frame = window.requestAnimationFrame(() => {
-      setReference(currentReference)
-      if (currentProject) setProject(currentProject)
-      if (currentBrief) setInput(currentBrief)
-    })
-
-    async function loadHistory() {
-      try {
-        const response = await fetch('/api/chat-history', {
-          signal: controller.signal,
-        })
-        const data = await response.json()
-
-        if (data.messages?.length) {
-          setMessages(
-            data.messages.map((message: Omit<Message, 'id'>, index: number) => ({
-              ...message,
-              id: `history-${index}-${message.role}-${message.content.slice(0, 16)}`,
-            }))
-          )
-        } else {
-          setMessages([initialMessage(currentReference)])
-        }
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          setMessages([initialMessage(currentReference)])
-        }
-      }
-    }
-
-    void loadHistory()
-    return () => {
-      window.cancelAnimationFrame(frame)
-      controller.abort()
-    }
+    setReference(parseReference())
+    const { project: p, brief } = parseQueryExtras()
+    if (p) setProject(p)
+    if (brief) setInput(brief)
+    setConversationId(newConversationId())
   }, [])
 
-  function attachPlan(messageIdToUpdate: string, plan: ProductionPlan) {
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === messageIdToUpdate
-          ? { ...message, productionPlan: plan, planLoading: false }
-          : message
-      )
-    )
-  }
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length])
 
-  function stopPlanLoading(messageIdToUpdate: string) {
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === messageIdToUpdate
-          ? { ...message, planLoading: false }
-          : message
-      )
-    )
-  }
-
-  async function requestProductionPlan(text: string): Promise<ProductionPlan | null> {
-    try {
-      const response = await fetch('/api/ai/plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          context: {
-            selectedReference: reference,
-            currentRoute: '/ai',
-          },
-        }),
-      })
-      const data = await response.json()
-
-      if (response.ok && data.ok && data.plan) {
-        return data.plan as ProductionPlan
-      }
-    } catch {
-      return null
+  useEffect(() => {
+    if (!citeQuery.trim()) {
+      setCiteResults([])
+      return
     }
+    const timeout = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(citeQuery)}`)
+        .then((r) => r.json())
+        .then((d) => setCiteResults(d.items || []))
+        .catch(() => setCiteResults([]))
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [citeQuery])
 
-    return null
+  const openHistory = async () => {
+    setShowHistory(true)
+    try {
+      const res = await fetch('/api/chat-history?list=true')
+      const data = await res.json()
+      setConversations(data.conversations || [])
+    } catch {}
   }
+
+  const loadConversation = async (id: string) => {
+    try {
+      const res = await fetch(`/api/chat-history?conversation_id=${id}`)
+      const data = await res.json()
+      setMessages(
+        (data.messages || []).map((m: { role: 'user' | 'assistant'; content: string; image_url?: string }) => ({
+          id: messageId(),
+          role: m.role,
+          content: m.content,
+          image_url: m.image_url,
+        }))
+      )
+      setConversationId(id)
+      setShowHistory(false)
+    } catch {}
+  }
+
+  const startNewChat = () => {
+    setConversationId(newConversationId())
+    setMessages([])
+    setCitations([])
+    setShowHistory(false)
+  }
+
+  const addCitation = (item: Citation) => {
+    setCitations((prev) => (prev.find((c) => c.id === item.id) ? prev : [...prev, item]))
+    setShowCitePicker(false)
+    setCiteQuery('')
+  }
+
+  const removeCitation = (id: string) => setCitations((prev) => prev.filter((c) => c.id !== id))
 
   async function send(raw: string) {
     const text = raw.trim()
     if (!text || loading) return
 
-    const shouldPlan = isProductionRequest(text)
-    const userMessage: Message = {
-      id: messageId('user'),
-      role: 'user',
-      content: text,
-    }
-    const assistantMessageId = messageId('assistant')
-    const nextMessages = [...messages, userMessage]
-
+    const userMessage: Message = { id: messageId(), role: 'user', content: text }
+    const next = [...messages, userMessage]
+    setMessages(next)
     setInput('')
     setLoading(true)
-    setMessages(nextMessages)
 
-    const contextBlocks = [projectContext, referenceContext].filter(Boolean).join('\n\n')
-    const messageForApi = contextBlocks
-      ? `${contextBlocks}\n\nRICHIESTA DI DAVIDE:\n${text}`
-      : text
+    const contextBlocks = [projectContext, referenceContext, buildCitationsContext(citations)].filter(Boolean).join('\n\n')
+    const messageForApi = contextBlocks ? `${contextBlocks}\n\nRICHIESTA DI DAVIDE:\n${text}` : text
 
     try {
-      const planRequest = shouldPlan
-        ? requestProductionPlan(text)
-        : null
-      const response = await fetch('/api/chat', {
+      const res = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageForApi,
-          history: messages.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          conversationId,
         }),
       })
-      const data = await response.json()
-
-      if (!response.ok) throw new Error(data.error || 'Chat request failed')
-
-      setMessages([
-        ...nextMessages,
-        {
-          id: assistantMessageId,
-          role: 'assistant',
-          content: data.reply || 'Errore: risposta vuota.',
-          imageUrl: data.imageUrl,
-          provider: data.provider,
-          providerLabel: data.providerLabel,
-          model: data.model,
-          mode: data.mode,
-          productionBrief: text,
-          planLoading: shouldPlan,
-        },
-      ])
-
-      if (planRequest) {
-        void planRequest.then((plan) => {
-          if (plan) {
-            attachPlan(assistantMessageId, plan)
-          } else {
-            stopPlanLoading(assistantMessageId)
-          }
-        })
+      const data = await res.json()
+      if (res.ok) {
+        setMessages([...next, { id: messageId(), role: 'assistant', content: data.reply, imageUrl: data.imageUrl, actions: data.actions }])
+      } else {
+        setMessages([...next, { id: messageId(), role: 'assistant', content: `Errore: ${data.error || 'qualcosa non ha funzionato'}` }])
       }
     } catch {
-      setMessages([
-        ...nextMessages,
-        {
-          id: assistantMessageId,
-          role: 'assistant',
-          content: 'Errore di connessione. Riprova.',
-          productionBrief: text,
-          planLoading: false,
-        },
-      ])
-    } finally {
-      setLoading(false)
+      setMessages([...next, { id: messageId(), role: 'assistant', content: 'Errore di connessione. Riprova.' }])
     }
+    setCitations([])
+    setLoading(false)
   }
-
-  async function clear() {
-    try {
-      await fetch('/api/chat-history', { method: 'DELETE' })
-    } catch {}
-    setMessages([initialMessage(reference)])
-  }
-
-  async function testAIProviders() {
-    setHealthLoading(true)
-    setHealthResults(null)
-
-    try {
-      const response = await fetch('/api/ai/health', { method: 'POST' })
-      const data = await response.json()
-
-      if (!response.ok) throw new Error(data.error || 'Health check failed')
-      setHealthResults([
-        ...(data.results || []),
-        ...(data.pollinations ? [data.pollinations] : []),
-      ])
-    } catch {
-      setHealthResults([
-        {
-          provider: 'grow-ai',
-          model: 'health-check',
-          ok: false,
-          latency_ms: 0,
-          error: 'Controllo non disponibile. Verifica la sessione e riprova.',
-        },
-      ])
-    } finally {
-      setHealthLoading(false)
-    }
-  }
-
-  const quickActions = reference
-    ? [
-        'Crea un reel AN23 da questa reference',
-        'Trasformala in un mockup prodotto',
-        'Prepara un carosello editoriale',
-        'Compila un workflow ComfyUI',
-      ]
-    : [
-        'Reel AN23 con bottiglia in pineta e logo finale',
-        'Mockup Cantina Don Carlo con etichetta vera',
-        'Carosello Exousia sulla finanza agevolata',
-        'Visual premium da produrre con ComfyUI',
-      ]
 
   return (
     <main className="flex min-h-screen flex-col bg-grow-bg text-grow-text">
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 pb-28 pt-8">
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
-              GROW AI
-            </p>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">GROW</p>
             <h1 className="mt-2 text-[34px] font-black uppercase leading-[0.9] tracking-tighter">
-              Dal brief alla produzione<span className="text-grow-yellow">.</span>
+              AI<span className="text-grow-yellow">.</span>
             </h1>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => void testAIProviders()}
-              disabled={healthLoading}
-              className="rounded-full bg-[#0F0F10] px-3 py-2 text-[10px] font-black uppercase tracking-tight text-white disabled:opacity-40"
+              onClick={openHistory}
+              className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
             >
-              {healthLoading ? 'Test…' : 'Test AI'}
+              Cronologia
             </button>
             <button
               type="button"
-              onClick={clear}
-              className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
+              onClick={startNewChat}
+              className="rounded-full bg-[#0F0F10] px-3 py-2 text-[10px] font-black uppercase tracking-tight text-white"
             >
-              Reset
+              Nuova chat
             </button>
           </div>
         </header>
 
-        <section className="mb-5 grid grid-cols-3 overflow-hidden rounded-[1.4rem] border border-black/10 bg-white/70">
-          {[
-            ['01', 'Scrivi il brief'],
-            ['02', 'Controlla il piano'],
-            ['03', 'Produci in Studio'],
-          ].map(([number, label]) => (
-            <div
-              key={number}
-              className="border-r border-black/10 px-3 py-3 last:border-r-0"
-            >
-              <p className="text-[9px] font-black text-grow-muted">{number}</p>
-              <p className="mt-1 text-[10px] font-black uppercase leading-tight">
-                {label}
-              </p>
-            </div>
-          ))}
-        </section>
-
-        {healthResults && (
-          <section className="mb-5 rounded-[1.4rem] bg-[#0F0F10] p-4 text-white">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em]">
-                Stato motori
-              </p>
-              <button
-                type="button"
-                onClick={() => setHealthResults(null)}
-                className="text-[10px] font-black uppercase text-white/40"
-              >
-                Chiudi
-              </button>
-            </div>
-            <div className="mt-3 space-y-2">
-              {healthResults.map((result) => (
-                <div
-                  key={result.provider}
-                  className="flex items-start justify-between gap-3 rounded-xl bg-white/[0.07] px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-black uppercase">
-                      {result.label || result.provider}
-                    </p>
-                    <p className="mt-0.5 truncate text-[10px] text-white/40">
-                      {result.model} · {result.latency_ms} ms
-                    </p>
-                    {result.error && (
-                      <p className="mt-1 text-[10px] leading-relaxed text-red-300/80">
-                        {result.error}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${
-                      result.ok
-                        ? 'bg-grow-yellow text-black'
-                        : 'bg-red-400/15 text-red-200'
-                    }`}
-                  >
-                    {result.ok ? 'Online' : 'Errore'}
-                  </span>
+        {showHistory && (
+          <div className="fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-sm" onClick={() => setShowHistory(false)}>
+            <div className="max-h-[70vh] w-full overflow-y-auto rounded-t-[2rem] bg-grow-bg p-5" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-black uppercase">Conversazioni</h2>
+                <button onClick={() => setShowHistory(false)} className="text-xs font-bold text-grow-muted">Chiudi</button>
+              </div>
+              {conversations.length === 0 ? (
+                <p className="text-sm text-grow-muted">Nessuna conversazione salvata ancora.</p>
+              ) : (
+                <div className="space-y-2">
+                  {conversations.map((c) => (
+                    <button
+                      key={c.conversation_id}
+                      onClick={() => loadConversation(c.conversation_id)}
+                      className="block w-full rounded-[1.1rem] border border-black/10 bg-white/70 px-4 py-3 text-left"
+                    >
+                      <p className="line-clamp-1 text-sm font-bold">{c.title || 'Conversazione'}</p>
+                      <p className="mt-0.5 text-[10px] text-grow-muted">{new Date(c.updated_at).toLocaleString('it-IT')}</p>
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </section>
+          </div>
         )}
 
         {project && (
@@ -490,95 +292,49 @@ export default function AiPage() {
           <section className="mb-5 overflow-hidden rounded-[2rem] border border-black/10 bg-white/70 shadow-sm">
             {reference.image && (
               <div className="h-52">
-                {/* Dynamic archive URLs cannot use next/image without a fixed host allowlist. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={reference.image}
-                  alt={reference.title || 'Reference'}
-                  className="h-full w-full object-cover"
-                />
+                <img src={reference.image} alt={reference.title || 'Reference'} className="h-full w-full object-cover" />
               </div>
             )}
             <div className="p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                Reference collegata
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">Reference collegata</p>
               <h2 className="mt-1 line-clamp-2 text-xl font-black uppercase leading-tight tracking-tight">
                 {reference.title || 'Reference senza titolo'}
               </h2>
-              {reference.category && (
-                <p className="mt-2 inline-flex rounded-full bg-grow-yellow px-3 py-1 text-[10px] font-black uppercase tracking-wider text-black">
-                  {reference.category}
-                </p>
-              )}
             </div>
           </section>
         )}
 
-        <section className="mb-5">
-          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-grow-muted">
-            Prova un brief reale
-          </p>
-          <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4">
-            {quickActions.map((action) => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => send(action)}
-                className="shrink-0 rounded-full border border-black/10 bg-white/70 px-4 py-2 text-xs font-black text-grow-muted transition hover:bg-grow-yellow hover:text-black"
-              >
-                {action}
-              </button>
-            ))}
-          </div>
-        </section>
-
         <div className="flex-1 space-y-4 overflow-y-auto pb-4">
+          {messages.length === 0 && (
+            <div className="rounded-[1.6rem] border border-black/10 bg-white/60 px-5 py-10 text-center">
+              <p className="text-sm text-grow-muted">
+                Scrivi qualsiasi cosa — brief, brainstorming, una domanda su un cliente. Posso anche leggere e modificare calendario, inbox e archivio mentre parliamo.
+              </p>
+            </div>
+          )}
+
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
-            >
+            <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
               <div
                 className={[
-                  message.productionPlan ? 'max-w-full' : 'max-w-[88%]',
-                  'rounded-[1.6rem] px-4 py-3 text-sm leading-relaxed shadow-sm',
-                  message.role === 'user'
-                    ? 'bg-grow-yellow text-black'
-                    : 'border border-black/10 bg-white/75 text-grow-text',
+                  'max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-relaxed shadow-sm',
+                  message.role === 'user' ? 'bg-grow-yellow text-black' : 'border border-black/10 bg-white/75 text-grow-text',
                 ].join(' ')}
               >
                 <p className="whitespace-pre-wrap">{message.content}</p>
-
                 {(message.imageUrl || message.image_url) && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={message.imageUrl || message.image_url}
-                    alt="Output generato da GROW"
-                    className="mt-3 rounded-[1.2rem]"
-                  />
+                  <img src={message.imageUrl || message.image_url} alt="Output generato da GROW" className="mt-3 rounded-[1.2rem]" />
                 )}
-
-                {message.planLoading && (
-                  <div className="mt-3 rounded-xl bg-[#0F0F10] p-3 text-xs font-bold text-white/65">
-                    Sto costruendo motore, percorso e controlli…
+                {message.actions && message.actions.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {message.actions.map((a, i) => (
+                      <span key={i} className="rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-bold uppercase text-grow-text">
+                        {TOOL_LABELS[a.tool] || a.tool}
+                      </span>
+                    ))}
                   </div>
-                )}
-
-                {message.productionPlan && (
-                  <ProductionPlanCard
-                    plan={message.productionPlan}
-                    brief={message.productionBrief || message.content}
-                    reference={selectedReference}
-                  />
-                )}
-
-                {message.role === 'assistant' && (message.provider || message.model) && (
-                  <p className="mt-3 border-t border-black/10 pt-2 text-[10px] font-black uppercase tracking-[0.12em] text-grow-muted">
-                    {message.providerLabel || message.provider || 'AI'}
-                    {message.model ? ` · ${message.model}` : ''}
-                    {message.mode ? ` · ${message.mode}` : ''}
-                  </p>
                 )}
               </div>
             </div>
@@ -586,55 +342,86 @@ export default function AiPage() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="rounded-[1.6rem] border border-black/10 bg-white/75 px-4 py-3 text-sm font-bold text-grow-muted">
-                Sto ragionando…
-              </div>
+              <div className="rounded-[1.6rem] border border-black/10 bg-white/75 px-4 py-3 text-sm font-bold text-grow-muted">…</div>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
 
         <div className="fixed bottom-[92px] left-0 right-0 z-40 px-4">
-          <div className="mx-auto flex max-w-xl items-center gap-2 rounded-[2rem] border border-black/10 bg-[#F7F4EE]/95 p-2 shadow-[0_18px_50px_rgba(15,15,16,0.12)] backdrop-blur-xl">
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void send(input)
-                }
-              }}
-              placeholder={
-                reference
-                  ? 'Cosa vuoi produrre da questa reference?'
-                  : 'Es. Reel AN23, bottiglia in pineta…'
-              }
-              aria-label="Brief per GROW AI"
-              className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-grow-muted"
-            />
-            <button
-              type="button"
-              onClick={() => void send(input)}
-              disabled={!input.trim() || loading}
-              aria-label="Invia brief"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-grow-yellow text-grow-text disabled:opacity-40"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                aria-hidden="true"
-              >
-                <path
-                  d="M5 12h14M12 5l7 7-7 7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+          <div className="mx-auto max-w-xl">
+            {citations.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {citations.map((c) => (
+                  <span key={c.id} className="flex items-center gap-1.5 rounded-full bg-[#0F0F10] px-3 py-1 text-[10px] font-bold text-grow-yellow">
+                    {c.title}
+                    <button onClick={() => removeCitation(c.id)} className="text-white/50">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {showCitePicker && (
+              <div className="mb-2 rounded-[1.3rem] border border-black/10 bg-white p-3 shadow-lg">
+                <input
+                  autoFocus
+                  value={citeQuery}
+                  onChange={(e) => setCiteQuery(e.target.value)}
+                  placeholder="Cerca in archivio, inbox, calendario..."
+                  className="mb-2 w-full rounded-full border border-black/10 px-3 py-1.5 text-sm focus:outline-none"
                 />
-              </svg>
-            </button>
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {citeResults.map((item) => (
+                    <button
+                      key={`${item.type}-${item.id}`}
+                      onClick={() => addCitation(item)}
+                      className="block w-full rounded-lg px-2 py-1.5 text-left text-xs hover:bg-grow-soft"
+                    >
+                      <span className="mr-1.5 rounded bg-grow-soft px-1.5 py-0.5 text-[9px] font-bold uppercase text-grow-muted">{item.type}</span>
+                      {item.title}
+                    </button>
+                  ))}
+                  {citeQuery.trim() && citeResults.length === 0 && (
+                    <p className="px-2 py-1.5 text-xs text-grow-muted">Nessun risultato.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 rounded-[2rem] border border-black/10 bg-[#F7F4EE]/95 p-2 shadow-[0_18px_50px_rgba(15,15,16,0.12)] backdrop-blur-xl">
+              <button
+                type="button"
+                onClick={() => setShowCitePicker((v) => !v)}
+                aria-label="Cita un elemento salvato"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-grow-muted hover:text-grow-text"
+              >
+                @
+              </button>
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    void send(input)
+                  }
+                }}
+                placeholder="Scrivi qualsiasi cosa..."
+                aria-label="Messaggio per GROW AI"
+                className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-grow-muted"
+              />
+              <button
+                type="button"
+                onClick={() => void send(input)}
+                disabled={!input.trim() || loading}
+                aria-label="Invia"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-grow-yellow text-grow-text disabled:opacity-40"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>

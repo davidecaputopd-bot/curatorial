@@ -21,6 +21,15 @@ export type AgentResult = {
   reply: string
   actions: AgentAction[]
   provider: string
+  imageUrl?: string
+}
+
+function extractImageUrl(actions: AgentAction[]): string | undefined {
+  for (let i = actions.length - 1; i >= 0; i--) {
+    const result = actions[i].result as { image_url?: string } | undefined
+    if (actions[i].tool === 'generate_image' && result?.image_url) return result.image_url
+  }
+  return undefined
 }
 
 function hasKey(value: string | undefined) {
@@ -144,7 +153,7 @@ export async function runAgent(
     }
 
     if (!result.tool_calls?.length) {
-      return { reply: result.content || 'Nessuna risposta.', actions, provider: provider.id }
+      return { reply: result.content || 'Nessuna risposta.', actions, provider: provider.id, imageUrl: extractImageUrl(actions) }
     }
 
     messages.push({ role: 'assistant', content: result.content || '', tool_calls: result.tool_calls })
@@ -172,5 +181,6 @@ export async function runAgent(
     reply: 'Ho eseguito alcune azioni ma non sono riuscito a concludere il ragionamento. Chiedimi di nuovo per continuare.',
     actions,
     provider: provider.id,
+    imageUrl: extractImageUrl(actions),
   }
 }
