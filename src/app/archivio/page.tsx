@@ -22,6 +22,13 @@ type ArchiveItem = {
   height?: number | null
   is_studio_asset?: boolean
   sync_status?: StudioAsset['sync_status']
+  platform?: string | null
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  arena: 'Are.na',
+  unsplash: 'Unsplash',
+  pexels: 'Pexels',
 }
 
 function buildAiHref(item: ArchiveItem) {
@@ -211,6 +218,12 @@ export default function ArchivioPage() {
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={img} alt={item.title || ''} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]" />
+                  )}
+
+                  {item.platform && PLATFORM_LABELS[item.platform] && (
+                    <span className="absolute left-2 top-2 z-20 rounded-full bg-white/90 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F0F10] backdrop-blur-xl">
+                      {PLATFORM_LABELS[item.platform]}
+                    </span>
                   )}
 
                   <div className="absolute right-2 top-2 z-20 flex gap-2">

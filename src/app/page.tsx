@@ -22,6 +22,12 @@ const categories = [
   { key: 'lifestyle', label: 'Lifestyle' },
 ]
 
+const PLATFORM_LABELS: Record<string, string> = {
+  arena: 'Are.na',
+  unsplash: 'Unsplash',
+  pexels: 'Pexels',
+}
+
 const categoryLabels: Record<string, string> = {
   branding: 'Branding',
   typography: 'Tipografia',
@@ -103,6 +109,11 @@ function ImageCard({
         alt={item.title || 'Reference'}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]"
       />
+      {item.platform && PLATFORM_LABELS[item.platform] && (
+        <span className="absolute left-2 top-2 z-20 rounded-full bg-white/90 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F0F10] backdrop-blur-xl">
+          {PLATFORM_LABELS[item.platform]}
+        </span>
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <div className="mb-2 inline-flex rounded-full bg-[#FFE500] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F0F10]">
