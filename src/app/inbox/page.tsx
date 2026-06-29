@@ -123,12 +123,17 @@ export default function InboxPage() {
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
       <div className="mx-auto max-w-lg px-4 pt-12">
-        <header className="mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>GROW Inbox</p>
-          <h1 className="text-[28px] font-black uppercase tracking-tight">
-            Inbox<span className="text-grow-yellow">.</span>
-          </h1>
-          <p className="mt-1 text-sm text-grow-muted">Cattura tutto. Organizza dopo.</p>
+        <header className="mb-6 flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>GROW Inbox</p>
+            <h1 className="text-[28px] font-black uppercase tracking-tight">
+              Inbox<span className="text-grow-yellow">.</span>
+            </h1>
+            <p className="mt-1 text-sm text-grow-muted">Cattura tutto. Organizza dopo.</p>
+          </div>
+          <Link href="/chat" className="mt-1 shrink-0 rounded-full bg-grow-black px-3 py-1.5 text-[10px] font-bold uppercase text-grow-yellow">
+            Chat veloce →
+          </Link>
         </header>
 
         {/* Input */}

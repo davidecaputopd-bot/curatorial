@@ -2,16 +2,23 @@ import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { fetchLinkTitle } from '@/lib/link-preview'
 
-export async function GET() {
+export async function GET(request: Request) {
   const { supabase, user } = await getAuthenticatedSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
+  const { searchParams } = new URL(request.url)
+  const source = searchParams.get('source')
+
+  let query = supabase
     .from('inbox_items')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(100)
+
+  query = source ? query.eq('source', source) : query.neq('source', 'chat')
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ items: data || [] })
