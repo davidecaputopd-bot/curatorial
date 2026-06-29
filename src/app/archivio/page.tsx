@@ -3,10 +3,30 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
+import {
+  readLocalStudioAssets,
+  removeLocalStudioAsset,
+  type StudioAsset,
+} from '@/lib/studio/local-assets'
 
 const font = "Inter, 'Helvetica Neue', system-ui, sans-serif"
 
-function buildAiHref(item: any) {
+type ArchiveItem = {
+  id: string
+  title?: string | null
+  category?: string | null
+  image_url?: string | null
+  url?: string | null
+  summary?: string | null
+  output_text?: string | null
+  project?: string | null
+  width?: number | null
+  height?: number | null
+  is_studio_asset?: boolean
+  sync_status?: StudioAsset['sync_status']
+}
+
+function buildAiHref(item: ArchiveItem) {
   const params = new URLSearchParams()
 
   if (item.id) params.set('ref', item.id)
@@ -32,31 +52,82 @@ const placeholders: Record<string, string> = {
 }
 
 export default function ArchivioPage() {
-  const [items, setItems] = useState<any[]>([])
+  const [items, setItems] = useState<ArchiveItem[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/saved')
-      const data = await res.json()
-      setItems(data.items || [])
+      const [savedResponse, studioResponse] = await Promise.all([
+        fetch('/api/saved'),
+        fetch('/api/studio/assets'),
+      ])
+      const [savedData, studioData] = (await Promise.all([
+        savedResponse.json().catch(() => ({ items: [] })),
+        studioResponse.json().catch(() => ({ assets: [] })),
+      ])) as [{ items?: ArchiveItem[] }, { assets?: StudioAsset[] }]
+      const localAssets = readLocalStudioAssets()
+      const remoteAssets = Array.isArray(studioData.assets)
+        ? (studioData.assets as StudioAsset[])
+        : []
+      const knownRemoteIds = new Set(remoteAssets.map((asset) => asset.id))
+      const studioAssets = [
+        ...remoteAssets,
+        ...localAssets.filter((asset) => !knownRemoteIds.has(asset.id)),
+      ].map((asset) => ({
+        ...asset,
+        is_studio_asset: true,
+        image_url: asset.url,
+        category: asset.asset_type,
+        summary: asset.output_text,
+      }))
+
+      setItems([
+        ...studioAssets,
+        ...(Array.isArray(savedData.items) ? savedData.items : []),
+      ])
     } catch {
-      setItems([])
+      setItems(
+        readLocalStudioAssets().map((asset) => ({
+          ...asset,
+          is_studio_asset: true,
+          image_url: asset.url,
+          category: asset.asset_type,
+          summary: asset.output_text,
+        }))
+      )
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    load()
+    const frame = window.requestAnimationFrame(() => {
+      void load()
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [])
 
   const remove = async (id: string) => {
+    const item = items.find((candidate) => candidate.id === id)
     setItems((prev) => prev.filter((item) => item.id !== id))
 
     try {
+      if (item?.is_studio_asset) {
+        if (item.sync_status === 'local_only') {
+          removeLocalStudioAsset(id)
+          return
+        }
+        const response = await fetch('/api/studio/assets', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+        if (!response.ok) removeLocalStudioAsset(id)
+        return
+      }
+
       await fetch('/api/interact', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -74,11 +145,12 @@ export default function ArchivioPage() {
           </p>
 
           <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
-            Salvati<span className="text-grow-yellow">.</span>
+            Archivio<span className="text-grow-yellow">.</span>
           </h1>
 
           <p className="mt-3 text-sm leading-relaxed text-grow-muted">
-            Reference, immagini, mood e materiali che hai scelto. Qui GROW inizia a diventare memoria creativa.
+            Reference scelte e output prodotti in Studio, raccolti nella stessa
+            memoria creativa.
           </p>
         </header>
 
@@ -105,26 +177,43 @@ export default function ArchivioPage() {
             </h2>
 
             <p className="mt-2 text-sm leading-relaxed text-grow-muted">
-              Vai su Scopri e usa il cuore giallo sulle reference che vuoi tenere.
+              Salva una reference da Scopri oppure crea un output in Studio.
             </p>
           </div>
         ) : (
           <div className="grid auto-rows-[124px] grid-cols-2 gap-3">
             {items.map((item, idx) => {
-              const img = item.image_url || placeholders[item.category] || placeholders.design
+              const img =
+                item.image_url ||
+                placeholders[item.category || 'design'] ||
+                placeholders.design
               const tall = idx % 4 === 0 || (item.height || 0) > (item.width || 0)
+              const isTextOutput = item.is_studio_asset && !item.image_url
 
               return (
                 <article
                   key={item.id}
                   className={[
-                    'group relative overflow-hidden rounded-[1.6rem] bg-grow-soft',
+                    'group relative overflow-hidden rounded-[1.6rem]',
+                    isTextOutput ? 'bg-[#0F0F10]' : 'bg-grow-soft',
                     tall ? 'row-span-2' : 'row-span-1',
                   ].join(' ')}
                 >
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="block h-full">
+                  {isTextOutput ? (
+                    <div className="flex h-full flex-col justify-end p-4 text-white">
+                      <p className="line-clamp-6 text-xs leading-relaxed text-white/70">
+                        {item.output_text || item.summary}
+                      </p>
+                    </div>
+                  ) : item.url ? (
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="block h-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img} alt={item.title || ''} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]" />
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={img} alt={item.title || ''} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]" />
-                  </a>
+                  )}
 
                   <div className="absolute right-2 top-2 z-20 flex gap-2">
                     <Link
@@ -144,9 +233,16 @@ export default function ArchivioPage() {
                     </button>
                   </div>
 
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div
+                    className={[
+                      'pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 transition-opacity',
+                      item.is_studio_asset ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                    ].join(' ')}
+                  >
                     <p className="text-[10px] font-black uppercase tracking-wider text-[#FFE500]">
-                      {item.category || 'reference'}
+                      {item.is_studio_asset
+                        ? `Studio · ${item.project || item.category}`
+                        : item.category || 'reference'}
                     </p>
 
                     {item.title && (

@@ -36,17 +36,25 @@ export type StudioJob = {
 
 export type GeneratedAsset = {
   id: string
-  job_id: string
-  url: string
+  user_id: string
+  title: string
+  project: ProductionProject
   asset_type: ProductionAssetType
   engine: ProductionEngine
   prompt: string
+  negative_prompt: string | null
+  format: string | null
+  url: string | null
+  output_text: string | null
   quality_score: number | null
   usable_for_client: boolean | null
   notes: string | null
   watermark: boolean | null
   reuse_score: number | null
   created_at: string
+  updated_at: string
+  deleted_at: string | null
+  sync_status?: 'local_only' | 'synced'
 }
 
 export type AIUsageEvent = {

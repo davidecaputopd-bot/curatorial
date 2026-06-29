@@ -19,6 +19,10 @@ import {
   readLocalStudioJobs,
   saveLocalStudioJob,
 } from '@/lib/studio/local-jobs'
+import {
+  saveLocalStudioAsset,
+  type NewStudioAsset,
+} from '@/lib/studio/local-assets'
 
 const PROJECTS: ProductionProject[] = [
   'AN23',
@@ -134,6 +138,8 @@ export default function StudioPage() {
   const [importedPlan, setImportedPlan] = useState<ProductionPlan | null>(null)
   const [copied, setCopied] = useState<CompiledPrompt['engine'] | null>(null)
   const [saving, setSaving] = useState<CompiledPrompt['engine'] | null>(null)
+  const [archiving, setArchiving] = useState<CompiledPrompt['engine'] | null>(null)
+  const [archived, setArchived] = useState<CompiledPrompt['engine'][]>([])
   const [localJobCount, setLocalJobCount] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [generated, setGenerated] = useState<
@@ -366,6 +372,62 @@ export default function StudioPage() {
               : 'Generazione interna non disponibile',
         },
       }))
+    }
+  }
+
+  function buildGeneratedAsset(prompt: CompiledPrompt): NewStudioAsset | null {
+    if (!activePlan) return null
+    const output = generated[prompt.engine]
+    if (!output?.imageUrl && !output?.text) return null
+
+    return {
+      title: prompt.title,
+      project,
+      asset_type: activePlan.asset_type,
+      engine: prompt.engine,
+      prompt: prompt.prompt,
+      negative_prompt: prompt.negative_prompt || null,
+      format: format || null,
+      url: output.imageUrl || null,
+      output_text: output.text || null,
+    }
+  }
+
+  async function saveGeneratedAsset(prompt: CompiledPrompt) {
+    const asset = buildGeneratedAsset(prompt)
+    if (!asset) return
+
+    setArchiving(prompt.engine)
+    setNotice(null)
+
+    try {
+      const response = await fetch('/api/studio/assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(asset),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (response.ok && data?.ok) {
+        setNotice('Output salvato nell’Archivio GROW.')
+      } else if (response.status === 401) {
+        setNotice('Sessione scaduta. Accedi di nuovo per salvare nell’Archivio.')
+        return
+      } else {
+        saveLocalStudioAsset(asset)
+        setNotice('Output salvato nell’Archivio locale di questo dispositivo.')
+      }
+      setArchived((current) =>
+        current.includes(prompt.engine) ? current : [...current, prompt.engine]
+      )
+    } catch {
+      saveLocalStudioAsset(asset)
+      setArchived((current) =>
+        current.includes(prompt.engine) ? current : [...current, prompt.engine]
+      )
+      setNotice('Output salvato nell’Archivio locale di questo dispositivo.')
+    } finally {
+      setArchiving(null)
     }
   }
 
@@ -695,6 +757,31 @@ export default function StudioPage() {
                     <p className="mt-3 rounded-xl bg-red-400/10 p-3 text-xs leading-relaxed text-red-200">
                       {generated[prompt.engine]?.error}
                     </p>
+                  )}
+
+                  {(generated[prompt.engine]?.imageUrl ||
+                    generated[prompt.engine]?.text) && (
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-grow-yellow/35 bg-grow-yellow/10 p-3">
+                      <p className="text-xs leading-relaxed text-white/70">
+                        L’output è pronto. Salvalo per ritrovarlo insieme alle
+                        reference.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void saveGeneratedAsset(prompt)}
+                        disabled={
+                          archiving === prompt.engine ||
+                          archived.includes(prompt.engine)
+                        }
+                        className="shrink-0 rounded-full bg-grow-yellow px-4 py-2.5 text-[10px] font-black uppercase tracking-tight text-black disabled:opacity-55"
+                      >
+                        {archiving === prompt.engine
+                          ? 'Salvataggio…'
+                          : archived.includes(prompt.engine)
+                            ? 'Salvato'
+                            : 'Salva in Archivio'}
+                      </button>
+                    </div>
                   )}
 
                   <div className="mt-4">
