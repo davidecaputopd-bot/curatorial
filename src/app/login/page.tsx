@@ -23,7 +23,7 @@ export default function LoginPage() {
       email,
       options: {
         emailRedirectTo: callback.toString(),
-        shouldCreateUser: true,
+        shouldCreateUser: false,
       },
     })
 
