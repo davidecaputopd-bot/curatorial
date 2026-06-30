@@ -115,10 +115,10 @@ function ImageCard({
           {PLATFORM_LABELS[item.platform]}
         </span>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0 opacity-0 transition-opacity duration-300 opacity-100">
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <div className="mb-2 inline-flex rounded-full bg-[#FFE500] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F0F10]">
-            {categoryLabels[item.category] || item.category || 'Reference'}
+            {PLATFORM_LABELS[item.platform] || 'Reference'}
           </div>
           {item.artist_name && <p className="truncate text-[11px] font-bold text-white/90">{item.artist_name}</p>}
           {item.title && <p className="mt-0.5 line-clamp-2 text-[11px] leading-tight text-white/75">{item.title}</p>}
@@ -140,16 +140,15 @@ export default function Home() {
   // stable seed for the day so pagination is consistent
   const feedSeed = useRef(Math.floor(Date.now() / 86400000))
 
-  const fetchPage = (cat: string | null, offset: number) => {
-    const p = cat ? '&category=' + cat : ''
-    return fetch(`/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}&seed=${feedSeed.current}${p}`).then((r) => r.json())
+  const fetchPage = (_cat: string | null, offset: number) => {
+    return fetch(`/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}&seed=${feedSeed.current}`).then((r) => r.json())
   }
 
   const load = async (cat: string | null) => {
-    setActive(cat)
+    setActive(null)
     setLoadingImages(true)
     try {
-      const d = await fetchPage(cat, 0)
+      const d = await fetchPage(null, 0)
       setImages(d.items || [])
       setHasMore(Boolean(d.hasMore) && PAGE_SIZE < FEED_CEILING)
     } catch {
@@ -169,7 +168,7 @@ export default function Home() {
         setHasMore(false)
         return
       }
-      const d = await fetchPage(active, offset)
+      const d = await fetchPage(null, offset)
       const newItems = d.items || []
       setImages((prev) => [...prev, ...newItems])
       setHasMore(Boolean(d.hasMore) && offset + newItems.length < FEED_CEILING && newItems.length > 0)
@@ -281,7 +280,7 @@ export default function Home() {
           </div>
         ) : images.length === 0 ? (
           <div className="rounded-[2rem] border border-black/10 bg-white/70 p-6 text-center">
-            <p className="text-sm font-bold text-grow-muted">Nessuna immagine disponibile. Popola GROW con Are.na o fetch-images.</p>
+            <p className="text-sm font-bold text-grow-muted">Nessuna reference disponibile. Aggiorna Are.na o le piattaforme immagini.</p>
           </div>
         ) : (
           <div className="grid auto-rows-[122px] grid-cols-3 gap-2">

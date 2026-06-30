@@ -84,18 +84,23 @@ export async function GET(request: Request) {
         const dwellBoost = Math.min(0.25, (dwellWeights[item.category] || 0) / 60)
         const hoursAgo = (Date.now() - new Date(item.published_at).getTime()) / 3600000
         const freshness = Math.max(0.3, 1 - (hoursAgo / 72) * 0.7)
-        const hasImage = item.image_url ? 0.05 : 0
+        const hasImage = item.image_url ? 0.08 : -0.25
+        const platformBoost =
+          item.platform === 'arena' ? 0.45 :
+          item.platform === 'unsplash' ? 0.10 :
+          item.platform === 'pexels' ? 0.08 :
+          -1
+
         return {
           ...item,
-          _score: (catWeight + dwellBoost + hasImage) * freshness,
+          _score: (catWeight + dwellBoost + hasImage + platformBoost) * freshness,
           is_serendipity: false
         }
       })
       .sort((a, b) => {
-        const ap = a.platform === 'arena' ? 1 : 0
-        const bp = b.platform === 'arena' ? 1 : 0
-        if (ap !== bp) return bp - ap
-        return b._score - a._score
+        const ar = a.platform === 'arena' ? 0.12 : 0
+        const br = b.platform === 'arena' ? 0.12 : 0
+        return (b._score + br) - (a._score + ar)
       })
       .slice(0, mainLimit)
 
