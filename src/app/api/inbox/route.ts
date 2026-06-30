@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
-import { fetchLinkTitle } from '@/lib/link-preview'
+import { fetchLinkPreview } from '@/lib/link-preview'
 
 export async function GET(request: Request) {
   const { supabase, user } = await getAuthenticatedSupabase()
@@ -32,11 +32,29 @@ export async function POST(request: Request) {
   if (!body.content && !body.url && !body.image_url)
     return NextResponse.json({ error: 'content, url o image_url richiesto' }, { status: 400 })
 
+  // detect URL in content (for chat messages that are pure links)
+  const detectedUrl: string | null =
+    body.url ||
+    (body.content ? (body.content.match(/https?:\/\/[^\s<>"']+/)?.[0] ?? null) : null)
+
   let content = body.content
-  if (body.url && (!content || content === body.url)) {
-    const title = await fetchLinkTitle(body.url)
-    content = title || body.url
+  let ogTitle: string | null = null
+  let ogDescription: string | null = null
+  let ogImage: string | null = null
+
+  if (detectedUrl) {
+    const og = await fetchLinkPreview(detectedUrl)
+    if (og) {
+      ogTitle = og.title
+      ogDescription = og.description
+      ogImage = og.image
+      // if content is just the raw URL with no title, use OG title
+      if (!content || content === detectedUrl) {
+        content = og.title || detectedUrl
+      }
+    }
   }
+
   if (!content && body.image_url) content = 'Screenshot'
 
   const { data, error } = await supabase
@@ -44,10 +62,13 @@ export async function POST(request: Request) {
     .insert({
       user_id: user.id,
       content,
-      url: body.url,
+      url: detectedUrl,
       image_url: body.image_url || null,
       client: body.client,
       source: body.source || 'manual',
+      og_title: ogTitle,
+      og_description: ogDescription,
+      og_image: ogImage,
     })
     .select()
     .single()
