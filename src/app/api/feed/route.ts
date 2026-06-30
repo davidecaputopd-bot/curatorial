@@ -60,8 +60,13 @@ export async function GET(request: Request) {
       .limit(mainLimit * 3)
 
     // Filtro type
+    // Home/Scopri usa type=image: solo piattaforme immagini/reference, niente RSS/articoli.
     if (typeFilter) {
       mainQuery = mainQuery.eq('type', typeFilter)
+
+      if (typeFilter === 'image') {
+        mainQuery = mainQuery.in('platform', ['arena', 'unsplash', 'pexels'])
+      }
     }
 
     // Filtro category
