@@ -135,6 +135,7 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [hasUnreadChat, setHasUnreadChat] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const fetchPage = (cat: string | null, offset: number) => {
@@ -186,6 +187,23 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    const checkUnread = async () => {
+      try {
+        const res = await fetch('/api/inbox?source=chat')
+        const data = await res.json()
+        const items = data.items || []
+        const latest = items[0]
+        if (!latest) return setHasUnreadChat(false)
+        const lastSeen = localStorage.getItem('grow_chat_last_seen')
+        setHasUnreadChat(!lastSeen || new Date(latest.created_at).getTime() > new Date(lastSeen).getTime())
+      } catch {}
+    }
+    checkUnread()
+    const interval = setInterval(checkUnread, 8000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
     const observer = new IntersectionObserver(
@@ -220,11 +238,20 @@ export default function Home() {
 
         <Link
           href="/chat"
-          className="mb-5 flex items-center justify-between rounded-[1.4rem] bg-[#0F0F10] px-5 py-4 text-white"
+          className="relative mb-5 flex items-center justify-between rounded-[1.4rem] bg-[#0F0F10] px-5 py-4 text-white"
         >
+          {hasUnreadChat && (
+            <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center">
+              <span className="absolute h-full w-full animate-ping rounded-full bg-grow-yellow opacity-75" />
+              <span className="relative h-2.5 w-2.5 rounded-full bg-grow-yellow" />
+            </span>
+          )}
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50">Telefono ↔ Computer</p>
-            <p className="mt-1 text-base font-black uppercase">Chat veloce</p>
+            <p className="mt-1 text-base font-black uppercase">
+              Chat veloce
+              {hasUnreadChat && <span className="ml-2 rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-black text-black">Nuovo</span>}
+            </p>
           </div>
           <span className="rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-black uppercase text-black">Apri →</span>
         </Link>

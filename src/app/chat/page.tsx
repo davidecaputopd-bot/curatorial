@@ -33,7 +33,10 @@ export default function ChatPage() {
     try {
       const res = await fetch('/api/inbox?source=chat')
       const data = await res.json()
-      setItems((data.items || []).slice().reverse())
+      const sorted = (data.items || []).slice().reverse()
+      setItems(sorted)
+      const latest = sorted[sorted.length - 1]
+      if (latest) localStorage.setItem('grow_chat_last_seen', latest.created_at)
     } catch {}
   }
 
