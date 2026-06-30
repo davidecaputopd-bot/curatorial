@@ -14,14 +14,34 @@ function AuthCallbackInner() {
     const next = nextPath?.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/'
 
     const supabase = createBrowserSupabaseClient()
-    supabase.auth.getSession().then(({ data, error: sessionError }) => {
-      if (sessionError || !data.session) {
-        setError(true)
-        setTimeout(() => router.replace('/login?error=callback'), 1500)
+
+    // With implicit flow the token lands in the URL hash.
+    // onAuthStateChange fires as soon as Supabase has parsed it — safe to use
+    // instead of getSession() which may run before the hash is consumed.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        subscription.unsubscribe()
+        router.replace(next)
         return
       }
-      router.replace(next)
+      if (event === 'INITIAL_SESSION' && !session) {
+        // No session and no hash token — genuinely failed
+        setError(true)
+        setTimeout(() => router.replace('/login?error=callback'), 1500)
+      }
     })
+
+    // Safety timeout: if nothing fires in 8s, redirect to login
+    const timeout = setTimeout(() => {
+      subscription.unsubscribe()
+      setError(true)
+      router.replace('/login?error=timeout')
+    }, 8000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [router, searchParams])
 
   return (

@@ -12,6 +12,29 @@ type Item = {
   created_at: string
 }
 
+const URL_RE = /(https?:\/\/[^\s<>"']+)/g
+
+function renderContent(text: string) {
+  const parts = text.split(URL_RE)
+  return parts.map((part, i) => {
+    if (URL_RE.test(part)) {
+      URL_RE.lastIndex = 0
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all font-semibold text-[#0F0F10] underline decoration-grow-yellow underline-offset-2"
+        >
+          {part}
+        </a>
+      )
+    }
+    return <span key={i}>{part}</span>
+  })
+}
+
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime()
   const mins = Math.floor(diff / 60000)
@@ -134,7 +157,7 @@ export default function ChatPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.image_url} alt="" className="mb-1.5 max-h-60 w-full rounded-lg object-cover" />
                 )}
-                {item.content && <p className="whitespace-pre-wrap text-sm text-grow-text">{item.content}</p>}
+                {item.content && <p className="whitespace-pre-wrap text-sm text-grow-text">{renderContent(item.content)}</p>}
                 <p className="mt-1 text-[10px] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>{timeAgo(item.created_at)}</p>
               </div>
               <div className="flex flex-col gap-1 pt-1">
