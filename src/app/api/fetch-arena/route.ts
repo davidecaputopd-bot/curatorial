@@ -2,18 +2,21 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 const SEARCHES = [
-  { q: 'fashion editorial', cat: 'fashion' },
-  { q: 'typography poster', cat: 'typography' },
-  { q: 'graphic design', cat: 'branding' },
-  { q: 'interior architecture', cat: 'interior_design' },
-  { q: 'art direction', cat: 'branding' },
-  { q: 'photography', cat: 'art' },
-  { q: 'packaging design', cat: 'branding' },
-  { q: 'minimal design', cat: 'design' },
-  { q: 'contemporary art', cat: 'art' },
-  { q: 'web design', cat: 'web' },
-  { q: 'color palette', cat: 'design' },
-  { q: 'brutalist', cat: 'interior_design' },
+  { q: 'graphic design reference', cat: 'design' },
+  { q: 'visual identity design', cat: 'branding' },
+  { q: 'brand identity system', cat: 'branding' },
+  { q: 'typography layout poster', cat: 'typography' },
+  { q: 'editorial design layout', cat: 'typography' },
+  { q: 'packaging design wine label', cat: 'branding' },
+  { q: 'art direction campaign', cat: 'branding' },
+  { q: 'fashion editorial photography', cat: 'fashion' },
+  { q: 'interior design moodboard', cat: 'interior_design' },
+  { q: 'restaurant branding', cat: 'branding' },
+  { q: 'web design inspiration', cat: 'web' },
+  { q: 'color palette graphic design', cat: 'design' },
+  { q: 'creative direction moodboard', cat: 'design' },
+  { q: 'minimal poster design', cat: 'typography' },
+  { q: 'luxury packaging design', cat: 'branding' },
 ]
 
 export async function GET() {

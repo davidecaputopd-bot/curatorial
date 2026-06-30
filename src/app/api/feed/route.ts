@@ -86,7 +86,12 @@ export async function GET(request: Request) {
           is_serendipity: false
         }
       })
-      .sort((a, b) => b._score - a._score)
+      .sort((a, b) => {
+        const ap = a.platform === 'arena' ? 1 : 0
+        const bp = b.platform === 'arena' ? 1 : 0
+        if (ap !== bp) return bp - ap
+        return b._score - a._score
+      })
       .slice(0, mainLimit)
 
     let surpriseItems: any[] = []
