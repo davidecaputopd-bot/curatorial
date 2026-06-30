@@ -137,10 +137,12 @@ export default function Home() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  // stable seed for the day so pagination is consistent
+  const feedSeed = useRef(Math.floor(Date.now() / 86400000))
 
   const fetchPage = (cat: string | null, offset: number) => {
     const p = cat ? '&category=' + cat : ''
-    return fetch(`/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}${p}`).then((r) => r.json())
+    return fetch(`/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}&seed=${feedSeed.current}${p}`).then((r) => r.json())
   }
 
   const load = async (cat: string | null) => {

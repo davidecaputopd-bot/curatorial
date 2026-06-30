@@ -203,6 +203,10 @@ export default function AiPage() {
     const contextBlocks = [projectContext, referenceContext, buildCitationsContext(citations)].filter(Boolean).join('\n\n')
     const messageForApi = contextBlocks ? `${contextBlocks}\n\nRICHIESTA DI DAVIDE:\n${text}` : text
 
+    const assistantId = messageId()
+    // placeholder for streaming reply
+    setMessages([...next, { id: assistantId, role: 'assistant', content: '' }])
+
     try {
       const res = await fetch('/api/agent', {
         method: 'POST',
@@ -213,14 +217,57 @@ export default function AiPage() {
           conversationId,
         }),
       })
-      const data = await res.json()
-      if (res.ok) {
-        setMessages([...next, { id: messageId(), role: 'assistant', content: data.reply, imageUrl: data.imageUrl, actions: data.actions }])
-      } else {
-        setMessages([...next, { id: messageId(), role: 'assistant', content: `Errore: ${data.error || 'qualcosa non ha funzionato'}` }])
+
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}))
+        setMessages([...next, { id: assistantId, role: 'assistant', content: `Errore: ${(data as {error?: string}).error || 'qualcosa non ha funzionato'}` }])
+        setLoading(false)
+        return
       }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      let finalActions: Action[] = []
+      let finalImageUrl: string | undefined
+
+      const updateContent = (patch: (prev: string) => string) => {
+        setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: patch(m.content) } : m))
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() || ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const evt = JSON.parse(line.slice(6)) as { type: string; text?: string; tool?: string; actions?: Action[]; imageUrl?: string; error?: string }
+            if (evt.type === 'token' && evt.text) {
+              updateContent(prev => prev + evt.text)
+            } else if (evt.type === 'tool' && evt.tool) {
+              setMessages(prev => prev.map(m => m.id === assistantId
+                ? { ...m, actions: [...(m.actions || []), { tool: evt.tool!, args: {}, result: {} }] }
+                : m
+              ))
+            } else if (evt.type === 'done') {
+              finalActions = evt.actions || []
+              finalImageUrl = evt.imageUrl || undefined
+            } else if (evt.type === 'error') {
+              updateContent(() => `Errore: ${evt.error || 'qualcosa non ha funzionato'}`)
+            }
+          } catch {}
+        }
+      }
+
+      setMessages(prev => prev.map(m => m.id === assistantId
+        ? { ...m, actions: finalActions, imageUrl: finalImageUrl }
+        : m
+      ))
     } catch {
-      setMessages([...next, { id: messageId(), role: 'assistant', content: 'Errore di connessione. Riprova.' }])
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: 'Errore di connessione. Riprova.' } : m))
     }
     setCitations([])
     setLoading(false)
@@ -289,7 +336,7 @@ export default function AiPage() {
         )}
 
         {reference && (
-          <section className="mb-5 overflow-hidden rounded-[2rem] border border-black/10 bg-white/70 shadow-sm">
+          <section className="mb-5 overflow-hidden rounded-[2rem] border border-black/10 bg-white/70">
             {reference.image && (
               <div className="h-52">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -318,7 +365,7 @@ export default function AiPage() {
             <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
               <div
                 className={[
-                  'max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-relaxed shadow-sm',
+                  'max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-relaxed',
                   message.role === 'user' ? 'bg-grow-yellow text-black' : 'border border-black/10 bg-white/75 text-grow-text',
                 ].join(' ')}
               >
@@ -340,9 +387,15 @@ export default function AiPage() {
             </div>
           ))}
 
-          {loading && (
+          {loading && messages[messages.length - 1]?.role !== 'assistant' && (
             <div className="flex justify-start">
-              <div className="rounded-[1.6rem] border border-black/10 bg-white/75 px-4 py-3 text-sm font-bold text-grow-muted">…</div>
+              <div className="rounded-[1.6rem] border border-black/10 bg-white/75 px-4 py-3 text-sm font-bold text-grow-muted">
+                <span className="inline-flex gap-1">
+                  <span className="ds-pulse-dot" style={{ animationDelay: '0ms' }}>·</span>
+                  <span className="ds-pulse-dot" style={{ animationDelay: '160ms' }}>·</span>
+                  <span className="ds-pulse-dot" style={{ animationDelay: '320ms' }}>·</span>
+                </span>
+              </div>
             </div>
           )}
           <div ref={bottomRef} />

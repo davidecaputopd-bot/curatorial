@@ -173,8 +173,8 @@ export default function ArchivioPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-[2rem] border border-black/10 bg-white/70 px-6 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFE500] text-2xl">
-              ♥
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFE500]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0F0F10"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.3 4 6.2 4c2.1 0 3.7 1.1 4.8 2.7C12.1 5.1 13.7 4 15.8 4c3.9 0 5.8 4.1 4.2 7.7C19.5 16.4 12 21 12 21z"/></svg>
             </div>
 
             <h2 className="mt-5 text-xl font-black uppercase tracking-tight">
@@ -229,7 +229,7 @@ export default function ArchivioPage() {
                   <div className="absolute right-2 top-2 z-20 flex gap-2">
                     <Link
                       href={buildAiHref(item)}
-                      className="flex h-9 items-center justify-center rounded-full bg-white/90 px-3 text-[10px] font-black uppercase tracking-tight text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-transform hover:scale-105"
+                      className="flex h-11 items-center justify-center rounded-full bg-white/90 px-3.5 text-[10px] font-black uppercase tracking-tight text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-transform hover:scale-105"
                     >
                       Usa
                     </Link>
@@ -237,10 +237,10 @@ export default function ArchivioPage() {
                     <button
                       type="button"
                       onClick={() => remove(item.id)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-transform hover:scale-110"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-transform hover:scale-110"
                       aria-label="Rimuovi dai salvati"
                     >
-                      ♥
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#0F0F10"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.3 4 6.2 4c2.1 0 3.7 1.1 4.8 2.7C12.1 5.1 13.7 4 15.8 4c3.9 0 5.8 4.1 4.2 7.7C19.5 16.4 12 21 12 21z"/></svg>
                     </button>
                   </div>
 

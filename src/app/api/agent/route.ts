@@ -38,6 +38,10 @@ TONO:
 - Su domande di design/AI/strategia: opinione netta, non panoramica bilanciata.`
 }
 
+function sse(data: unknown): string {
+  return `data: ${JSON.stringify(data)}\n\n`
+}
+
 export async function POST(request: Request) {
   try {
     const { supabase, user } = await getAuthenticatedSupabase()
@@ -48,40 +52,63 @@ export async function POST(request: Request) {
     const history = Array.isArray(body.history) ? body.history : []
     const conversationId = typeof body.conversationId === 'string' ? body.conversationId : null
 
-    if (!message.trim()) {
-      return NextResponse.json({ error: 'message richiesto' }, { status: 400 })
+    if (!message.trim()) return NextResponse.json({ error: 'message richiesto' }, { status: 400 })
+    if (!conversationId) return NextResponse.json({ error: 'conversationId richiesto' }, { status: 400 })
+
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
+    const writer = writable.getWriter()
+    const enc = new TextEncoder()
+
+    const write = (data: unknown) => writer.write(enc.encode(sse(data)))
+
+    // Run agent in background, streaming events to the SSE connection
+    const run = async () => {
+      try {
+        const result = await runAgent(
+          buildAgentSystemPrompt(),
+          message,
+          history,
+          supabase,
+          user.id,
+          {
+            onTool: (tool, toolResult) => { void write({ type: 'tool', tool, result: toolResult }) },
+            onToken: (token) => { void write({ type: 'token', text: token }) },
+          }
+        )
+
+        try {
+          await supabase.from('chat_history').insert([
+            { user_id: user.id, conversation_id: conversationId, role: 'user', content: message },
+            {
+              user_id: user.id,
+              conversation_id: conversationId,
+              role: 'assistant',
+              content: result.reply,
+              image_url: result.imageUrl || null,
+              provider: result.provider,
+            },
+          ])
+        } catch {}
+
+        await write({ type: 'done', actions: result.actions, provider: result.provider, imageUrl: result.imageUrl || null })
+      } catch (err) {
+        await write({ type: 'error', error: err instanceof Error ? err.message : 'Errore agente' })
+      } finally {
+        await writer.close()
+      }
     }
-    if (!conversationId) {
-      return NextResponse.json({ error: 'conversationId richiesto' }, { status: 400 })
-    }
 
-    const result = await runAgent(buildAgentSystemPrompt(), message, history, supabase, user.id)
+    void run()
 
-    try {
-      await supabase.from('chat_history').insert([
-        { user_id: user.id, conversation_id: conversationId, role: 'user', content: message },
-        {
-          user_id: user.id,
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: result.reply,
-          image_url: result.imageUrl || null,
-          provider: result.provider,
-        },
-      ])
-    } catch {}
-
-    return NextResponse.json({
-      reply: result.reply,
-      actions: result.actions,
-      provider: result.provider,
-      imageUrl: result.imageUrl,
+    return new Response(readable as unknown as ReadableStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
     })
   } catch (error) {
     console.error('[AGENT]', error instanceof Error ? error.message : error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Errore agente' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Errore agente' }, { status: 500 })
   }
 }

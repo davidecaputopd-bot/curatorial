@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const out = [...arr]
+  let s = seed
+  for (let i = out.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) >>> 0
+    const j = s % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
 export async function GET(request: Request) {
   const { supabase, user } = await getAuthenticatedSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -10,6 +21,7 @@ export async function GET(request: Request) {
   const typeFilter = searchParams.get('type')
   const limit = parseInt(searchParams.get('limit') || '40')
   const offset = parseInt(searchParams.get('offset') || '0')
+  const seed = parseInt(searchParams.get('seed') || String(Math.floor(Date.now() / 86400000)))
 
   try {
     const { data: profile } = await supabase
@@ -92,8 +104,7 @@ export async function GET(request: Request) {
           .order('published_at', { ascending: false })
           .limit(surpriseLimit * 8)
 
-        surpriseItems = (surpriseRaw || [])
-          .sort(() => Math.random() - 0.5)
+        surpriseItems = seededShuffle(surpriseRaw || [], seed)
           .slice(0, surpriseLimit)
           .map(i => ({ ...i, is_serendipity: true }))
       }

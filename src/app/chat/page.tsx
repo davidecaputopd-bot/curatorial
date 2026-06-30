@@ -131,7 +131,7 @@ function InputPreview({ url, onDismiss }: { url: string; onDismiss: () => void }
   if (done && !data) return null
 
   return (
-    <div className="mb-2 flex items-center gap-3 overflow-hidden rounded-[1rem] border border-grow-border bg-grow-card px-3 py-2.5 shadow-sm">
+    <div className="mb-2 flex items-center gap-3 overflow-hidden rounded-[1rem] border border-grow-border bg-grow-card px-3 py-2.5">
       {!done && <div className="h-1.5 w-1.5 animate-ping rounded-full bg-grow-yellow" />}
       {data?.image && done && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -168,7 +168,7 @@ function Bubble({
   return (
     <div className="group flex items-end gap-2">
       <div className="max-w-[86%] flex-1">
-        <div className="rounded-[1.1rem] rounded-bl-[0.35rem] border border-grow-border bg-grow-card px-3.5 py-2.5 shadow-sm">
+        <div className="rounded-[1.1rem] rounded-bl-[0.35rem] border border-grow-border bg-grow-card px-3.5 py-2.5">
 
           {/* Image */}
           {item.image_url && (

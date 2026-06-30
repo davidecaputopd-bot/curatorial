@@ -278,8 +278,8 @@ export default function InboxPage() {
                       </p>
                     </button>
 
-                    {/* OG preview card (da DB) */}
-                    {expanded === item.id && <OGCard item={item} />}
+                    {/* OG preview card (da DB) — sempre visibile se disponibile */}
+                    <OGCard item={item} />
 
                     {/* Meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -311,7 +311,7 @@ export default function InboxPage() {
                   </div>
 
                   <button onClick={() => remove(item.id)}
-                    className="mt-0.5 shrink-0 text-grow-muted transition-colors hover:text-red-400"
+                    className="-mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-grow-muted transition-colors hover:bg-red-500/10 hover:text-red-400"
                     aria-label="Elimina">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
