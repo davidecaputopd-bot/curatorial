@@ -21,21 +21,14 @@ type LinkPreview = {
 
 type Filter = 'all' | 'links' | 'images' | 'text'
 
-const URL_RE = /(https?:\/\/[^\s<>"']+)/g
-
 function extractFirstUrl(text: string): string | null {
-  URL_RE.lastIndex = 0
-  const m = URL_RE.exec(text)
-  URL_RE.lastIndex = 0
-  return m ? m[1] : null
+  const m = text.match(/https?:\/\/[^\s<>"']+/)
+  return m ? m[0] : null
 }
 
 function renderContent(text: string) {
-  URL_RE.lastIndex = 0
-  const parts = text.split(URL_RE)
-  URL_RE.lastIndex = 0
+  const parts = text.split(/(https?:\/\/[^\s<>"']+)/)
   return parts.map((part, i) => {
-    URL_RE.lastIndex = 0
     if (/^https?:\/\//.test(part)) {
       return (
         <a
@@ -49,7 +42,7 @@ function renderContent(text: string) {
         </a>
       )
     }
-    return <span key={i}>{part}</span>
+    return part ? <span key={i}>{part}</span> : null
   })
 }
 

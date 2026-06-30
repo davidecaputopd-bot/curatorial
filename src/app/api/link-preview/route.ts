@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   if (!url) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
 
   const preview = await fetchLinkPreview(url)
+  console.log('[link-preview]', url, preview ? 'ok' : 'null')
   if (!preview) return NextResponse.json({ error: 'Could not fetch' }, { status: 422 })
 
   return NextResponse.json(preview, {
