@@ -154,8 +154,8 @@ export default function InboxPage() {
   const isDetectedUrl = /^https?:\/\//.test(text.trim())
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
-      <div className="mx-auto max-w-lg px-4 pt-12">
+    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
+      <div className="mx-auto max-w-lg px-4 pt-12 lg:max-w-4xl lg:px-8">
 
         <header className="mb-6 flex items-start justify-between">
           <div>

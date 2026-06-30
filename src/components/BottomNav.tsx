@@ -56,7 +56,7 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-5 pt-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-5 pt-2 lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-[1.8rem] border border-black/10 bg-[#F7F4EE]/92 p-1.5 shadow-[0_-2px_40px_rgba(15,15,16,0.08),0_18px_50px_rgba(15,15,16,0.12)] backdrop-blur-xl">
         {items.map((item) => {
           const active = item.href === '/'

@@ -229,8 +229,8 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
-      <div className="mx-auto max-w-lg px-4 pt-10">
+    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
+      <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-6xl lg:px-8">
         <header className="mb-5">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">GROW</p>
           <h1 className="mt-2 text-[34px] font-black uppercase leading-[0.9] tracking-tighter">
