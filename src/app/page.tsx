@@ -257,21 +257,6 @@ export default function Home() {
           <span className="rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-black uppercase text-black">Apri →</span>
         </Link>
 
-        <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 pb-5">
-          {categories.map((c) => (
-            <button
-              key={c.key ?? 'all'}
-              onClick={() => load(c.key)}
-              className={[
-                'shrink-0 rounded-full px-4 py-2 text-sm font-black transition-colors',
-                active === c.key ? 'bg-grow-yellow text-grow-bg' : 'border border-black/10 bg-white/60 text-grow-muted hover:text-grow-text',
-              ].join(' ')}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
         {loadingImages ? (
           <div className="grid auto-rows-[122px] grid-cols-3 gap-2">
             {Array.from({ length: 18 }).map((_, i) => (
