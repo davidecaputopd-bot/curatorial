@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import {
   readLocalStudioAssets,
@@ -57,8 +58,11 @@ const placeholders: Record<string, string> = {
 }
 
 export default function ArchivioPage() {
+  const router = useRouter()
   const [items, setItems] = useState<ArchiveItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const load = async () => {
     setLoading(true)
@@ -141,21 +145,82 @@ export default function ArchivioPage() {
     } catch {}
   }
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else if (next.size < 12) {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const cancelSelection = () => {
+    setSelecting(false)
+    setSelectedIds(new Set())
+  }
+
+  const useSelectionWithAI = () => {
+    const bundle = items
+      .filter((item) => selectedIds.has(item.id))
+      .map((item, index) => ({
+        type: 'archivio' as const,
+        id: item.id,
+        title: item.title || `Reference ${index + 1}`,
+        meta: [item.category, item.project, item.platform]
+          .filter(Boolean)
+          .join(' · '),
+        image_url: item.image_url || undefined,
+        url: item.url || undefined,
+      }))
+
+    if (!bundle.length) return
+    window.sessionStorage.setItem(
+      'grow-ai-reference-bundle',
+      JSON.stringify(bundle)
+    )
+    router.push('/ai?bundle=archive')
+  }
+
   return (
     <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-10 text-grow-text">
       <section className="mx-auto max-w-lg">
         <header className="mb-7">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
-            GROW Archivio
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
+                GROW Archivio
+              </p>
 
-          <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
-            Archivio<span className="text-grow-yellow">.</span>
-          </h1>
+              <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+                Archivio<span className="text-grow-yellow">.</span>
+              </h1>
+            </div>
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (selecting) cancelSelection()
+                  else setSelecting(true)
+                }}
+                className={[
+                  'rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wide',
+                  selecting
+                    ? 'bg-[#0F0F10] text-grow-yellow'
+                    : 'border border-grow-border bg-white text-grow-muted',
+                ].join(' ')}
+              >
+                {selecting ? 'Annulla' : 'Seleziona'}
+              </button>
+            )}
+          </div>
 
           <p className="mt-3 text-sm leading-relaxed text-grow-muted">
-            Reference scelte e output prodotti in Studio, raccolti nella stessa
-            memoria creativa.
+            {selecting
+              ? 'Scegli fino a 12 reference da portare insieme nell’AI.'
+              : 'Reference scelte e output prodotti in Studio, raccolti nella stessa memoria creativa.'}
           </p>
         </header>
 
@@ -199,9 +264,12 @@ export default function ArchivioPage() {
                 <article
                   key={item.id}
                   className={[
-                    'group relative overflow-hidden rounded-[1.6rem]',
+                    'group relative overflow-hidden rounded-[1.6rem] transition',
                     isTextOutput ? 'bg-[#0F0F10]' : 'bg-grow-soft',
                     tall ? 'row-span-2' : 'row-span-1',
+                    selectedIds.has(item.id)
+                      ? 'ring-4 ring-grow-yellow ring-offset-2 ring-offset-grow-bg'
+                      : '',
                   ].join(' ')}
                 >
                   {isTextOutput ? (
@@ -226,6 +294,31 @@ export default function ArchivioPage() {
                     </span>
                   )}
 
+                  {selecting && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSelection(item.id)}
+                      className="absolute inset-0 z-30 flex items-start justify-end p-2"
+                      aria-label={
+                        selectedIds.has(item.id)
+                          ? 'Rimuovi dalla selezione'
+                          : 'Aggiungi alla selezione'
+                      }
+                    >
+                      <span
+                        className={[
+                          'flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-black shadow-lg',
+                          selectedIds.has(item.id)
+                            ? 'border-grow-yellow bg-grow-yellow text-black'
+                            : 'border-white bg-black/45 text-white backdrop-blur',
+                        ].join(' ')}
+                      >
+                        {selectedIds.has(item.id) ? '✓' : '+'}
+                      </span>
+                    </button>
+                  )}
+
+                  {!selecting && (
                   <div className="absolute right-2 top-2 z-20 flex gap-2">
                     <Link
                       href={buildAiHref(item)}
@@ -243,6 +336,7 @@ export default function ArchivioPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="#0F0F10"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.3 4 6.2 4c2.1 0 3.7 1.1 4.8 2.7C12.1 5.1 13.7 4 15.8 4c3.9 0 5.8 4.1 4.2 7.7C19.5 16.4 12 21 12 21z"/></svg>
                     </button>
                   </div>
+                  )}
 
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                     <p className="text-[10px] font-black uppercase tracking-wider text-[#FFE500]">
@@ -263,6 +357,29 @@ export default function ArchivioPage() {
           </div>
         )}
       </section>
+
+      {selecting && (
+        <div className="fixed inset-x-0 bottom-[92px] z-40 px-4 lg:bottom-6 lg:left-[280px]">
+          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-[1.4rem] bg-[#0F0F10] p-3 pl-4 text-white shadow-[0_18px_50px_rgba(15,15,16,0.24)]">
+            <div>
+              <p className="text-sm font-black">
+                {selectedIds.size} reference
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-wide text-white/40">
+                massimo 12
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={useSelectionWithAI}
+              disabled={selectedIds.size === 0}
+              className="rounded-full bg-grow-yellow px-5 py-3 text-[10px] font-black uppercase text-black disabled:opacity-35"
+            >
+              Usa con AI →
+            </button>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </main>

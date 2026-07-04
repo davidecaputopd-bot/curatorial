@@ -27,6 +27,8 @@ type Citation = {
   id: string
   title: string
   meta?: string
+  image_url?: string
+  url?: string
 }
 
 type Conversation = { conversation_id: string; title: string; updated_at: string }
@@ -101,7 +103,18 @@ function buildCitationsContext(citations: Citation[]) {
   if (!citations.length) return ''
   return [
     'DAVIDE CITA QUESTI ELEMENTI SALVATI:',
-    ...citations.map((c) => `- [${c.type}] ${c.title}${c.meta ? ` (${c.meta})` : ''}`),
+    ...citations.map((citation) =>
+      [
+        `- [${citation.type}] ${citation.title}`,
+        citation.meta ? `Tipo/contesto: ${citation.meta}` : '',
+        citation.url ? `Fonte: ${citation.url}` : '',
+        citation.image_url ? `Immagine: ${citation.image_url}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    ),
+    '',
+    'Tratta la selezione come un insieme: confronta ricorrenze, differenze e principi riutilizzabili. Non dichiarare di aver visto dettagli visivi che il modello non può verificare.',
   ].join('\n')
 }
 
@@ -124,11 +137,42 @@ export default function AiPage() {
   const projectContext = useMemo(() => buildProjectContext(project), [project])
 
   useEffect(() => {
-    setReference(parseReference())
     const { project: p, brief } = parseQueryExtras()
-    if (p) setProject(p)
-    if (brief) setInput(brief)
-    setConversationId(newConversationId())
+    let bundle: Citation[] = []
+    try {
+      const stored = window.sessionStorage.getItem(
+        'grow-ai-reference-bundle'
+      )
+      const parsed = stored ? JSON.parse(stored) : []
+      if (Array.isArray(parsed)) {
+        bundle = parsed
+          .filter(
+            (item): item is Citation =>
+              item &&
+              item.type === 'archivio' &&
+              typeof item.id === 'string' &&
+              typeof item.title === 'string'
+          )
+          .slice(0, 12)
+      }
+      window.sessionStorage.removeItem('grow-ai-reference-bundle')
+    } catch {}
+
+    const frame = window.requestAnimationFrame(() => {
+      setReference(parseReference())
+      if (p) setProject(p)
+      if (brief) setInput(brief)
+      if (bundle.length) {
+        setCitations(bundle)
+        if (!brief) {
+          setInput(
+            'Confronta queste reference e ricavane una direzione creativa coerente, concreta e riutilizzabile.'
+          )
+        }
+      }
+      setConversationId(newConversationId())
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [])
 
   useEffect(() => {
@@ -137,7 +181,6 @@ export default function AiPage() {
 
   useEffect(() => {
     if (!citeQuery.trim()) {
-      setCiteResults([])
       return
     }
     const timeout = setTimeout(() => {
@@ -186,6 +229,7 @@ export default function AiPage() {
     setCitations((prev) => (prev.find((c) => c.id === item.id) ? prev : [...prev, item]))
     setShowCitePicker(false)
     setCiteQuery('')
+    setCiteResults([])
   }
 
   const removeCitation = (id: string) => setCitations((prev) => prev.filter((c) => c.id !== id))
@@ -419,7 +463,11 @@ export default function AiPage() {
                 <input
                   autoFocus
                   value={citeQuery}
-                  onChange={(e) => setCiteQuery(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setCiteQuery(value)
+                    if (!value.trim()) setCiteResults([])
+                  }}
                   placeholder="Cerca in archivio, inbox, calendario..."
                   className="mb-2 w-full rounded-full border border-black/10 px-3 py-1.5 text-sm focus:outline-none"
                 />
