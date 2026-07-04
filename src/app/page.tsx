@@ -7,42 +7,12 @@ import SaveHeart from '@/components/SaveHeart'
 
 const PAGE_SIZE = 60
 const FEED_CEILING = 720
-
-const categories = [
-  { key: null, label: 'Tutto' },
-  { key: 'branding', label: 'Branding' },
-  { key: 'typography', label: 'Tipo' },
-  { key: 'interior_design', label: 'Interni' },
-  { key: 'fashion', label: 'Moda' },
-  { key: 'web', label: 'Web' },
-  { key: 'ai', label: 'AI' },
-  { key: '3d_printing', label: '3D' },
-  { key: 'art', label: 'Arte' },
-  { key: 'social_design', label: 'Social' },
-  { key: 'design', label: 'Design' },
-  { key: 'lifestyle', label: 'Lifestyle' },
-]
+const DAILY_FEED_SEED = Math.floor(Date.now() / 86_400_000)
 
 const PLATFORM_LABELS: Record<string, string> = {
   arena: 'Are.na',
   unsplash: 'Unsplash',
   pexels: 'Pexels',
-}
-
-const categoryLabels: Record<string, string> = {
-  branding: 'Branding',
-  typography: 'Tipografia',
-  interior_design: 'Interni',
-  fashion: 'Moda',
-  web: 'Web',
-  ai: 'AI',
-  '3d_printing': '3D Print',
-  art: 'Arte',
-  social_design: 'Social Design',
-  design: 'Design',
-  lifestyle: 'Lifestyle',
-  social: 'Social',
-  growth: 'Crescita',
 }
 
 const placeholders: Record<string, string> = {
@@ -52,23 +22,89 @@ const placeholders: Record<string, string> = {
   fashion: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&q=80',
   web: 'https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?w=900&q=80',
   ai: 'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=900&q=80',
-  '3d_printing': 'https://images.unsplash.com/photo-1581092921461-39b9d08a9b21?w=900&q=80',
   art: 'https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=900&q=80',
   social_design: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=900&q=80',
   design: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=900&q=80',
   lifestyle: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=900&q=80',
-  social: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=900&q=80',
-  growth: 'https://images.unsplash.com/photo-1512314889357-e157c22f938d?w=900&q=80',
 }
 
-function SafeImage({ src, alt, className }: { src: string; alt: string; className: string }) {
-  const [err, setErr] = useState(false)
+const STATUS_LABELS: Record<string, string> = {
+  idea: 'Idea',
+  in_produzione: 'In produzione',
+  pronto: 'Pronto',
+  pubblicato: 'Pubblicato',
+  da_riciclare: 'Da riciclare',
+}
+
+type FeedItem = {
+  id: string
+  title?: string | null
+  image_url?: string | null
+  category?: string | null
+  platform?: string | null
+  artist_name?: string | null
+  url?: string | null
+  height?: number | null
+  width?: number | null
+}
+
+type CalendarItem = {
+  id: string
+  client: string
+  title: string
+  content_type?: string | null
+  status: string
+  scheduled_date?: string | null
+}
+
+type InboxItem = {
+  id: string
+  content?: string | null
+  url?: string | null
+  created_at: string
+}
+
+function localDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function shortDate(value: string) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString('it-IT', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+function timeAgo(value: string) {
+  const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60_000)
+  if (minutes < 1) return 'adesso'
+  if (minutes < 60) return `${minutes}m fa`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h fa`
+  return `${Math.floor(hours / 24)}g fa`
+}
+
+function SafeImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string
+  alt: string
+  className: string
+}) {
+  const [failed, setFailed] = useState(false)
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={err ? placeholders.design : src}
+      src={failed ? placeholders.design : src}
       alt={alt}
       className={className}
-      onError={() => setErr(true)}
+      onError={() => setFailed(true)}
       loading="lazy"
     />
   )
@@ -79,19 +115,21 @@ function ImageCard({
   saved,
   onDwell,
 }: {
-  item: any
+  item: FeedItem
   saved: boolean
   onDwell: (id: string, seconds: number) => void
 }) {
-  const t = useRef(0)
-  const enter = () => { t.current = Date.now() }
-  const leave = () => {
-    const seconds = (Date.now() - t.current) / 1000
+  const enteredAt = useRef(0)
+  const image =
+    item.image_url ||
+    placeholders[item.category || 'design'] ||
+    placeholders.design
+  const href = item.url && item.url !== '#' ? item.url : undefined
+
+  const stopDwell = () => {
+    const seconds = (Date.now() - enteredAt.current) / 1000
     if (seconds > 1) onDwell(item.id, seconds)
   }
-
-  const imgSrc = item.image_url || placeholders[item.category as string] || placeholders.design
-  const href = item.url === '#' ? undefined : item.url
 
   return (
     <a
@@ -99,14 +137,18 @@ function ImageCard({
       target={href ? '_blank' : undefined}
       rel="noopener noreferrer"
       className="group relative block h-full w-full overflow-hidden rounded-[1.35rem] bg-grow-soft"
-      onMouseEnter={enter}
-      onMouseLeave={leave}
-      onTouchStart={enter}
-      onTouchEnd={leave}
+      onMouseEnter={() => {
+        enteredAt.current = Date.now()
+      }}
+      onMouseLeave={stopDwell}
+      onTouchStart={() => {
+        enteredAt.current = Date.now()
+      }}
+      onTouchEnd={stopDwell}
     >
       <SaveHeart itemId={item.id} initialSaved={saved} />
       <SafeImage
-        src={imgSrc}
+        src={image}
         alt={item.title || 'Reference'}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045]"
       />
@@ -115,107 +157,171 @@ function ImageCard({
           {PLATFORM_LABELS[item.platform]}
         </span>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0 opacity-0 transition-opacity duration-300 opacity-100">
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <div className="mb-2 inline-flex rounded-full bg-[#FFE500] px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F0F10]">
-            {PLATFORM_LABELS[item.platform] || 'Reference'}
-          </div>
-          {item.artist_name && <p className="truncate text-[11px] font-bold text-white/90">{item.artist_name}</p>}
-          {item.title && <p className="mt-0.5 line-clamp-2 text-[11px] leading-tight text-white/75">{item.title}</p>}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent">
+        <div className="absolute inset-x-0 bottom-0 p-3">
+          {item.artist_name && (
+            <p className="truncate text-[11px] font-bold text-white/90">
+              {item.artist_name}
+            </p>
+          )}
+          {item.title && (
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-tight text-white/75">
+              {item.title}
+            </p>
+          )}
         </div>
       </div>
     </a>
   )
 }
 
+function CalendarRow({ item }: { item: CalendarItem }) {
+  return (
+    <Link
+      href="/calendario"
+      className="flex items-center gap-3 border-t border-white/10 py-3 first:border-t-0"
+    >
+      <span className="h-8 w-1 shrink-0 rounded-full bg-grow-yellow" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold">{item.title}</span>
+        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-white/45">
+          {item.client}
+          {item.content_type ? ` · ${item.content_type}` : ''}
+        </span>
+      </span>
+      <span className="shrink-0 text-[9px] font-black uppercase text-grow-yellow">
+        {STATUS_LABELS[item.status] || item.status}
+      </span>
+    </Link>
+  )
+}
+
 export default function Home() {
-  const [active, setActive] = useState<string | null>(null)
-  const [images, setImages] = useState<any[]>([])
+  const [images, setImages] = useState<FeedItem[]>([])
+  const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([])
+  const [inboxItems, setInboxItems] = useState<InboxItem[]>([])
   const [loadingImages, setLoadingImages] = useState(true)
+  const [loadingWork, setLoadingWork] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
-  // stable seed for the day so pagination is consistent
-  const feedSeed = useRef(Math.floor(Date.now() / 86400000))
 
-  const fetchPage = (_cat: string | null, offset: number) => {
-    return fetch(`/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}&seed=${feedSeed.current}`).then((r) => r.json())
-  }
-
-  const load = async (cat: string | null) => {
-    setActive(null)
-    setLoadingImages(true)
-    try {
-      const d = await fetchPage(null, 0)
-      setImages(d.items || [])
-      setHasMore(Boolean(d.hasMore) && PAGE_SIZE < FEED_CEILING)
-    } catch {
-      setImages([])
-      setHasMore(false)
-    } finally {
-      setLoadingImages(false)
-    }
-  }
-
-  const loadMore = async () => {
-    if (loadingMore || loadingImages || !hasMore) return
-    setLoadingMore(true)
-    try {
-      const offset = images.length
-      if (offset >= FEED_CEILING) {
-        setHasMore(false)
-        return
-      }
-      const d = await fetchPage(null, offset)
-      const newItems = d.items || []
-      setImages((prev) => [...prev, ...newItems])
-      setHasMore(Boolean(d.hasMore) && offset + newItems.length < FEED_CEILING && newItems.length > 0)
-    } catch {
-      setHasMore(false)
-    } finally {
-      setLoadingMore(false)
-    }
-  }
+  const fetchFeedPage = (offset: number) =>
+    fetch(
+      `/api/feed?type=image&limit=${PAGE_SIZE}&offset=${offset}&seed=${DAILY_FEED_SEED}`
+    ).then((response) => response.json())
 
   useEffect(() => {
-    load(null)
-    fetch('/api/saved')
-      .then((r) => r.json())
-      .then((data) => setSavedIds(new Set((data.items || []).map((item: any) => item.id))))
-      .catch(() => setSavedIds(new Set()))
-  }, [])
+    let cancelled = false
 
-  useEffect(() => {
-    const checkUnread = async () => {
-      try {
-        const res = await fetch('/api/inbox?source=chat')
-        const data = await res.json()
-        const items = data.items || []
-        const latest = items[0]
-        if (!latest) return setHasUnreadChat(false)
+    Promise.all([
+      fetchFeedPage(0),
+      fetch('/api/saved').then((response) => response.json()),
+      fetch('/api/calendar').then((response) => response.json()),
+      fetch('/api/inbox').then((response) => response.json()),
+      fetch('/api/inbox?source=chat').then((response) => response.json()),
+    ])
+      .then(([feed, saved, calendar, inbox, chat]) => {
+        if (cancelled) return
+        const feedItems = (feed.items || []) as FeedItem[]
+        const chatItems = (chat.items || []) as InboxItem[]
+        const latestChat = chatItems[0]
         const lastSeen = localStorage.getItem('grow_chat_last_seen')
-        setHasUnreadChat(!lastSeen || new Date(latest.created_at).getTime() > new Date(lastSeen).getTime())
-      } catch {}
+
+        setImages(feedItems)
+        setHasMore(Boolean(feed.hasMore) && feedItems.length < FEED_CEILING)
+        setSavedIds(
+          new Set(
+            ((saved.items || []) as { id: string }[]).map((item) => item.id)
+          )
+        )
+        setCalendarItems((calendar.items || []) as CalendarItem[])
+        setInboxItems((inbox.items || []) as InboxItem[])
+        setHasUnreadChat(
+          Boolean(
+            latestChat &&
+              (!lastSeen ||
+                new Date(latestChat.created_at).getTime() >
+                  new Date(lastSeen).getTime())
+          )
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setHasMore(false)
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingImages(false)
+          setLoadingWork(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
     }
-    checkUnread()
-    const interval = setInterval(checkUnread, 8000)
-    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
+    const element = sentinelRef.current
+    if (!element) return
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) loadMore()
+        if (!entries[0]?.isIntersecting) return
+        if (loadingMore || loadingImages || !hasMore) return
+
+        setLoadingMore(true)
+        const offset = images.length
+        fetchFeedPage(offset)
+          .then((data) => {
+            const newItems = (data.items || []) as FeedItem[]
+            setImages((current) => [...current, ...newItems])
+            setHasMore(
+              Boolean(data.hasMore) &&
+                offset + newItems.length < FEED_CEILING &&
+                newItems.length > 0
+            )
+          })
+          .catch(() => setHasMore(false))
+          .finally(() => setLoadingMore(false))
       },
       { rootMargin: '600px' }
     )
-    observer.observe(el)
+
+    observer.observe(element)
     return () => observer.disconnect()
-  }, [images, hasMore, loadingMore, loadingImages, active])
+  }, [hasMore, images.length, loadingImages, loadingMore])
+
+  const now = new Date()
+  const today = localDateKey(now)
+  const todayItems = calendarItems.filter(
+    (item) => item.scheduled_date === today && item.status !== 'pubblicato'
+  )
+  const upcomingItems = calendarItems
+    .filter(
+      (item) =>
+        item.scheduled_date &&
+        item.scheduled_date > today &&
+        item.status !== 'pubblicato'
+    )
+    .sort((a, b) =>
+      String(a.scheduled_date).localeCompare(String(b.scheduled_date))
+    )
+    .slice(0, 4)
+  const activeItems = calendarItems
+    .filter(
+      (item) =>
+        item.status === 'in_produzione' || item.status === 'pronto'
+    )
+    .slice(0, 4)
+  const greeting =
+    now.getHours() < 12
+      ? 'Buongiorno'
+      : now.getHours() < 18
+        ? 'Buon pomeriggio'
+        : 'Buonasera'
 
   const handleDwell = async (itemId: string, seconds: number) => {
     try {
@@ -230,67 +336,302 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-6xl lg:px-8">
-        <header className="mb-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">GROW</p>
-          <h1 className="mt-2 text-[34px] font-black uppercase leading-[0.9] tracking-tighter">
-            Home<span className="text-grow-yellow">.</span>
-          </h1>
+        <header className="mb-7 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
+              {greeting}
+            </p>
+            <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+              Oggi<span className="text-grow-yellow">.</span>
+            </h1>
+          </div>
+          <p className="pb-1 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted">
+            {now.toLocaleDateString('it-IT', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })}
+          </p>
         </header>
 
-        <Link
-          href="/chat"
-          className="relative mb-5 flex items-center justify-between rounded-[1.4rem] bg-[#0F0F10] px-5 py-4 text-white"
-        >
-          {hasUnreadChat && (
-            <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center">
-              <span className="absolute h-full w-full animate-ping rounded-full bg-grow-yellow opacity-75" />
-              <span className="relative h-2.5 w-2.5 rounded-full bg-grow-yellow" />
-            </span>
-          )}
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50">Telefono ↔ Computer</p>
-            <p className="mt-1 text-base font-black uppercase">
-              Chat veloce
-              {hasUnreadChat && <span className="ml-2 rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-black text-black">Nuovo</span>}
-            </p>
-          </div>
-          <span className="rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-black uppercase text-black">Apri →</span>
-        </Link>
+        <section className="grid gap-3 lg:grid-cols-[1.45fr_0.8fr]">
+          <div className="rounded-[1.5rem] bg-[#0F0F10] p-5 text-white">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
+                  Priorità
+                </p>
+                <h2 className="mt-1 text-xl font-black uppercase">
+                  Da chiudere oggi
+                </h2>
+              </div>
+              <Link
+                href="/calendario"
+                className="rounded-full bg-grow-yellow px-3 py-2 text-[10px] font-black uppercase text-black"
+              >
+                Piano →
+              </Link>
+            </div>
 
-        {loadingImages ? (
-          <div className="grid auto-rows-[122px] grid-cols-3 gap-2">
-            {Array.from({ length: 18 }).map((_, i) => (
-              <div key={i} className={['animate-pulse rounded-[1.35rem] bg-grow-soft', i % 7 === 0 || i % 11 === 0 ? 'row-span-2' : ''].join(' ')} />
-            ))}
-          </div>
-        ) : images.length === 0 ? (
-          <div className="rounded-[2rem] border border-black/10 bg-white/70 p-6 text-center">
-            <p className="text-sm font-bold text-grow-muted">Nessuna reference disponibile. Aggiorna Are.na o le piattaforme immagini.</p>
-          </div>
-        ) : (
-          <div className="grid auto-rows-[122px] grid-cols-3 gap-2">
-            {images.map((item, idx) => {
-              const isPortrait = (item.height || 0) > (item.width || 0)
-              const isBig = idx % 7 === 0 || idx % 13 === 0
-              const isTall = isBig || isPortrait
-              return (
-                <div key={item.id} className={isTall ? 'row-span-2' : 'row-span-1'}>
-                  <ImageCard item={item} saved={savedIds.has(item.id)} onDwell={handleDwell} />
+            <div className="mt-4">
+              {loadingWork ? (
+                <div className="space-y-2">
+                  {[1, 2].map((item) => (
+                    <div
+                      key={item}
+                      className="h-12 animate-pulse rounded-xl bg-white/5"
+                    />
+                  ))}
                 </div>
-              )
-            })}
+              ) : todayItems.length ? (
+                todayItems.slice(0, 4).map((item) => (
+                  <CalendarRow key={item.id} item={item} />
+                ))
+              ) : (
+                <div className="rounded-[1.1rem] border border-white/10 bg-white/5 p-4">
+                  <p className="text-sm font-bold">Nessuna consegna oggi.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-white/45">
+                    Usa questo spazio per avanzare un lavoro già aperto.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        )}
 
-        {!loadingImages && images.length > 0 && (
-          <div ref={sentinelRef} className="flex h-16 items-center justify-center">
-            {loadingMore && (
-              <span className="text-[11px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                Carico altre reference…
+          <Link
+            href="/inbox"
+            className="flex min-h-44 flex-col justify-between rounded-[1.5rem] border border-grow-border bg-white p-5"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                  Taccuino
+                </p>
+                <h2 className="mt-1 text-xl font-black uppercase">Inbox</h2>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-grow-yellow text-lg font-black">
+                +
+              </span>
+            </div>
+            <div>
+              <p className="text-4xl font-black">{inboxItems.length}</p>
+              <p className="mt-1 text-xs leading-relaxed text-grow-muted">
+                Note, link e screenshot. Nessun obbligo di organizzarli subito.
+              </p>
+            </div>
+          </Link>
+        </section>
+
+        <section className="mt-6 grid gap-5 lg:grid-cols-2">
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                  Prossime
+                </p>
+                <h2 className="mt-1 text-lg font-black uppercase">Scadenze</h2>
+              </div>
+              <Link
+                href="/calendario"
+                className="text-[10px] font-black uppercase text-grow-muted"
+              >
+                Vedi piano
+              </Link>
+            </div>
+            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-white">
+              {loadingWork ? (
+                <div className="h-36 animate-pulse bg-grow-soft" />
+              ) : upcomingItems.length ? (
+                upcomingItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href="/calendario"
+                    className="flex items-center gap-3 border-t border-grow-border px-4 py-3 first:border-t-0"
+                  >
+                    <span className="w-16 shrink-0 text-[9px] font-black uppercase text-grow-muted">
+                      {shortDate(item.scheduled_date!)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold">
+                        {item.title}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-grow-muted">
+                        {item.client}
+                      </span>
+                    </span>
+                  </Link>
+                ))
+              ) : (
+                <p className="px-5 py-10 text-center text-sm text-grow-muted">
+                  Nessuna scadenza futura.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                  Continua
+                </p>
+                <h2 className="mt-1 text-lg font-black uppercase">
+                  Lavori aperti
+                </h2>
+              </div>
+              <Link
+                href="/ai"
+                className="rounded-full bg-[#0F0F10] px-3 py-2 text-[9px] font-black uppercase text-grow-yellow"
+              >
+                Lavora in AI →
+              </Link>
+            </div>
+            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-white">
+              {loadingWork ? (
+                <div className="h-36 animate-pulse bg-grow-soft" />
+              ) : activeItems.length ? (
+                activeItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/ai?project=${encodeURIComponent(item.client)}&brief=${encodeURIComponent(item.title)}`}
+                    className="flex items-center gap-3 border-t border-grow-border px-4 py-3 first:border-t-0"
+                  >
+                    <span className="h-8 w-1 shrink-0 rounded-full bg-grow-yellow" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold">
+                        {item.title}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] font-bold uppercase text-grow-muted">
+                        {item.client} · {STATUS_LABELS[item.status]}
+                      </span>
+                    </span>
+                    <span className="text-grow-muted">→</span>
+                  </Link>
+                ))
+              ) : (
+                <p className="px-5 py-10 text-center text-sm text-grow-muted">
+                  Nessun lavoro in produzione.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+          <Link
+            href="/chat"
+            className="relative flex items-center justify-between rounded-[1.4rem] bg-[#0F0F10] px-5 py-4 text-white"
+          >
+            {hasUnreadChat && (
+              <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center">
+                <span className="absolute h-full w-full animate-ping rounded-full bg-grow-yellow opacity-75" />
+                <span className="relative h-2.5 w-2.5 rounded-full bg-grow-yellow" />
               </span>
             )}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
+                Telefono ↔ Computer
+              </p>
+              <p className="mt-1 text-base font-black uppercase">
+                Chat veloce
+              </p>
+            </div>
+            <span className="rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-black uppercase text-black">
+              Apri →
+            </span>
+          </Link>
+
+          <div className="rounded-[1.4rem] border border-grow-border bg-white px-5 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                  Ultime note
+                </p>
+                <p className="mt-1 line-clamp-2 text-sm font-bold">
+                  {inboxItems[0]?.content ||
+                    inboxItems[0]?.url ||
+                    'Il taccuino è vuoto.'}
+                </p>
+              </div>
+              {inboxItems[0] && (
+                <span className="ml-4 shrink-0 text-[9px] font-bold uppercase text-grow-muted">
+                  {timeAgo(inboxItems[0].created_at)}
+                </span>
+              )}
+            </div>
           </div>
-        )}
+        </section>
+
+        <section id="scopri" className="mt-10 scroll-mt-6">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                Selezione visiva
+              </p>
+              <h2 className="mt-1 text-[28px] font-black uppercase leading-none">
+                Scopri<span className="text-grow-yellow">.</span>
+              </h2>
+            </div>
+            <Link
+              href="/archivio"
+              className="text-[10px] font-black uppercase text-grow-muted"
+            >
+              Vai all’Archivio
+            </Link>
+          </div>
+
+          {loadingImages ? (
+            <div className="grid auto-rows-[122px] grid-cols-3 gap-2">
+              {Array.from({ length: 12 }).map((_, index) => (
+                <div
+                  key={index}
+                  className={[
+                    'animate-pulse rounded-[1.35rem] bg-grow-soft',
+                    index % 7 === 0 ? 'row-span-2' : '',
+                  ].join(' ')}
+                />
+              ))}
+            </div>
+          ) : images.length === 0 ? (
+            <div className="rounded-[2rem] border border-grow-border bg-white p-6 text-center">
+              <p className="text-sm font-bold text-grow-muted">
+                Nessuna reference disponibile.
+              </p>
+            </div>
+          ) : (
+            <div className="grid auto-rows-[122px] grid-cols-3 gap-2 lg:grid-cols-6">
+              {images.map((item, index) => {
+                const portrait = (item.height || 0) > (item.width || 0)
+                const tall = index % 7 === 0 || index % 13 === 0 || portrait
+                return (
+                  <div
+                    key={item.id}
+                    className={tall ? 'row-span-2' : 'row-span-1'}
+                  >
+                    <ImageCard
+                      item={item}
+                      saved={savedIds.has(item.id)}
+                      onDwell={handleDwell}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {!loadingImages && images.length > 0 && (
+            <div
+              ref={sentinelRef}
+              className="flex h-16 items-center justify-center"
+            >
+              {loadingMore && (
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                  Carico altre reference…
+                </span>
+              )}
+            </div>
+          )}
+        </section>
       </div>
 
       <BottomNav />
