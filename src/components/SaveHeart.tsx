@@ -65,7 +65,10 @@ export default function SaveHeart({
         busy ? 'scale-90 opacity-60' : 'hover:scale-110',
       ].join(' ')}
     >
-      <Flower size={18} weight={saved ? 'fill' : 'regular'} />
+      <span className="relative flex h-[18px] w-[18px] items-center justify-center">
+        <Flower size={18} weight="regular" />
+        <span className="absolute h-[4px] w-[4px] rounded-full bg-current" />
+      </span>
     </button>
   )
 }
