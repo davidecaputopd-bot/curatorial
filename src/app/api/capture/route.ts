@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { fetchLinkTitle } from '@/lib/link-preview'
+import { classifyInboxItem } from '@/lib/inbox/classify'
 
 function isAuthorized(request: Request) {
   const header = request.headers.get('authorization') || ''
@@ -68,19 +69,36 @@ export async function POST(request: Request) {
   }
   if (!content && imageUrl) content = 'Screenshot'
 
-  const { data, error } = await supabase
+  const noteType = classifyInboxItem({
+    content,
+    url: body.url,
+    imageUrl,
+  })
+  const insert = {
+    user_id: userId,
+    content,
+    url: body.url || null,
+    image_url: imageUrl,
+    client: body.client || null,
+    source: 'shortcut',
+  }
+  let result = await supabase
     .from('inbox_items')
-    .insert({
-      user_id: userId,
-      content,
-      url: body.url || null,
-      image_url: imageUrl,
-      client: body.client || null,
-      source: 'shortcut',
-    })
+    .insert({ ...insert, note_type: noteType })
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ item: data })
+  if (
+    result.error?.code === 'PGRST204' ||
+    (result.error?.message || '').toLowerCase().includes('note_type')
+  ) {
+    result = await supabase.from('inbox_items').insert(insert).select().single()
+  }
+
+  if (result.error) {
+    return NextResponse.json({ error: result.error.message }, { status: 500 })
+  }
+  return NextResponse.json({
+    item: result.data ? { ...result.data, note_type: noteType } : null,
+  })
 }

@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { fetchLinkPreview } from '@/lib/link-preview'
+import { classifyInboxItem } from '@/lib/inbox/classify'
+
+function missingNoteTypeColumn(error: { code?: string; message?: string } | null) {
+  if (!error) return false
+  return (
+    error.code === 'PGRST204' ||
+    (error.message || '').toLowerCase().includes('note_type')
+  )
+}
 
 export async function GET(request: Request) {
   const { supabase, user } = await getAuthenticatedSupabase()
@@ -21,7 +30,18 @@ export async function GET(request: Request) {
   const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ items: data || [] })
+  const items = (data || []).map((item) => ({
+    ...item,
+    note_type:
+      item.note_type ||
+      classifyInboxItem({
+        content: item.content,
+        url: item.url,
+        imageUrl: item.image_url,
+      }),
+  }))
+
+  return NextResponse.json({ items })
 }
 
 export async function POST(request: Request) {
@@ -57,24 +77,39 @@ export async function POST(request: Request) {
 
   if (!content && body.image_url) content = 'Screenshot'
 
-  const { data, error } = await supabase
+  const noteType = classifyInboxItem({
+    content,
+    url: detectedUrl,
+    imageUrl: body.image_url,
+  })
+  const insert = {
+    user_id: user.id,
+    content,
+    url: detectedUrl,
+    image_url: body.image_url || null,
+    client: body.client || null,
+    source: body.source || 'manual',
+    og_title: ogTitle,
+    og_description: ogDescription,
+    og_image: ogImage,
+  }
+
+  let result = await supabase
     .from('inbox_items')
-    .insert({
-      user_id: user.id,
-      content,
-      url: detectedUrl,
-      image_url: body.image_url || null,
-      client: body.client,
-      source: body.source || 'manual',
-      og_title: ogTitle,
-      og_description: ogDescription,
-      og_image: ogImage,
-    })
+    .insert({ ...insert, note_type: noteType })
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ item: data })
+  if (missingNoteTypeColumn(result.error)) {
+    result = await supabase.from('inbox_items').insert(insert).select().single()
+  }
+
+  if (result.error) {
+    return NextResponse.json({ error: result.error.message }, { status: 500 })
+  }
+  return NextResponse.json({
+    item: result.data ? { ...result.data, note_type: noteType } : null,
+  })
 }
 
 export async function DELETE(request: Request) {

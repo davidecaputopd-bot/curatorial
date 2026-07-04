@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-
-const CLIENTS = ['ANventitre', 'Exousia', 'Cantina Don Carlo', 'ACI Copertino', 'TRAMA', 'Altro']
+import {
+  classifyInboxItem,
+  INBOX_NOTE_LABELS,
+  INBOX_NOTE_TYPES,
+  type InboxNoteType,
+} from '@/lib/inbox/classify'
 
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime()
@@ -38,7 +42,7 @@ type Item = {
   og_title?: string | null
   og_description?: string | null
   og_image?: string | null
-  client?: string
+  note_type?: InboxNoteType
   source?: string
   created_at: string
 }
@@ -78,23 +82,30 @@ export default function InboxPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [text, setText] = useState('')
-  const [client, setClient] = useState('')
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<'all' | InboxNoteType>('all')
+  const [copied, setCopied] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { void loadItems() }, [])
-
-  const loadItems = async () => {
-    try {
-      const res = await fetch('/api/inbox')
-      const data = await res.json()
-      setItems(data.items || [])
-    } catch {}
-    setLoading(false)
-  }
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/inbox')
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled) setItems(data.items || [])
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const save = async () => {
     if (!text.trim() || saving) return
@@ -104,13 +115,12 @@ export default function InboxPage() {
       const res = await fetch('/api/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text, client, source: 'manual' }),
+        body: JSON.stringify({ content: text, source: 'manual' }),
       })
       const data = await res.json()
       if (data.item) {
         setItems(prev => [data.item as Item, ...prev])
         setText('')
-        setClient('')
       } else {
         setError(data.error || 'Salvataggio non riuscito.')
       }
@@ -133,7 +143,7 @@ export default function InboxPage() {
       const res = await fetch('/api/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: data.publicUrl, client, source: 'manual' }),
+        body: JSON.stringify({ image_url: data.publicUrl, source: 'manual' }),
       })
       const saved = await res.json()
       if (saved.item) setItems(prev => [saved.item as Item, ...prev])
@@ -150,6 +160,41 @@ export default function InboxPage() {
       body: JSON.stringify({ id }),
     }).catch(() => {})
   }
+
+  const copy = async (item: Item) => {
+    try {
+      await navigator.clipboard.writeText(item.content || item.url || '')
+      setCopied(item.id)
+      window.setTimeout(() => setCopied(null), 1200)
+    } catch {}
+  }
+
+  const typedItems = useMemo(
+    () =>
+      items.map((item) => ({
+        ...item,
+        note_type:
+          item.note_type ||
+          classifyInboxItem({
+            content: item.content,
+            url: item.url,
+            imageUrl: item.image_url,
+          }),
+      })),
+    [items]
+  )
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase('it-IT')
+    return typedItems.filter((item) => {
+      if (filter !== 'all' && item.note_type !== filter) return false
+      if (!normalizedQuery) return true
+      return [item.content, item.url, item.og_title, item.og_description]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLocaleLowerCase('it-IT').includes(normalizedQuery)
+        )
+    })
+  }, [filter, query, typedItems])
 
   const isDetectedUrl = /^https?:\/\//.test(text.trim())
 
@@ -201,11 +246,9 @@ export default function InboxPage() {
             </span>
           )}
           <div className="flex items-center gap-2">
-            <select value={client} onChange={e => setClient(e.target.value)}
-              className="flex-1 rounded-full border border-grow-border bg-grow-soft px-3 py-2 text-xs text-grow-text focus:outline-none">
-              <option value="">Nessun cliente</option>
-              {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <p className="min-w-0 flex-1 text-[10px] font-bold uppercase tracking-wide text-grow-muted">
+              Classificazione automatica · nessun progetto
+            </p>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) void uploadScreenshot(f); e.target.value = '' }} />
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
@@ -230,6 +273,60 @@ export default function InboxPage() {
           {error && <p className="text-xs text-red-500">{error}</p>}
         </div>
 
+        <div className="mb-4">
+          <div className="relative">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-grow-muted"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Cerca nelle note..."
+              className="w-full rounded-2xl border border-grow-border bg-grow-card py-3 pl-11 pr-4 text-sm outline-none focus:border-grow-yellow"
+            />
+          </div>
+          <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+            {[
+              { key: 'all' as const, label: 'Tutto' },
+              ...INBOX_NOTE_TYPES.map((type) => ({
+                key: type,
+                label: INBOX_NOTE_LABELS[type],
+              })),
+            ].map((option) => {
+              const count =
+                option.key === 'all'
+                  ? typedItems.length
+                  : typedItems.filter((item) => item.note_type === option.key)
+                      .length
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setFilter(option.key)}
+                  className={[
+                    'shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wide',
+                    filter === option.key
+                      ? 'bg-[#0F0F10] text-grow-yellow'
+                      : 'border border-grow-border bg-white text-grow-muted',
+                  ].join(' ')}
+                >
+                  {option.label} · {count}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Lista */}
         {loading ? (
           <div className="space-y-2">
@@ -237,14 +334,18 @@ export default function InboxPage() {
               <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-grow-soft" />
             ))}
           </div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="rounded-[1.5rem] border border-grow-border bg-grow-card px-6 py-16 text-center">
-            <p className="text-sm font-semibold text-grow-text">Nessuna idea ancora.</p>
-            <p className="mt-1 text-xs text-grow-muted">Scrivi la prima.</p>
+            <p className="text-sm font-semibold text-grow-text">
+              {items.length ? 'Nessuna nota trovata.' : 'Nessuna nota ancora.'}
+            </p>
+            <p className="mt-1 text-xs text-grow-muted">
+              {items.length ? 'Prova un altro filtro.' : 'Scrivi la prima.'}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-grow-border rounded-[1.5rem] border border-grow-border bg-grow-card">
-            {items.map(item => (
+            {filteredItems.map(item => (
               <div key={item.id} className="px-4 py-3.5">
                 <div className="flex items-start gap-3">
                   {/* Thumbnail immagine (se c'è) */}
@@ -283,11 +384,9 @@ export default function InboxPage() {
 
                     {/* Meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {item.client && (
-                        <span className="rounded-full bg-grow-yellow px-2 py-0.5 text-[10px] font-bold text-grow-text">
-                          {item.client}
-                        </span>
-                      )}
+                      <span className="rounded-full bg-grow-yellow px-2 py-0.5 text-[10px] font-bold text-grow-text">
+                        {INBOX_NOTE_LABELS[item.note_type]}
+                      </span>
                       {item.url && !item.og_title && (
                         <a href={item.url} target="_blank" rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
@@ -302,11 +401,20 @@ export default function InboxPage() {
 
                     {/* AI handoff */}
                     {expanded === item.id && (
-                      <Link
-                        href={`/ai?brief=${encodeURIComponent(item.content || item.url || '')}${item.client ? `&project=${encodeURIComponent(item.client)}` : ''}`}
-                        className="mt-3 inline-flex items-center gap-1 rounded-full bg-grow-black px-3 py-1.5 text-[10px] font-bold uppercase text-grow-yellow">
-                        Lavora in AI →
-                      </Link>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          href={`/ai?brief=${encodeURIComponent(item.content || item.url || '')}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-grow-black px-3 py-1.5 text-[10px] font-bold uppercase text-grow-yellow">
+                          Usa con AI →
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => void copy(item)}
+                          className="rounded-full border border-grow-border px-3 py-1.5 text-[10px] font-bold uppercase text-grow-muted"
+                        >
+                          {copied === item.id ? 'Copiato' : 'Copia'}
+                        </button>
+                      </div>
                     )}
                   </div>
 
