@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Flower } from '@phosphor-icons/react'
 
 export default function SaveHeart({
   itemId,
@@ -64,7 +65,7 @@ export default function SaveHeart({
         busy ? 'scale-90 opacity-60' : 'hover:scale-110',
       ].join(' ')}
     >
-      <span className="text-[17px] leading-none">{saved ? '♥' : '♡'}</span>
+      <Flower size={18} weight={saved ? 'fill' : 'regular'} />
     </button>
   )
 }

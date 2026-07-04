@@ -57,7 +57,7 @@ function OGCard({ item }: { item: Item }) {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}
-      className="mt-2 block overflow-hidden rounded-[0.85rem] border border-black/10 bg-grow-soft transition-opacity active:opacity-70">
+      className="mt-2 block overflow-hidden rounded-[0.85rem] border border-black/10 bg-white transition-opacity active:opacity-70">
       {item.og_image && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={item.og_image} alt="" className="h-36 w-full object-cover"
@@ -210,14 +210,14 @@ export default function InboxPage() {
             </h1>
             <p className="mt-1 text-sm text-grow-muted">Cattura tutto. Organizza dopo.</p>
           </div>
-          <Link href="/chat" className="mt-1 shrink-0 rounded-full bg-grow-black px-3 py-1.5 text-[10px] font-bold uppercase text-grow-yellow">
+          <Link href="/chat" className="mt-1 shrink-0 rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-bold uppercase text-grow-black">
             Chat veloce →
           </Link>
         </header>
 
         {/* Composer */}
         <div
-          className="mb-6 space-y-3 rounded-[1.5rem] border border-grow-border bg-grow-card p-4"
+          className="mb-6 space-y-3 rounded-[1.5rem] border border-black/10 bg-white p-4"
           onDragOver={e => e.preventDefault()}
           onDrop={e => {
             e.preventDefault()
@@ -252,7 +252,7 @@ export default function InboxPage() {
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) void uploadScreenshot(f); e.target.value = '' }} />
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-grow-soft text-grow-text disabled:opacity-40"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1EDE5] text-grow-text disabled:opacity-40"
               aria-label="Carica immagine">
               {uploading ? <div className="h-3 w-3 animate-spin rounded-full border-2 border-grow-text border-t-transparent" /> : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -292,7 +292,7 @@ export default function InboxPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Cerca nelle note..."
-              className="w-full rounded-2xl border border-grow-border bg-grow-card py-3 pl-11 pr-4 text-sm outline-none focus:border-grow-yellow"
+              className="w-full rounded-2xl border border-black/10 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-grow-yellow"
             />
           </div>
           <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
@@ -317,7 +317,7 @@ export default function InboxPage() {
                     'shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wide',
                     filter === option.key
                       ? 'bg-[#0F0F10] text-grow-yellow'
-                      : 'border border-grow-border bg-grow-card text-grow-muted',
+                      : 'border border-black/10 bg-white text-grow-muted',
                   ].join(' ')}
                 >
                   {option.label} · {count}
@@ -331,11 +331,11 @@ export default function InboxPage() {
         {loading ? (
           <div className="space-y-2">
             {[1,2,3].map(i => (
-              <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-grow-soft" />
+              <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-white" />
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="rounded-[1.5rem] border border-grow-border bg-grow-card px-6 py-16 text-center">
+          <div className="rounded-[1.5rem] border border-black/10 bg-white px-6 py-16 text-center">
             <p className="text-sm font-semibold text-grow-text">
               {items.length ? 'Nessuna nota trovata.' : 'Nessuna nota ancora.'}
             </p>
@@ -344,7 +344,7 @@ export default function InboxPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-grow-border rounded-[1.5rem] border border-grow-border bg-grow-card">
+          <div className="divide-y divide-black/10 rounded-[1.5rem] border border-black/10 bg-white">
             {filteredItems.map(item => (
               <div key={item.id} className="px-4 py-3.5">
                 <div className="flex items-start gap-3">
@@ -384,7 +384,7 @@ export default function InboxPage() {
 
                     {/* Meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-grow-yellow px-2 py-0.5 text-[10px] font-bold text-grow-text">
+                      <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-[10px] font-bold text-grow-muted">
                         {INBOX_NOTE_LABELS[item.note_type]}
                       </span>
                       {item.url && !item.og_title && (
