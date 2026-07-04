@@ -27,6 +27,13 @@ const STATUS_DOT: Record<string, string> = {
   pubblicato: 'bg-grow-yellow',
   da_riciclare: 'bg-red-400',
 }
+const STATUS_ICONS: Record<string, string> = {
+  idea: '/icon-1.svg',
+  in_produzione: '/icon-3.svg',
+  pronto: '/icon-4.svg',
+  pubblicato: '/icon-5.svg',
+  da_riciclare: '/icon-2.svg',
+}
 const CLIENT_COLORS: Record<string, string> = {
   ANventitre: 'bg-amber-400',
   Exousia: 'bg-emerald-500',
@@ -416,6 +423,14 @@ export default function CalendarioPage() {
                     const pct = items.length ? Math.round((count / items.length) * 100) : 0
                     return (
                       <div key={s} className={`relative flex-1 py-3 text-center ${i < STATUSES.length - 1 ? 'border-r border-grow-border' : ''}`}>
+                        <span className="relative mx-auto mb-1 flex h-7 w-8 items-end justify-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={STATUS_ICONS[s]}
+                            alt=""
+                            className="absolute bottom-0 w-6 max-w-none object-contain"
+                          />
+                        </span>
                         <p className="text-[15px] font-black text-grow-text">{count}</p>
                         <p className="text-[8px] font-bold uppercase text-grow-muted">{STATUS_LABELS[s].split(' ')[0]}</p>
                         {pct > 0 && (
@@ -431,8 +446,15 @@ export default function CalendarioPage() {
                     const statusItems = itemsByStatus(status)
                     return (
                       <div key={status}>
-                        <div className="mb-2 flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status]}`} />
+                        <div className="mb-2 flex min-h-9 items-end gap-2">
+                          <span className="relative flex h-8 w-9 shrink-0 items-end justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={STATUS_ICONS[status]}
+                              alt=""
+                              className="absolute bottom-0 w-7 max-w-none object-contain"
+                            />
+                          </span>
                           <span className="text-xs font-black uppercase tracking-tight text-grow-text">
                             {STATUS_LABELS[status]}
                           </span>

@@ -36,14 +36,6 @@ const STATUS_LABELS: Record<string, string> = {
   da_riciclare: 'Da riciclare',
 }
 
-const GROWTH_PHASES = [
-  { src: '/icon-1.svg', label: 'Seme in attesa' },
-  { src: '/icon-2.svg', label: 'Seme attivo' },
-  { src: '/icon-3.svg', label: 'Seme in apertura' },
-  { src: '/icon-4.svg', label: 'Germoglio' },
-  { src: '/icon-5.svg', label: 'Fioritura' },
-] as const
-
 type FeedItem = {
   id: string
   title?: string | null
@@ -214,7 +206,6 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
-  const [growthPhase, setGrowthPhase] = useState(0)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const fetchFeedPage = (offset: number) =>
@@ -270,16 +261,6 @@ export default function Home() {
     return () => {
       cancelled = true
     }
-  }, [])
-
-  useEffect(() => {
-    const updateGrowthPhase = () => {
-      setGrowthPhase(Math.min(4, Math.floor(new Date().getHours() / 5)))
-    }
-
-    updateGrowthPhase()
-    const timer = window.setInterval(updateGrowthPhase, 60_000)
-    return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -365,16 +346,12 @@ export default function Home() {
             </h1>
           </div>
           <div className="flex min-w-[7.5rem] flex-col items-end">
-            <div
-              className="relative flex h-[5.75rem] w-[5.25rem] items-end justify-center"
-              title={GROWTH_PHASES[growthPhase].label}
-            >
-              {/* La larghezza della capsula resta costante; la fioritura cresce verso l'alto. */}
+            <div className="flex h-[5.75rem] w-[5.25rem] items-end justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={GROWTH_PHASES[growthPhase].src}
-                alt={GROWTH_PHASES[growthPhase].label}
-                className="absolute bottom-0 w-[4.6rem] max-w-none object-contain drop-shadow-[0_8px_12px_rgba(15,15,16,0.12)]"
+                src="/icon-1.svg"
+                alt="Seme GROW"
+                className="w-[4.6rem] object-contain"
               />
             </div>
             <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted">

@@ -55,9 +55,17 @@ function LoginInner() {
   return (
     <main className="min-h-screen bg-[#F7F4EE] px-6 text-[#0F0F10]">
       <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center">
-        <p className="mb-12 text-4xl font-black tracking-tight">
-          GROW<span className="text-[#FFE500]">.</span>
-        </p>
+        <div className="mb-12 flex items-end justify-between">
+          <p className="text-4xl font-black tracking-tight">
+            GROW<span className="text-[#FFE500]">.</span>
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon-1.svg"
+            alt="Seme GROW"
+            className="w-[4.6rem] object-contain"
+          />
+        </div>
 
         <form onSubmit={handleSubmit}>
           <h1 className="text-2xl font-black">Inserisci PIN</h1>
