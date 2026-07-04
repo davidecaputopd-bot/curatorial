@@ -331,7 +331,7 @@ export default function AiPage() {
             <button
               type="button"
               onClick={openHistory}
-              className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
+              className="rounded-full border border-grow-border bg-grow-card px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
             >
               Cronologia
             </button>
@@ -360,7 +360,7 @@ export default function AiPage() {
                     <button
                       key={c.conversation_id}
                       onClick={() => loadConversation(c.conversation_id)}
-                      className="block w-full rounded-[1.1rem] border border-black/10 bg-white/70 px-4 py-3 text-left"
+                      className="block w-full rounded-[1.1rem] border border-grow-border bg-grow-card px-4 py-3 text-left"
                     >
                       <p className="line-clamp-1 text-sm font-bold">{c.title || 'Conversazione'}</p>
                       <p className="mt-0.5 text-[10px] text-grow-muted">{new Date(c.updated_at).toLocaleString('it-IT')}</p>
@@ -373,14 +373,14 @@ export default function AiPage() {
         )}
 
         {project && (
-          <div className="mb-4 flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-4 py-2">
+          <div className="mb-4 flex items-center gap-2 rounded-full border border-grow-border bg-grow-card px-4 py-2">
             <span className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">Progetto attivo</span>
             <span className="rounded-full bg-grow-yellow px-2.5 py-0.5 text-[11px] font-black uppercase text-black">{project}</span>
           </div>
         )}
 
         {reference && (
-          <section className="mb-5 overflow-hidden rounded-[2rem] border border-black/10 bg-white/70">
+          <section className="mb-5 overflow-hidden rounded-[2rem] border border-grow-border bg-grow-card">
             {reference.image && (
               <div className="h-52">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -398,7 +398,7 @@ export default function AiPage() {
 
         <div className="flex-1 space-y-4 overflow-y-auto pb-4">
           {messages.length === 0 && (
-            <div className="rounded-[1.6rem] border border-black/10 bg-white/60 px-5 py-10 text-center">
+            <div className="rounded-[1.6rem] border border-grow-border bg-grow-card px-5 py-10 text-center">
               <p className="text-sm text-grow-muted">
                 Scrivi qualsiasi cosa — brief, brainstorming, una domanda su un cliente. Posso anche leggere e modificare calendario, inbox e archivio mentre parliamo.
               </p>
@@ -410,7 +410,7 @@ export default function AiPage() {
               <div
                 className={[
                   'max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-relaxed',
-                  message.role === 'user' ? 'bg-grow-yellow text-black' : 'border border-black/10 bg-white/75 text-grow-text',
+                  message.role === 'user' ? 'bg-grow-yellow text-black' : 'border border-grow-border bg-grow-card text-grow-text',
                 ].join(' ')}
               >
                 <p className="whitespace-pre-wrap">{message.content}</p>
@@ -433,7 +433,7 @@ export default function AiPage() {
 
           {loading && messages[messages.length - 1]?.role !== 'assistant' && (
             <div className="flex justify-start">
-              <div className="rounded-[1.6rem] border border-black/10 bg-white/75 px-4 py-3 text-sm font-bold text-grow-muted">
+              <div className="rounded-[1.6rem] border border-grow-border bg-grow-card px-4 py-3 text-sm font-bold text-grow-muted">
                 <span className="inline-flex gap-1">
                   <span className="ds-pulse-dot" style={{ animationDelay: '0ms' }}>·</span>
                   <span className="ds-pulse-dot" style={{ animationDelay: '160ms' }}>·</span>

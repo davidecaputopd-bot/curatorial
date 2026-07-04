@@ -410,7 +410,7 @@ export default function Home() {
 
           <Link
             href="/inbox"
-            className="flex min-h-44 flex-col justify-between rounded-[1.5rem] border border-grow-border bg-white p-5"
+            className="flex min-h-44 flex-col justify-between rounded-[1.5rem] border border-grow-border bg-grow-card p-5"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -448,7 +448,7 @@ export default function Home() {
                 Vedi piano
               </Link>
             </div>
-            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-white">
+            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-grow-card">
               {loadingWork ? (
                 <div className="h-36 animate-pulse bg-grow-soft" />
               ) : upcomingItems.length ? (
@@ -496,7 +496,7 @@ export default function Home() {
                 Lavora in AI →
               </Link>
             </div>
-            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-white">
+            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-grow-card">
               {loadingWork ? (
                 <div className="h-36 animate-pulse bg-grow-soft" />
               ) : activeItems.length ? (
@@ -551,7 +551,7 @@ export default function Home() {
             </span>
           </Link>
 
-          <div className="rounded-[1.4rem] border border-grow-border bg-white px-5 py-4">
+          <div className="rounded-[1.4rem] border border-grow-border bg-grow-card px-5 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
@@ -603,7 +603,7 @@ export default function Home() {
               ))}
             </div>
           ) : images.length === 0 ? (
-            <div className="rounded-[2rem] border border-grow-border bg-white p-6 text-center">
+            <div className="rounded-[2rem] border border-grow-border bg-grow-card p-6 text-center">
               <p className="text-sm font-bold text-grow-muted">
                 Nessuna reference disponibile.
               </p>

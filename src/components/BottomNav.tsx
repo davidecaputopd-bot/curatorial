@@ -23,11 +23,11 @@ const items = [
     ),
   },
   {
-    href: '/chat',
-    label: 'Chat',
+    href: '/archivio',
+    label: 'Archivio',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        <path d="M3 6h18v4H3z"/><path d="M5 10h14v10H5z"/><path d="M9 14h6"/>
       </svg>
     ),
   },

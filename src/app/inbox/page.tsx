@@ -317,7 +317,7 @@ export default function InboxPage() {
                     'shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wide',
                     filter === option.key
                       ? 'bg-[#0F0F10] text-grow-yellow'
-                      : 'border border-grow-border bg-white text-grow-muted',
+                      : 'border border-grow-border bg-grow-card text-grow-muted',
                   ].join(' ')}
                 >
                   {option.label} · {count}

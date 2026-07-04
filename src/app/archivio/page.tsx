@@ -209,7 +209,7 @@ export default function ArchivioPage() {
                   'rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wide',
                   selecting
                     ? 'bg-[#0F0F10] text-grow-yellow'
-                    : 'border border-grow-border bg-white text-grow-muted',
+                    : 'border border-grow-border bg-grow-card text-grow-muted',
                 ].join(' ')}
               >
                 {selecting ? 'Annulla' : 'Seleziona'}
@@ -237,7 +237,7 @@ export default function ArchivioPage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-[2rem] border border-black/10 bg-white/70 px-6 py-14 text-center">
+          <div className="rounded-[2rem] border border-grow-border bg-grow-card px-6 py-14 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFE500]">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="#0F0F10"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.3 4 6.2 4c2.1 0 3.7 1.1 4.8 2.7C12.1 5.1 13.7 4 15.8 4c3.9 0 5.8 4.1 4.2 7.7C19.5 16.4 12 21 12 21z"/></svg>
             </div>
