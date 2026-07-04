@@ -36,6 +36,14 @@ const STATUS_LABELS: Record<string, string> = {
   da_riciclare: 'Da riciclare',
 }
 
+const GROWTH_PHASES = [
+  { src: '/icon-1.svg', label: 'Seme in attesa' },
+  { src: '/icon-2.svg', label: 'Seme attivo' },
+  { src: '/icon-3.svg', label: 'Seme in apertura' },
+  { src: '/icon-4.svg', label: 'Germoglio' },
+  { src: '/icon-5.svg', label: 'Fioritura' },
+] as const
+
 type FeedItem = {
   id: string
   title?: string | null
@@ -206,6 +214,7 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
+  const [growthPhase, setGrowthPhase] = useState(0)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const fetchFeedPage = (offset: number) =>
@@ -261,6 +270,16 @@ export default function Home() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    const updateGrowthPhase = () => {
+      setGrowthPhase(Math.min(4, Math.floor(new Date().getHours() / 5)))
+    }
+
+    updateGrowthPhase()
+    const timer = window.setInterval(updateGrowthPhase, 60_000)
+    return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -336,7 +355,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-6xl lg:px-8">
-        <header className="mb-7 flex items-end justify-between gap-4">
+        <header className="mb-7 flex min-h-[7.25rem] items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
               {greeting}
@@ -345,13 +364,27 @@ export default function Home() {
               Oggi<span className="text-grow-yellow">.</span>
             </h1>
           </div>
-          <p className="pb-1 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted">
-            {now.toLocaleDateString('it-IT', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
-          </p>
+          <div className="flex min-w-[7.5rem] flex-col items-end">
+            <div
+              className="relative flex h-[5.75rem] w-[5.25rem] items-end justify-center"
+              title={GROWTH_PHASES[growthPhase].label}
+            >
+              {/* La larghezza della capsula resta costante; la fioritura cresce verso l'alto. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={GROWTH_PHASES[growthPhase].src}
+                alt={GROWTH_PHASES[growthPhase].label}
+                className="absolute bottom-0 w-[4.6rem] max-w-none object-contain drop-shadow-[0_8px_12px_rgba(15,15,16,0.12)]"
+              />
+            </div>
+            <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted">
+              {now.toLocaleDateString('it-IT', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+              })}
+            </p>
+          </div>
         </header>
 
         <section className="grid gap-3 lg:grid-cols-[1.45fr_0.8fr]">
