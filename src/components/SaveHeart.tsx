@@ -3,6 +3,24 @@
 import { useEffect, useState } from 'react'
 import { Flower } from '@phosphor-icons/react'
 
+export function SaveFlowerIcon({ size = 18 }: { size?: number }) {
+  const centerSize = size > 20 ? 5 : 4
+
+  return (
+    <span
+      className="relative flex items-center justify-center"
+      style={{ height: size, width: size }}
+      aria-hidden="true"
+    >
+      <Flower size={size} weight="regular" />
+      <span
+        className="absolute rounded-full bg-current"
+        style={{ height: centerSize, width: centerSize }}
+      />
+    </span>
+  )
+}
+
 export default function SaveHeart({
   itemId,
   initialSaved = false,
@@ -65,10 +83,7 @@ export default function SaveHeart({
         busy ? 'scale-90 opacity-60' : 'hover:scale-110',
       ].join(' ')}
     >
-      <span className="relative flex h-[18px] w-[18px] items-center justify-center">
-        <Flower size={18} weight="regular" />
-        <span className="absolute h-[4px] w-[4px] rounded-full bg-current" />
-      </span>
+      <SaveFlowerIcon />
     </button>
   )
 }

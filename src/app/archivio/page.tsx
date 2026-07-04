@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
+import { SaveFlowerIcon } from '@/components/SaveHeart'
 import {
   readLocalStudioAssets,
   removeLocalStudioAsset,
@@ -239,7 +240,7 @@ export default function ArchivioPage() {
         ) : items.length === 0 ? (
           <div className="rounded-[2rem] border border-grow-border bg-grow-card px-6 py-14 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFE500]">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0F0F10"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.3 4 6.2 4c2.1 0 3.7 1.1 4.8 2.7C12.1 5.1 13.7 4 15.8 4c3.9 0 5.8 4.1 4.2 7.7C19.5 16.4 12 21 12 21z"/></svg>
+              <SaveFlowerIcon size={24} />
             </div>
 
             <h2 className="mt-5 text-xl font-black uppercase tracking-tight">
@@ -333,7 +334,7 @@ export default function ArchivioPage() {
                       className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFE500] text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition-transform hover:scale-110"
                       aria-label="Rimuovi dai salvati"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#0F0F10"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2.3 4 6.2 4c2.1 0 3.7 1.1 4.8 2.7C12.1 5.1 13.7 4 15.8 4c3.9 0 5.8 4.1 4.2 7.7C19.5 16.4 12 21 12 21z"/></svg>
+                      <SaveFlowerIcon />
                     </button>
                   </div>
                   )}
