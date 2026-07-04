@@ -256,7 +256,7 @@ export default function CalendarioPage() {
         {activeTab === 'settimana' && (
           <>
             {/* Mini month calendar */}
-            <div className="mb-5 overflow-hidden rounded-[1.5rem] border border-grow-border bg-grow-card">
+            <div className="mb-5 overflow-hidden rounded-[1.5rem] border border-[#D9C968] bg-grow-butter">
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
                 <button onClick={() => {
                   const d = new Date(calYear, calMonth - 1, 1)
