@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 
-type Action = { tool: string; args: unknown; result: unknown }
+type Action = {
+  tool: string
+  args: unknown
+  result: unknown
+  uiStatus?: 'running' | 'confirmed' | 'cancelled' | 'error'
+}
 
 type Message = {
   id: string
@@ -42,6 +47,38 @@ const TOOL_LABELS: Record<string, string> = {
   search_saved_content: 'Cercato in archivio',
   get_monthly_output_summary: 'Calcolato output mensile',
   generate_image: 'Immagine generata',
+  web_search: 'Ricerca web completata',
+  fetch_webpage: 'Pagina letta',
+}
+
+const CONFIRMATION_TOOLS = new Set([
+  'create_calendar_item',
+  'update_calendar_status',
+  'create_inbox_item',
+])
+
+function actionArgs(action: Action) {
+  return action.args && typeof action.args === 'object' && !Array.isArray(action.args)
+    ? (action.args as Record<string, unknown>)
+    : {}
+}
+
+function actionSummary(action: Action) {
+  const args = actionArgs(action)
+  if (action.tool === 'create_calendar_item') {
+    return [
+      args.title,
+      args.client,
+      args.scheduled_date,
+    ].filter(Boolean).join(' · ')
+  }
+  if (action.tool === 'update_calendar_status') {
+    return `${args.title_contains || 'Contenuto'} → ${args.new_status || 'nuovo stato'}`
+  }
+  if (action.tool === 'create_inbox_item') {
+    return String(args.content || args.url || 'Nuovo elemento Inbox')
+  }
+  return TOOL_LABELS[action.tool] || action.tool
 }
 
 const CLIENT_NOTES: Record<string, string> = {
@@ -234,6 +271,51 @@ export default function AiPage() {
 
   const removeCitation = (id: string) => setCitations((prev) => prev.filter((c) => c.id !== id))
 
+  const updateAction = (
+    messageId: string,
+    actionIndex: number,
+    patch: Partial<Action>
+  ) => {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              actions: message.actions?.map((action, index) =>
+                index === actionIndex ? { ...action, ...patch } : action
+              ),
+            }
+          : message
+      )
+    )
+  }
+
+  const confirmAction = async (
+    messageId: string,
+    actionIndex: number,
+    action: Action
+  ) => {
+    updateAction(messageId, actionIndex, { uiStatus: 'running' })
+    try {
+      const response = await fetch('/api/agent/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: action.tool, args: actionArgs(action) }),
+      })
+      const data = await response.json().catch(() => ({}))
+      updateAction(messageId, actionIndex, {
+        result: data.result,
+        uiStatus: response.ok && data.ok ? 'confirmed' : 'error',
+      })
+    } catch {
+      updateAction(messageId, actionIndex, { uiStatus: 'error' })
+    }
+  }
+
+  const cancelAction = (messageId: string, actionIndex: number) => {
+    updateAction(messageId, actionIndex, { uiStatus: 'cancelled' })
+  }
+
   async function send(raw: string) {
     const text = raw.trim()
     if (!text || loading) return
@@ -420,12 +502,79 @@ export default function AiPage() {
                   <img src={message.imageUrl || message.image_url} alt="Output generato da GROW" className="mt-3 rounded-[1.2rem]" />
                 )}
                 {message.actions && message.actions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {message.actions.map((a, i) => (
-                      <span key={i} className="rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-bold uppercase text-grow-text">
-                        {TOOL_LABELS[a.tool] || a.tool}
-                      </span>
-                    ))}
+                  <div className="mt-3 space-y-2">
+                    {message.actions.map((action, index) => {
+                      const needsConfirmation = CONFIRMATION_TOOLS.has(action.tool)
+                      if (!needsConfirmation) {
+                        return (
+                          <span
+                            key={`${action.tool}-${index}`}
+                            className="inline-flex rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-bold uppercase text-grow-text"
+                          >
+                            {TOOL_LABELS[action.tool] || action.tool}
+                          </span>
+                        )
+                      }
+
+                      return (
+                        <div
+                          key={`${action.tool}-${index}`}
+                          className="rounded-[1.15rem] bg-[#0F0F10] p-3 text-white"
+                        >
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-grow-yellow">
+                            Azione proposta
+                          </p>
+                          <p className="mt-1 text-xs font-black uppercase">
+                            {TOOL_LABELS[action.tool] || action.tool}
+                          </p>
+                          <p className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-white/60">
+                            {actionSummary(action)}
+                          </p>
+
+                          {!action.uiStatus && (
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void confirmAction(message.id, index, action)
+                                }
+                                className="rounded-full bg-grow-yellow px-3 py-2 text-[9px] font-black uppercase text-black"
+                              >
+                                Conferma
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => cancelAction(message.id, index)}
+                                className="rounded-full border border-white/15 px-3 py-2 text-[9px] font-black uppercase text-white/60"
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          )}
+
+                          {action.uiStatus && (
+                            <p
+                              className={[
+                                'mt-3 text-[9px] font-black uppercase',
+                                action.uiStatus === 'confirmed'
+                                  ? 'text-grow-yellow'
+                                  : action.uiStatus === 'error'
+                                    ? 'text-red-400'
+                                    : 'text-white/40',
+                              ].join(' ')}
+                            >
+                              {action.uiStatus === 'running'
+                                ? 'Esecuzione…'
+                                : action.uiStatus === 'confirmed'
+                                  ? 'Confermato ed eseguito'
+                                  : action.uiStatus === 'cancelled'
+                                    ? 'Annullato'
+                                    : 'Errore: riprova'}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

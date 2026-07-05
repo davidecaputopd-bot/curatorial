@@ -17,6 +17,7 @@ type AgentToolCall = {
 
 type AgentToolChoice =
   | 'auto'
+  | 'none'
   | { type: 'function'; function: { name: 'web_search' | 'fetch_webpage' } }
 
 type AgentProvider = {
@@ -160,6 +161,11 @@ function firstToolFor(message: string): AgentToolChoice {
 }
 
 const MAX_HOPS = 5
+const CONFIRMATION_TOOLS = new Set([
+  'create_calendar_item',
+  'update_calendar_status',
+  'create_inbox_item',
+])
 
 export type AgentCallbacks = {
   onTool?: (tool: string, result: unknown) => void
@@ -188,6 +194,7 @@ export async function runAgent(
   const actions: AgentAction[] = []
   let activeProvider = providers[0]
   const initialToolChoice = firstToolFor(userMessage)
+  let pendingConfirmation = false
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
     let result: { content: string | null; tool_calls?: AgentToolCall[] } | null = null
@@ -201,7 +208,11 @@ export async function runAgent(
       try {
         result = await provider.call(
           messages,
-          hop === 0 ? initialToolChoice : 'auto'
+          pendingConfirmation
+            ? 'none'
+            : hop === 0
+              ? initialToolChoice
+              : 'auto'
         )
         activeProvider = provider
         break
@@ -236,7 +247,16 @@ export async function runAgent(
         args = {}
       }
 
-      const toolResult = await executeAgentTool(call.function.name, args, supabase, userId)
+      const toolResult = CONFIRMATION_TOOLS.has(call.function.name)
+        ? {
+            status: 'pending_confirmation',
+            requires_confirmation: true,
+            message: 'Azione proposta. Attendi la conferma di Davide.',
+          }
+        : await executeAgentTool(call.function.name, args, supabase, userId)
+      if (CONFIRMATION_TOOLS.has(call.function.name)) {
+        pendingConfirmation = true
+      }
       actions.push({ tool: call.function.name, args, result: toolResult })
       callbacks?.onTool?.(call.function.name, toolResult)
 
