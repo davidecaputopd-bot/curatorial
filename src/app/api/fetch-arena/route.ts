@@ -1,89 +1,138 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { isAuthorizedCron } from '@/lib/cron-auth'
+import { topicsForToday, type DiscoveryTopic } from '@/lib/discovery-sources'
 
-const SEARCHES = [
-  { q: 'graphic design reference', cat: 'design' },
-  { q: 'visual identity design', cat: 'branding' },
-  { q: 'brand identity system', cat: 'branding' },
-  { q: 'typography layout poster', cat: 'typography' },
-  { q: 'editorial design layout', cat: 'typography' },
-  { q: 'packaging design wine label', cat: 'branding' },
-  { q: 'art direction campaign', cat: 'branding' },
-  { q: 'fashion editorial photography', cat: 'fashion' },
-  { q: 'interior design moodboard', cat: 'interior_design' },
-  { q: 'restaurant branding', cat: 'branding' },
-  { q: 'web design inspiration', cat: 'web' },
-  { q: 'color palette graphic design', cat: 'design' },
-  { q: 'creative direction moodboard', cat: 'design' },
-  { q: 'minimal poster design', cat: 'typography' },
-  { q: 'luxury packaging design', cat: 'branding' },
-]
+export const maxDuration = 60
 
-export async function GET() {
-  let totalSaved = 0
+type ArenaChannel = {
+  slug: string
+  title: string
+}
 
-  for (const search of SEARCHES) {
-    try {
-      // Cerca canali pubblici per keyword
-      const searchRes = await fetch(
-        'https://api.are.na/v2/search/channels?q=' + encodeURIComponent(search.q) + '&per=5',
-        { headers: { 'Content-Type': 'application/json' } }
-      )
-      if (!searchRes.ok) continue
+type MarkdownContent = {
+  plain?: string
+}
 
-      const searchData = await searchRes.json()
-      const channels = searchData.channels?.slice(0, 3) || []
+type ArenaImage = {
+  src?: string
+  width?: number | null
+  height?: number | null
+  large?: { src?: string; url?: string }
+  medium?: { src?: string; url?: string }
+}
 
-      for (const channel of channels) {
-        try {
-          const contRes = await fetch(
-            'https://api.are.na/v2/channels/' + channel.slug + '/contents?per=15&page=1',
-            { headers: { 'Content-Type': 'application/json' } }
-          )
-          if (!contRes.ok) continue
+type ArenaImageBlock = {
+  id: number
+  type: string
+  title?: string | null
+  description?: MarkdownContent | null
+  created_at?: string
+  user?: { name?: string; slug?: string }
+  image?: ArenaImage
+}
 
-          const contData = await contRes.json()
-          const blocks = (contData.contents || []).filter(
-            (b: any) => b.class === 'Image' && b.image
-          )
+async function searchChannels(topic: DiscoveryTopic): Promise<ArenaChannel[]> {
+  const token = process.env.ARENA_ACCESS_TOKEN
 
-          for (const block of blocks) {
-            const imageUrl =
-              block.image?.display?.url ||
-              block.image?.large?.url ||
-              block.image?.original?.url
-            if (!imageUrl) continue
-
-            const { error } = await supabase.from('content_items').upsert({
-              source_id: null,
-              title: block.title || block.description || channel.title || search.q,
-              url: 'https://www.are.na/block/' + block.id,
-              image_url: imageUrl,
-              summary: block.description || null,
-              author: block.user?.username || null,
-              artist_name: block.user?.username || null,
-              published_at: block.created_at || new Date().toISOString(),
-              category: search.cat,
-              type: 'image',
-              platform: 'arena',
-              dominant_color: null,
-              width: block.image?.original?.width || null,
-              height: block.image?.original?.height || null,
-              read_time_minutes: null,
-            }, { onConflict: 'url' })
-
-            if (!error) totalSaved++
-          }
-
-          await new Promise(r => setTimeout(r, 400))
-        } catch {}
-      }
-
-      await new Promise(r => setTimeout(r, 600))
-    } catch (err) {
-      console.error('Errore search:', search.q)
+  if (token) {
+    const params = new URLSearchParams({
+      query: topic.query,
+      type: 'Channel',
+      sort: 'score_desc',
+      per: '2',
+    })
+    const response = await fetch(`https://api.are.na/v3/search?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (response.ok) {
+      const payload = (await response.json()) as { data?: ArenaChannel[] }
+      return (payload.data || []).filter((channel) => channel.slug).slice(0, 2)
     }
   }
 
-  return NextResponse.json({ success: true, saved: totalSaved })
+  // Compatibilità temporanea: la ricerca v3 è Premium, i contenuti sono già letti via v3.
+  const response = await fetch(
+    `https://api.are.na/v2/search/channels?q=${encodeURIComponent(topic.query)}&per=2`,
+    { signal: AbortSignal.timeout(10_000) }
+  )
+  if (!response.ok) return []
+  const payload = (await response.json()) as { channels?: ArenaChannel[] }
+  return (payload.channels || []).filter((channel) => channel.slug).slice(0, 2)
+}
+
+async function readChannel(channel: ArenaChannel): Promise<ArenaImageBlock[]> {
+  const response = await fetch(
+    `https://api.are.na/v3/channels/${encodeURIComponent(channel.slug)}/contents?per=24&page=1&sort=created_at_desc`,
+    { signal: AbortSignal.timeout(10_000) }
+  )
+  if (!response.ok) return []
+  const payload = (await response.json()) as { data?: ArenaImageBlock[] }
+  return (payload.data || []).filter(
+    (block) => block.type === 'Image' && Boolean(block.image?.src)
+  )
+}
+
+export async function GET(request: Request) {
+  if (!isAuthorizedCron(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  let saved = 0
+  let failed = 0
+  const topics = topicsForToday()
+
+  for (const topic of topics) {
+    try {
+      const channels = await searchChannels(topic)
+      for (const channel of channels) {
+        const blocks = await readChannel(channel)
+        for (const block of blocks) {
+          const imageUrl =
+            block.image?.large?.src ||
+            block.image?.large?.url ||
+            block.image?.medium?.src ||
+            block.image?.medium?.url ||
+            block.image?.src
+          if (!imageUrl) continue
+
+          const author = block.user?.name || block.user?.slug || null
+          const description = block.description?.plain || null
+          const { error } = await supabase.from('content_items').upsert(
+            {
+              source_id: null,
+              title: block.title || description || channel.title || topic.query,
+              url: `https://www.are.na/block/${block.id}`,
+              image_url: imageUrl,
+              summary: description,
+              author,
+              artist_name: author,
+              published_at: block.created_at || new Date().toISOString(),
+              category: topic.category,
+              type: 'image',
+              platform: 'arena',
+              dominant_color: null,
+              width: block.image?.width || null,
+              height: block.image?.height || null,
+              read_time_minutes: null,
+            },
+            { onConflict: 'url' }
+          )
+          if (error) failed++
+          else saved++
+        }
+      }
+    } catch {
+      failed++
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    saved,
+    failed,
+    topics: topics.map((topic) => topic.query),
+    api: process.env.ARENA_ACCESS_TOKEN ? 'v3' : 'v3-contents-v2-search-fallback',
+  })
 }

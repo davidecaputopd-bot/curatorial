@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { isAuthorizedCron } from '@/lib/cron-auth'
 
 const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY
 const PEXELS_KEY = process.env.PEXELS_API_KEY
@@ -137,7 +138,10 @@ async function fetchPexels(q: string, cat: string): Promise<number> {
   return saved
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthorizedCron(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   let totalSaved = 0
 
   for (const { q, cat } of QUERIES) {
