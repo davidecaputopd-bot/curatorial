@@ -20,7 +20,10 @@ type FeedRow = {
   [key: string]: unknown
 }
 
-type ScoredFeedRow = FeedRow & { _score: number }
+type ScoredFeedRow = FeedRow & {
+  _score: number
+  discovery_mode?: 'for_you' | 'outside_bubble'
+}
 
 function scoreItem(item: FeedRow, weights: Record<string, number>, dwellWeights: Record<string, number>) {
   const cat = item.category || 'design'
@@ -197,7 +200,10 @@ export async function GET(request: Request) {
         }
         if (!picked.item) break
         selected.add(picked.item.id)
-        mixed.push(picked.item)
+        mixed.push({
+          ...picked.item,
+          discovery_mode: useExploration ? 'outside_bubble' : 'for_you',
+        })
       }
 
       // De-duplica anche URL/immagini equivalenti.

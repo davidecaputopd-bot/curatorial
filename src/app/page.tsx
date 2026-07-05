@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
-const PAGE_SIZE = 60
-const FEED_CEILING = 720
+const PAGE_SIZE = 18
+const FEED_CEILING = 18
 const DAILY_FEED_SEED = Math.floor(Date.now() / 86_400_000)
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -778,10 +778,10 @@ export default function Home() {
               </h2>
             </div>
             <Link
-              href="/archivio"
+              href="/scopri"
               className="text-[10px] font-black uppercase text-grow-muted"
             >
-              Vai all’Archivio
+              Apri Scopri →
             </Link>
           </div>
 
