@@ -18,7 +18,10 @@ type AgentToolCall = {
 type AgentToolChoice =
   | 'auto'
   | 'none'
-  | { type: 'function'; function: { name: 'web_search' | 'fetch_webpage' } }
+  | {
+      type: 'function'
+      function: { name: 'web_search' | 'fetch_webpage' | 'create_memory' | 'project_radar' }
+    }
 
 type AgentProvider = {
   id: string
@@ -155,9 +158,19 @@ function firstToolFor(message: string): AgentToolChoice {
     /\b(ultim[oaie]|recent[ei]|attuale|aggiornat[oaie]|oggi|adesso|novità|trend|notizi[ae])\b/i.test(message) ||
     /\b(quanto costa|prezzo attuale|chi è oggi|nel 2026)\b/i.test(message)
 
-  return needsFreshResearch
-    ? { type: 'function', function: { name: 'web_search' } }
-    : 'auto'
+  if (needsFreshResearch) {
+    return { type: 'function', function: { name: 'web_search' } }
+  }
+
+  if (/\b(radar|segnali|opportunità|ispirazioni)\b.{0,50}\b(AN23|ANventitre|Exousia|Cantina Don Carlo|ACI Copertino|TRAMA)\b/i.test(message)) {
+    return { type: 'function', function: { name: 'project_radar' } }
+  }
+
+  if (/\b(ricorda|ricordati|memorizza|tieni a mente|da ora in poi)\b/i.test(message)) {
+    return { type: 'function', function: { name: 'create_memory' } }
+  }
+
+  return 'auto'
 }
 
 const MAX_HOPS = 5
@@ -165,6 +178,7 @@ const CONFIRMATION_TOOLS = new Set([
   'create_calendar_item',
   'update_calendar_status',
   'create_inbox_item',
+  'create_memory',
 ])
 
 export type AgentCallbacks = {

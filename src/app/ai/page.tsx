@@ -17,6 +17,7 @@ type Message = {
   imageUrl?: string
   image_url?: string
   actions?: Action[]
+  feedback?: 'sending' | 'positive' | 'negative' | 'error'
 }
 
 type Reference = {
@@ -44,7 +45,9 @@ const TOOL_LABELS: Record<string, string> = {
   update_calendar_status: 'Aggiornato stato calendario',
   list_inbox_items: 'Letto inbox',
   create_inbox_item: 'Creato item inbox',
+  create_memory: 'Nuovo ricordo',
   search_saved_content: 'Cercato in archivio',
+  project_radar: 'Radar cliente aggiornato',
   get_monthly_output_summary: 'Calcolato output mensile',
   generate_image: 'Immagine generata',
   web_search: 'Ricerca web completata',
@@ -55,6 +58,7 @@ const CONFIRMATION_TOOLS = new Set([
   'create_calendar_item',
   'update_calendar_status',
   'create_inbox_item',
+  'create_memory',
 ])
 
 function actionArgs(action: Action) {
@@ -77,6 +81,9 @@ function actionSummary(action: Action) {
   }
   if (action.tool === 'create_inbox_item') {
     return String(args.content || args.url || 'Nuovo elemento Inbox')
+  }
+  if (action.tool === 'create_memory') {
+    return String(args.content || 'Nuovo ricordo')
   }
   return TOOL_LABELS[action.tool] || action.tool
 }
@@ -314,6 +321,38 @@ export default function AiPage() {
 
   const cancelAction = (messageId: string, actionIndex: number) => {
     updateAction(messageId, actionIndex, { uiStatus: 'cancelled' })
+  }
+
+  const sendFeedback = async (
+    messageId: string,
+    content: string,
+    rating: 'positive' | 'negative'
+  ) => {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, feedback: 'sending' } : message
+      )
+    )
+    try {
+      const response = await fetch('/api/ai/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, content, project }),
+      })
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? { ...message, feedback: response.ok ? rating : 'error' }
+            : message
+        )
+      )
+    } catch {
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId ? { ...message, feedback: 'error' } : message
+        )
+      )
+    }
   }
 
   async function send(raw: string) {
@@ -575,6 +614,46 @@ export default function AiPage() {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+                {message.role === 'assistant' && message.content && (
+                  <div className="mt-3 flex items-center gap-2 border-t border-black/5 pt-2">
+                    {message.feedback === 'positive' || message.feedback === 'negative' ? (
+                      <span className="text-[9px] font-black uppercase tracking-wide text-grow-muted">
+                        Preferenza registrata
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-[9px] font-bold uppercase text-grow-muted">
+                          Utile?
+                        </span>
+                        <button
+                          type="button"
+                          disabled={message.feedback === 'sending'}
+                          onClick={() =>
+                            void sendFeedback(message.id, message.content, 'positive')
+                          }
+                          className="rounded-full border border-black/10 px-2 py-1 text-[9px] font-black uppercase text-grow-muted disabled:opacity-40"
+                        >
+                          Sì
+                        </button>
+                        <button
+                          type="button"
+                          disabled={message.feedback === 'sending'}
+                          onClick={() =>
+                            void sendFeedback(message.id, message.content, 'negative')
+                          }
+                          className="rounded-full border border-black/10 px-2 py-1 text-[9px] font-black uppercase text-grow-muted disabled:opacity-40"
+                        >
+                          No
+                        </button>
+                        {message.feedback === 'error' && (
+                          <span className="text-[9px] font-bold text-red-500">
+                            Riprova
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

@@ -4,7 +4,48 @@ import { runAgent } from '@/lib/ai/agent-router'
 
 export const maxDuration = 60
 
-function buildAgentSystemPrompt() {
+type MemoryRow = {
+  content: string
+  created_at?: string | null
+}
+
+function normalizedWords(value: string) {
+  return new Set(
+    value
+      .toLocaleLowerCase('it-IT')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 4)
+  )
+}
+
+async function getRelevantMemories(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedSupabase>>['supabase'],
+  userId: string,
+  message: string
+) {
+  const { data } = await supabase
+    .from('memories')
+    .select('content, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(30)
+
+  const queryWords = normalizedWords(message)
+  return ((data || []) as MemoryRow[])
+    .map((memory, index) => {
+      const words = normalizedWords(memory.content)
+      let score = Math.max(0, 3 - index * 0.08)
+      for (const word of queryWords) {
+        if (words.has(word)) score += 3
+      }
+      return { ...memory, score }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+}
+
+function buildAgentSystemPrompt(memories: MemoryRow[]) {
   const now = new Date()
   const dayNames = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato']
   const today = now.toISOString().split('T')[0]
@@ -20,28 +61,35 @@ CONTESTO DAVIDE:
 - Design system personale: Bebas Neue, DM Mono, DM Sans, accento giallo #FFE500, nero #0F0F10.
 - Lavora da solo, gestisce tutto: brainstorming, produzione, calendario, organizzazione.
 
+MEMORIA CONFERMATA DA DAVIDE:
+${memories.length ? memories.map((memory) => `- ${memory.content}`).join('\n') : '- Nessun ricordo confermato ancora.'}
+
 OGGI E ${dayName.toUpperCase()} ${today} (formato YYYY-MM-DD). Quando Davide menziona un giorno della settimana o un riferimento relativo ("domani", "venerdi", "la prossima settimana"), calcola tu stesso la data esatta e passala come scheduled_date in formato YYYY-MM-DD. Non lasciare mai scheduled_date vuoto o uguale a oggi se Davide ha specificato un giorno diverso.
 
 HAI FUNZIONI VERE, USALE:
 - create/list/update_calendar_item(s) per il calendario editoriale
 - create/list_inbox_items per idee, link, note
 - search_saved_content per cercare nell'archivio reference
+- project_radar per trovare segnali recenti e opportunita' pertinenti a un cliente
 - get_monthly_output_summary per capire l'andamento del mese
 - generate_image quando Davide chiede di creare/disegnare un'immagine
 - web_search per cercare trend, brand, campagne, notizie e informazioni recenti; cita sempre le fonti trovate
 - fetch_webpage per leggere e analizzare l'URL specifico di un articolo, sito o reference
+- create_memory quando Davide chiede esplicitamente di ricordare una regola, preferenza o decisione stabile
 
 REGOLE DI INTELLIGENZA:
 - Per fatti recenti o instabili usa web_search prima di rispondere. Non fingere di conoscere informazioni aggiornate.
 - Se Davide fornisce un URL, usa fetch_webpage e ragiona sul testo realmente letto.
 - Per domande sul lavoro di Davide usa prima i dati interni di GROW; usa il web solo se aggiunge contesto esterno utile.
+- Per trovare reference in Archivio, cerca per concetti visivi e intenzione, non solo per titolo letterale.
+- Se Davide chiede un radar per un cliente, usa project_radar e traduci i risultati in massimo tre spunti applicabili, non in una rassegna stampa.
 - Dopo una ricerca sintetizza: non copiare gli snippet. Indica 2-4 fonti con titolo e URL.
 - Distingui chiaramente fatti trovati, interpretazione creativa e raccomandazione.
 - Se le fonti non bastano o sono in conflitto, dichiaralo. Non colmare i vuoti inventando.
 
 CONFERME:
 - Le funzioni di lettura e ricerca si eseguono subito.
-- create_calendar_item, update_calendar_status e create_inbox_item producono solo una proposta visibile nell'interfaccia. Non dichiarare mai che l'azione e' stata eseguita prima della conferma di Davide.
+- create_calendar_item, update_calendar_status, create_inbox_item e create_memory producono solo una proposta visibile nell'interfaccia. Non dichiarare mai che l'azione e' stata eseguita prima della conferma di Davide.
 - Quando proponi una modifica, spiega in una riga cosa cambiera' e invita Davide a usare Conferma o Annulla.
 
 Se Davide chiede cosa ha salvato o cosa ha in programma, chiama la funzione prima di rispondere. Se cita o allega un riferimento specifico (una reference, un'idea, un contenuto), trattalo come materiale concreto su cui ragionare, non un link generico.
@@ -72,6 +120,8 @@ export async function POST(request: Request) {
     if (!message.trim()) return NextResponse.json({ error: 'message richiesto' }, { status: 400 })
     if (!conversationId) return NextResponse.json({ error: 'conversationId richiesto' }, { status: 400 })
 
+    const memories = await getRelevantMemories(supabase, user.id, message)
+
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
     const writer = writable.getWriter()
     const enc = new TextEncoder()
@@ -82,7 +132,7 @@ export async function POST(request: Request) {
     const run = async () => {
       try {
         const result = await runAgent(
-          buildAgentSystemPrompt(),
+          buildAgentSystemPrompt(memories),
           message,
           history,
           supabase,

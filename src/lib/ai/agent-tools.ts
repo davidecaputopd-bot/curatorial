@@ -83,13 +83,28 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'search_saved_content',
-      description: 'Cerca tra le reference salvate in Archivio per titolo o categoria.',
+      description: 'Cerca in modo intelligente tra le reference dell’Archivio usando titolo, sintesi, tag, categoria, autore e concetti affini.',
       parameters: {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Testo da cercare nel titolo' },
           category: { type: 'string' },
         },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'project_radar',
+      description: 'Trova segnali, campagne, trend e opportunità recenti pertinenti a uno specifico cliente GROW.',
+      parameters: {
+        type: 'object',
+        properties: {
+          project: { type: 'string', description: 'Cliente o progetto, es. ANventitre, Exousia, Cantina Don Carlo, ACI Copertino, TRAMA' },
+          topic: { type: 'string', description: 'Tema opzionale da approfondire' },
+        },
+        required: ['project'],
       },
     },
   },
@@ -112,6 +127,23 @@ export const AGENT_TOOLS = [
           prompt: { type: 'string', description: 'Descrizione visiva dettagliata in inglese, pronta per un modello text-to-image' },
         },
         required: ['prompt'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_memory',
+      description: 'Propone di ricordare una preferenza, regola cliente, decisione o informazione stabile indicata esplicitamente da Davide.',
+      parameters: {
+        type: 'object',
+        properties: {
+          content: {
+            type: 'string',
+            description: 'Ricordo autosufficiente e sintetico, includendo il progetto quando pertinente.',
+          },
+        },
+        required: ['content'],
       },
     },
   },
@@ -236,12 +268,14 @@ export async function executeAgentTool(
     }
 
     case 'search_saved_content': {
-      let query = supabase.from('content_items').select('id, title, category, url, image_url')
-      if (args.query) query = query.ilike('title', `%${args.query}%`)
+      let query = supabase
+        .from('content_items')
+        .select('id, title, summary, category, tags, artist_name, platform, url, image_url, dominant_color')
       if (args.category) query = query.eq('category', args.category)
-      const { data, error } = await query.limit(20)
+      const { data, error } = await query.limit(120)
       if (error) return { error: error.message }
-      return { items: data }
+      const search = typeof args.query === 'string' ? args.query : ''
+      return { items: rankArchiveItems(data || [], search).slice(0, 20), search_mode: 'hybrid' }
     }
 
     case 'get_monthly_output_summary': {
@@ -268,10 +302,31 @@ export async function executeAgentTool(
       return { image_url: buildImageUrl(args.prompt), prompt: args.prompt }
     }
 
+    case 'create_memory': {
+      if (!args.content || typeof args.content !== 'string') {
+        return { error: 'content richiesto' }
+      }
+      const content = args.content.trim().slice(0, 1200)
+      if (!content) return { error: 'memoria vuota' }
+      const { data, error } = await supabase
+        .from('memories')
+        .insert({ user_id: userId, content })
+        .select('id, content, created_at')
+        .single()
+      if (error) return { error: error.message }
+      return { created: data }
+    }
+
     case 'web_search': {
       if (!args.query || typeof args.query !== 'string') return { error: 'query richiesta' }
       const requested = typeof args.max_results === 'number' ? args.max_results : 5
       return webSearch(args.query, Math.min(Math.max(Math.round(requested), 1), 10))
+    }
+
+    case 'project_radar': {
+      if (!args.project || typeof args.project !== 'string') return { error: 'project richiesto' }
+      const topic = typeof args.topic === 'string' ? args.topic.trim() : ''
+      return searchWeb(buildRadarQuery(args.project, topic), 5)
     }
 
     case 'fetch_webpage': {
@@ -291,7 +346,73 @@ type SearchResult = {
   snippet: string
 }
 
-async function webSearch(
+const ARCHIVE_SYNONYMS: Record<string, string[]> = {
+  lusso: ['premium', 'luxury', 'elegante', 'editoriale'],
+  vino: ['wine', 'bottiglia', 'cantina', 'etichetta', 'vigneto'],
+  moda: ['fashion', 'editorial', 'lookbook', 'abbigliamento'],
+  grafica: ['graphic', 'branding', 'poster', 'tipografia', 'layout'],
+  social: ['instagram', 'reel', 'carosello', 'post', 'story'],
+  interni: ['interior', 'architettura', 'spazio', 'retail'],
+  mediterraneo: ['mediterranean', 'salento', 'puglia', 'naturale'],
+}
+
+function archiveWords(value: string) {
+  const words = value
+    .toLocaleLowerCase('it-IT')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 2)
+  const expanded = new Set(words)
+  for (const word of words) {
+    for (const synonym of ARCHIVE_SYNONYMS[word] || []) expanded.add(synonym)
+  }
+  return expanded
+}
+
+function rankArchiveItems(items: Record<string, unknown>[], search: string) {
+  const wanted = archiveWords(search)
+  if (!wanted.size) return items
+
+  return items
+    .map((item) => {
+      const title = String(item.title || '')
+      const metadata = [
+        item.summary,
+        item.category,
+        Array.isArray(item.tags) ? item.tags.join(' ') : item.tags,
+        item.artist_name,
+        item.platform,
+        item.dominant_color,
+      ].join(' ')
+      const titleWords = archiveWords(title)
+      const metadataWords = archiveWords(metadata)
+      let score = 0
+      for (const word of wanted) {
+        if (titleWords.has(word)) score += 5
+        if (metadataWords.has(word)) score += 2
+        if (title.toLocaleLowerCase('it-IT').includes(word)) score += 2
+      }
+      return { ...item, relevance_score: score }
+    })
+    .filter((item) => item.relevance_score > 0)
+    .sort((a, b) => b.relevance_score - a.relevance_score)
+}
+
+const RADAR_CONTEXT: Record<string, string> = {
+  anventitre: 'premium Mediterranean wine branding hospitality social campaigns',
+  an23: 'premium Mediterranean wine branding hospitality social campaigns',
+  'cantina don carlo': 'Italian wine branding packaging hospitality Mediterranean campaigns',
+  exousia: 'Italian SME consulting training grants local business communication',
+  'aci copertino': 'Italian local mobility automotive public communication campaigns',
+  trama: 'contemporary vintage fashion retail store launch campaigns',
+}
+
+export function buildRadarQuery(project: string, topic = '') {
+  const context = RADAR_CONTEXT[project.toLocaleLowerCase('it-IT')] || 'creative brand communication'
+  return [project, context, topic, 'recent campaign trend case study 2026'].filter(Boolean).join(' ')
+}
+
+export async function searchWeb(
   query: string,
   maxResults: number
 ): Promise<{ results: SearchResult[] } | { error: string }> {
@@ -336,6 +457,8 @@ async function webSearch(
     }
   }
 }
+
+const webSearch = searchWeb
 
 function isBlockedHostname(hostname: string) {
   const host = hostname.toLowerCase()

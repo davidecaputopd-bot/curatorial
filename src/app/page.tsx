@@ -64,6 +64,24 @@ type InboxItem = {
   created_at: string
 }
 
+type DailyBrief = {
+  focus: string
+  risk: string
+  opportunity: string
+  prompt: string
+}
+
+type RadarSignal = {
+  title: string
+  url: string
+  snippet: string
+}
+
+type DailyRadar = {
+  project: string
+  signals: RadarSignal[]
+}
+
 function localDateKey(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -206,6 +224,8 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
+  const [dailyBrief, setDailyBrief] = useState<DailyBrief | null>(null)
+  const [dailyRadar, setDailyRadar] = useState<DailyRadar | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const fetchFeedPage = (offset: number) =>
@@ -257,6 +277,66 @@ export default function Home() {
           setLoadingWork(false)
         }
       })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const key = `grow-daily-radar-${localDateKey(new Date())}`
+    try {
+      const cached = localStorage.getItem(key)
+      if (cached) {
+        const parsed = JSON.parse(cached) as DailyRadar
+        queueMicrotask(() => setDailyRadar(parsed))
+        return
+      }
+    } catch {}
+
+    let cancelled = false
+    fetch('/api/ai/radar')
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled || !data.project || !data.signals?.length) return
+        const radar = {
+          project: data.project,
+          signals: data.signals as RadarSignal[],
+        }
+        setDailyRadar(radar)
+        try {
+          localStorage.setItem(key, JSON.stringify(radar))
+        } catch {}
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const key = `grow-daily-brief-${localDateKey(new Date())}`
+    try {
+      const cached = localStorage.getItem(key)
+      if (cached) {
+        const parsed = JSON.parse(cached) as DailyBrief
+        queueMicrotask(() => setDailyBrief(parsed))
+        return
+      }
+    } catch {}
+
+    let cancelled = false
+    fetch('/api/ai/brief')
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled || !data.brief) return
+        setDailyBrief(data.brief as DailyBrief)
+        try {
+          localStorage.setItem(key, JSON.stringify(data.brief))
+        } catch {}
+      })
+      .catch(() => {})
 
     return () => {
       cancelled = true
@@ -384,6 +464,34 @@ export default function Home() {
             </div>
 
             <div className="mt-4">
+              {dailyBrief && (
+                <div className="mb-3">
+                  <Link
+                    href={`/ai?brief=${encodeURIComponent(dailyBrief.prompt)}`}
+                    className="block rounded-[1.1rem] bg-grow-yellow p-3 text-black"
+                  >
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-black/50">
+                      Focus GROW
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-sm font-black">
+                      {dailyBrief.focus}
+                    </p>
+                  </Link>
+                  <details className="mt-2 rounded-xl border border-white/10 px-3 py-2 text-[10px] text-white/55">
+                    <summary className="cursor-pointer font-black uppercase tracking-wide text-white/45">
+                      Perché questo focus
+                    </summary>
+                    <p className="mt-2">
+                      <strong className="text-white/75">Rischio:</strong>{' '}
+                      {dailyBrief.risk}
+                    </p>
+                    <p className="mt-1">
+                      <strong className="text-white/75">Opportunità:</strong>{' '}
+                      {dailyBrief.opportunity}
+                    </p>
+                  </details>
+                </div>
+              )}
               {loadingWork ? (
                 <div className="space-y-2">
                   {[1, 2].map((item) => (
@@ -571,6 +679,30 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {dailyRadar?.signals[0] && (
+          <section className="mt-6 rounded-[1.5rem] border border-grow-border bg-grow-card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                  Radar · {dailyRadar.project}
+                </p>
+                <h2 className="mt-1 line-clamp-2 text-base font-black leading-tight">
+                  {dailyRadar.signals[0].title}
+                </h2>
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-grow-muted">
+                  {dailyRadar.signals[0].snippet}
+                </p>
+              </div>
+              <Link
+                href={`/ai?project=${encodeURIComponent(dailyRadar.project)}&brief=${encodeURIComponent(`Analizza questo segnale del radar e trasformalo in un'idea applicabile: ${dailyRadar.signals[0].url}`)}`}
+                className="shrink-0 rounded-full bg-[#0F0F10] px-3 py-2 text-[9px] font-black uppercase text-grow-yellow"
+              >
+                Sviluppa →
+              </Link>
+            </div>
+          </section>
+        )}
 
         <section id="scopri" className="mt-10 scroll-mt-6">
           <div className="mb-4 flex items-end justify-between gap-4">

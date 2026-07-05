@@ -6,6 +6,7 @@ const CONFIRMABLE_TOOLS = new Set([
   'create_calendar_item',
   'update_calendar_status',
   'create_inbox_item',
+  'create_memory',
 ])
 
 export async function POST(request: Request) {
