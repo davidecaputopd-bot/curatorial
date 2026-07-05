@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { runAgent } from '@/lib/ai/agent-router'
 
+export const maxDuration = 60
+
 function buildAgentSystemPrompt() {
   const now = new Date()
   const dayNames = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato']
@@ -26,6 +28,8 @@ HAI FUNZIONI VERE, USALE:
 - search_saved_content per cercare nell'archivio reference
 - get_monthly_output_summary per capire l'andamento del mese
 - generate_image quando Davide chiede di creare/disegnare un'immagine
+- web_search per cercare trend, brand, campagne, notizie e informazioni recenti; cita sempre le fonti trovate
+- fetch_webpage per leggere e analizzare l'URL specifico di un articolo, sito o reference
 
 Se Davide chiede cosa ha salvato, cosa ha in programma, o ti chiede di modificare qualcosa, chiama la funzione prima di rispondere — non descrivere cosa dovrebbe fare lui, fallo. Se cita o allega un riferimento specifico (una reference, un'idea, un contenuto), trattalo come materiale concreto su cui ragionare, non un link generico.
 
