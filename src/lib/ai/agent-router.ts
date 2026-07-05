@@ -83,62 +83,6 @@ async function callGroqWithTools(messages: AgentMessage[]): Promise<{
   }
 }
 
-async function streamGroqFinal(
-  messages: AgentMessage[],
-  onToken: (token: string) => void
-): Promise<string> {
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  const stream = await groq.chat.completions.create({
-    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    messages: messages as never,
-    max_tokens: 1200,
-    temperature: 0.4,
-    stream: true,
-  })
-  let full = ''
-  for await (const chunk of stream) {
-    const token = chunk.choices[0]?.delta?.content || ''
-    if (token) { full += token; onToken(token) }
-  }
-  return full
-}
-
-async function streamOpenRouterFinal(
-  messages: AgentMessage[],
-  model: string,
-  onToken: (token: string) => void
-): Promise<string> {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://grow-eight-kappa.vercel.app',
-    },
-    body: JSON.stringify({ model, messages, max_tokens: 1200, temperature: 0.4, stream: true }),
-  })
-  if (!res.ok || !res.body) throw new Error(`OpenRouter stream ${res.status}`)
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let full = ''
-  let buf = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buf += decoder.decode(value, { stream: true })
-    const lines = buf.split('\n')
-    buf = lines.pop() || ''
-    for (const line of lines) {
-      if (!line.startsWith('data: ') || line === 'data: [DONE]') continue
-      try {
-        const token = JSON.parse(line.slice(6))?.choices?.[0]?.delta?.content || ''
-        if (token) { full += token; onToken(token) }
-      } catch {}
-    }
-  }
-  return full
-}
-
 async function callOpenRouterWithTools(messages: AgentMessage[]): Promise<{
   content: string | null
   tool_calls?: AgentToolCall[]
@@ -215,27 +159,9 @@ export async function runAgent(
     }
 
     if (!result.tool_calls?.length) {
-      // Final response — stream if callbacks provided
-      if (callbacks?.onToken) {
-        messages.push({ role: 'assistant', content: result.content || '' })
-        // Re-call with streaming using the message history up to (not including) last assistant msg
-        const streamMessages = messages.slice(0, -1)
-        let streamedReply = ''
-        try {
-          if (provider.id === 'groq') {
-            streamedReply = await streamGroqFinal(streamMessages, callbacks.onToken)
-          } else {
-            const model = process.env.OPENROUTER_CLAUDE_MODEL || 'anthropic/claude-sonnet-4'
-            streamedReply = await streamOpenRouterFinal(streamMessages, model, callbacks.onToken)
-          }
-        } catch {
-          // streaming failed — fall back to buffered result
-          streamedReply = result.content || 'Nessuna risposta.'
-          callbacks.onToken(streamedReply)
-        }
-        return { reply: streamedReply, actions, provider: provider.id, imageUrl: extractImageUrl(actions) }
-      }
-      return { reply: result.content || 'Nessuna risposta.', actions, provider: provider.id, imageUrl: extractImageUrl(actions) }
+      const reply = result.content || 'Nessuna risposta.'
+      callbacks?.onToken?.(reply)
+      return { reply, actions, provider: provider.id, imageUrl: extractImageUrl(actions) }
     }
 
     messages.push({ role: 'assistant', content: result.content || '', tool_calls: result.tool_calls })

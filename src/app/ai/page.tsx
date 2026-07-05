@@ -288,7 +288,7 @@ export default function AiPage() {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           try {
-            const evt = JSON.parse(line.slice(6)) as { type: string; text?: string; tool?: string; actions?: Action[]; imageUrl?: string; error?: string }
+            const evt = JSON.parse(line.slice(6)) as { type: string; text?: string; tool?: string; actions?: Action[]; imageUrl?: string; error?: string; reply?: string }
             if (evt.type === 'token' && evt.text) {
               updateContent(prev => prev + evt.text)
             } else if (evt.type === 'tool' && evt.tool) {
@@ -299,6 +299,7 @@ export default function AiPage() {
             } else if (evt.type === 'done') {
               finalActions = evt.actions || []
               finalImageUrl = evt.imageUrl || undefined
+              if (evt.reply) updateContent(prev => prev || evt.reply!)
             } else if (evt.type === 'error') {
               updateContent(() => `Errore: ${evt.error || 'qualcosa non ha funzionato'}`)
             }

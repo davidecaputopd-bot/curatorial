@@ -90,7 +90,13 @@ export async function POST(request: Request) {
           ])
         } catch {}
 
-        await write({ type: 'done', actions: result.actions, provider: result.provider, imageUrl: result.imageUrl || null })
+        await write({
+          type: 'done',
+          reply: result.reply,
+          actions: result.actions,
+          provider: result.provider,
+          imageUrl: result.imageUrl || null,
+        })
       } catch (err) {
         await write({ type: 'error', error: err instanceof Error ? err.message : 'Errore agente' })
       } finally {
