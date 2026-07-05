@@ -15,6 +15,18 @@ type AgentToolCall = {
   function: { name: string; arguments: string }
 }
 
+type AgentToolChoice =
+  | 'auto'
+  | { type: 'function'; function: { name: 'web_search' | 'fetch_webpage' } }
+
+type AgentProvider = {
+  id: string
+  call: (
+    messages: AgentMessage[],
+    toolChoice: AgentToolChoice
+  ) => Promise<{ content: string | null; tool_calls?: AgentToolCall[] }>
+}
+
 export type AgentAction = { tool: string; args: unknown; result: unknown }
 
 export type AgentResult = {
@@ -56,7 +68,10 @@ function extractFailedGeneration(error: unknown): AgentToolCall[] | null {
   ]
 }
 
-async function callGroqWithTools(messages: AgentMessage[]): Promise<{
+async function callGroqWithTools(
+  messages: AgentMessage[],
+  toolChoice: AgentToolChoice
+): Promise<{
   content: string | null
   tool_calls?: AgentToolCall[]
 }> {
@@ -67,7 +82,7 @@ async function callGroqWithTools(messages: AgentMessage[]): Promise<{
       model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       messages: messages as never,
       tools: AGENT_TOOLS as never,
-      tool_choice: 'auto',
+      tool_choice: toolChoice as never,
       max_tokens: 1200,
       temperature: 0.4,
     })
@@ -83,7 +98,10 @@ async function callGroqWithTools(messages: AgentMessage[]): Promise<{
   }
 }
 
-async function callOpenRouterWithTools(messages: AgentMessage[]): Promise<{
+async function callOpenRouterWithTools(
+  messages: AgentMessage[],
+  toolChoice: AgentToolChoice
+): Promise<{
   content: string | null
   tool_calls?: AgentToolCall[]
 }> {
@@ -99,7 +117,7 @@ async function callOpenRouterWithTools(messages: AgentMessage[]): Promise<{
       model,
       messages,
       tools: AGENT_TOOLS,
-      tool_choice: 'auto',
+      tool_choice: toolChoice,
       max_tokens: 1200,
       temperature: 0.4,
     }),
@@ -110,10 +128,35 @@ async function callOpenRouterWithTools(messages: AgentMessage[]): Promise<{
   return { content: message?.content || null, tool_calls: message?.tool_calls }
 }
 
-function pickProvider(): { id: string; call: typeof callGroqWithTools } | null {
-  if (hasKey(process.env.OPENROUTER_API_KEY)) return { id: 'openrouter-claude', call: callOpenRouterWithTools }
-  if (hasKey(process.env.GROQ_API_KEY)) return { id: 'groq', call: callGroqWithTools }
-  return null
+function getProviders(): AgentProvider[] {
+  const providers: AgentProvider[] = []
+  if (hasKey(process.env.OPENROUTER_API_KEY)) {
+    providers.push({ id: 'openrouter-claude', call: callOpenRouterWithTools })
+  }
+  if (hasKey(process.env.GROQ_API_KEY)) {
+    providers.push({ id: 'groq', call: callGroqWithTools })
+  }
+  return providers
+}
+
+function firstToolFor(message: string): AgentToolChoice {
+  const trimmed = message.trim()
+  const asksToReadUrl =
+    /^https?:\/\/[^\s<>"']+$/i.test(trimmed) ||
+    /\b(leggi|analizza|apri|visita|guarda|riassumi)\b.{0,80}https?:\/\/[^\s<>"']+/i.test(message)
+
+  if (asksToReadUrl) {
+    return { type: 'function', function: { name: 'fetch_webpage' } }
+  }
+
+  const needsFreshResearch =
+    /\b(cerca|ricerca|trova)\b.{0,40}\b(web|online|internet|trend|notizi[ae]|campagn[ae]|reference|fonti)\b/i.test(message) ||
+    /\b(ultim[oaie]|recent[ei]|attuale|aggiornat[oaie]|oggi|adesso|novità|trend|notizi[ae])\b/i.test(message) ||
+    /\b(quanto costa|prezzo attuale|chi è oggi|nel 2026)\b/i.test(message)
+
+  return needsFreshResearch
+    ? { type: 'function', function: { name: 'web_search' } }
+    : 'auto'
 }
 
 const MAX_HOPS = 5
@@ -131,8 +174,8 @@ export async function runAgent(
   userId: string,
   callbacks?: AgentCallbacks
 ): Promise<AgentResult> {
-  const provider = pickProvider()
-  if (!provider) {
+  const providers = getProviders()
+  if (!providers.length) {
     throw new Error('Nessun provider AI con function calling configurato (serve GROQ_API_KEY o OPENROUTER_API_KEY)')
   }
 
@@ -143,25 +186,44 @@ export async function runAgent(
   ]
 
   const actions: AgentAction[] = []
+  let activeProvider = providers[0]
+  const initialToolChoice = firstToolFor(userMessage)
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
-    let result: { content: string | null; tool_calls?: AgentToolCall[] }
-    try {
-      result = await provider.call(messages)
-    } catch (error) {
+    let result: { content: string | null; tool_calls?: AgentToolCall[] } | null = null
+    let lastError: unknown
+    const orderedProviders = [
+      activeProvider,
+      ...providers.filter((provider) => provider.id !== activeProvider.id),
+    ]
+
+    for (const provider of orderedProviders) {
+      try {
+        result = await provider.call(
+          messages,
+          hop === 0 ? initialToolChoice : 'auto'
+        )
+        activeProvider = provider
+        break
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    if (!result) {
       return {
         reply:
-          'Il modello AI non è riuscito a eseguire l\'azione richiesta (limite del provider gratuito). Configura OPENROUTER_API_KEY per risposte più affidabili. Dettaglio: ' +
-          (error instanceof Error ? error.message.slice(0, 200) : String(error)),
+          'I provider AI non hanno completato la richiesta. Riprova tra poco. Dettaglio: ' +
+          (lastError instanceof Error ? lastError.message.slice(0, 160) : String(lastError)),
         actions,
-        provider: provider.id,
+        provider: activeProvider.id,
       }
     }
 
     if (!result.tool_calls?.length) {
       const reply = result.content || 'Nessuna risposta.'
       callbacks?.onToken?.(reply)
-      return { reply, actions, provider: provider.id, imageUrl: extractImageUrl(actions) }
+      return { reply, actions, provider: activeProvider.id, imageUrl: extractImageUrl(actions) }
     }
 
     messages.push({ role: 'assistant', content: result.content || '', tool_calls: result.tool_calls })
@@ -189,7 +251,7 @@ export async function runAgent(
   return {
     reply: 'Ho eseguito alcune azioni ma non sono riuscito a concludere il ragionamento. Chiedimi di nuovo per continuare.',
     actions,
-    provider: provider.id,
+    provider: activeProvider.id,
     imageUrl: extractImageUrl(actions),
   }
 }
