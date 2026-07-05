@@ -5,6 +5,14 @@ import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
 type DiscoveryMode = 'mix' | 'for_you' | 'outside_bubble'
+type CategoryMode =
+  | 'all'
+  | 'branding'
+  | 'typography'
+  | 'fashion'
+  | 'interior_design'
+  | 'art'
+  | 'web'
 
 type DiscoveryItem = {
   id: string
@@ -98,6 +106,13 @@ function DiscoveryCard({
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Apri ${item.title || 'reference'}`}
+          onClick={() => {
+            void fetch('/api/interact', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content_id: item.id, action: 'open' }),
+            })
+          }}
           className="absolute inset-0 z-10"
         />
       )}
@@ -166,6 +181,7 @@ export default function ScopriPage() {
   const [items, setItems] = useState<DiscoveryItem[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<DiscoveryMode>('mix')
+  const [category, setCategory] = useState<CategoryMode>('all')
   const [seed, setSeed] = useState(INITIAL_DISCOVERY_SEED)
   const [loading, setLoading] = useState(true)
 
@@ -198,9 +214,15 @@ export default function ScopriPage() {
   const visible = useMemo(
     () =>
       mode === 'mix'
-        ? items
-        : items.filter((item) => item.discovery_mode === mode),
-    [items, mode]
+        ? items.filter(
+            (item) => category === 'all' || item.category === category
+          )
+        : items.filter(
+            (item) =>
+              item.discovery_mode === mode &&
+              (category === 'all' || item.category === category)
+          ),
+    [category, items, mode]
   )
 
   return (
@@ -252,6 +274,32 @@ export default function ScopriPage() {
           ))}
         </div>
 
+        <div className="mb-5 flex gap-1.5 overflow-x-auto pb-1">
+          {[
+            ['all', 'Tutto'],
+            ['branding', 'Branding'],
+            ['typography', 'Tipo'],
+            ['fashion', 'Moda'],
+            ['interior_design', 'Spazi'],
+            ['art', 'Arte'],
+            ['web', 'Digital'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setCategory(value as CategoryMode)}
+              className={[
+                'shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase',
+                category === value
+                  ? 'bg-grow-yellow text-black'
+                  : 'border border-grow-border bg-grow-card text-grow-muted',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
           <div className="grid auto-rows-[150px] grid-cols-2 gap-2 lg:grid-cols-5">
             {Array.from({ length: 12 }).map((_, index) => (
@@ -261,7 +309,7 @@ export default function ScopriPage() {
               />
             ))}
           </div>
-        ) : (
+        ) : visible.length > 0 ? (
           <div className="grid auto-rows-[160px] grid-cols-2 gap-2 lg:grid-cols-5">
             {visible.map((item, index) => {
               const portrait = (item.height || 0) > (item.width || 0)
@@ -280,6 +328,20 @@ export default function ScopriPage() {
                 </div>
               )
             })}
+          </div>
+        ) : (
+          <div className="rounded-[1.5rem] border border-grow-border bg-grow-card px-5 py-12 text-center">
+            <p className="text-sm font-black">Nessuna reference in questo taglio.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('mix')
+                setCategory('all')
+              }}
+              className="mt-3 rounded-full bg-grow-yellow px-4 py-2 text-[9px] font-black uppercase text-black"
+            >
+              Torna al mix
+            </button>
           </div>
         )}
       </div>

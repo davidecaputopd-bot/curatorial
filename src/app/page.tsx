@@ -183,6 +183,14 @@ function ImageCard({
       href={href}
       target={href ? '_blank' : undefined}
       rel="noopener noreferrer"
+      onClick={() => {
+        if (!href) return
+        void fetch('/api/interact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content_id: item.id, action: 'open' }),
+        })
+      }}
       className="group relative block h-full w-full overflow-hidden rounded-[1.35rem] bg-grow-soft"
       onMouseEnter={() => {
         enteredAt.current = Date.now()

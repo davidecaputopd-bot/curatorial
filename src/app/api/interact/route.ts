@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     'save',
     'like',
     'dwell',
+    'open',
     'skip',
     'more_like_this',
     'less_like_this',
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
           action === 'more_like_this' ? 0.14 :
           action === 'save' ? 0.09 :
           action === 'like' ? 0.07 :
+          action === 'open' ? 0.05 :
           action === 'less_like_this' ? -0.16 :
           action === 'skip' ? -0.05 :
           Math.min(0.06, readSeconds / 500)

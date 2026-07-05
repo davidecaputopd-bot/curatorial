@@ -41,6 +41,7 @@ function actionValue(action: string, seconds = 0) {
   if (action === 'more_like_this') return 6
   if (action === 'save') return 5
   if (action === 'like') return 4
+  if (action === 'open') return 2.5
   if (action === 'dwell') return Math.min(3, Math.max(0, seconds - 2) / 5)
   if (action === 'skip') return -2
   if (action === 'less_like_this') return -6
