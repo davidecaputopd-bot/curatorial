@@ -40,10 +40,12 @@ function DiscoveryCard({
   item,
   saved,
   onLess,
+  onSimilar,
 }: {
   item: DiscoveryItem
   saved: boolean
   onLess: (id: string) => void
+  onSimilar: (item: DiscoveryItem) => void
 }) {
   const enteredAt = useRef(0)
   const [preference, setPreference] = useState<'more' | 'less' | null>(null)
@@ -153,6 +155,19 @@ function DiscoveryCard({
       <div className="absolute bottom-2 right-2 z-30 flex gap-1">
         <button
           type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onSimilar(item)
+          }}
+          aria-label="Trova reference simili"
+          title="Trova simili"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-black/40 text-[11px] font-black text-white backdrop-blur-xl hover:bg-white hover:text-black"
+        >
+          ≈
+        </button>
+        <button
+          type="button"
           onClick={(event) => void teach(event, 'less')}
           aria-label="Meno contenuti così"
           className="flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-black/40 text-sm font-black text-white backdrop-blur-xl hover:bg-white hover:text-black"
@@ -179,6 +194,8 @@ function DiscoveryCard({
 
 export default function ScopriPage() {
   const [items, setItems] = useState<DiscoveryItem[]>([])
+  const [similarItems, setSimilarItems] = useState<DiscoveryItem[] | null>(null)
+  const [similarTitle, setSimilarTitle] = useState('')
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<DiscoveryMode>('mix')
   const [category, setCategory] = useState<CategoryMode>('all')
@@ -214,16 +231,37 @@ export default function ScopriPage() {
   const visible = useMemo(
     () =>
       mode === 'mix'
-        ? items.filter(
+        ? (similarItems || items).filter(
             (item) => category === 'all' || item.category === category
           )
-        : items.filter(
+        : (similarItems || items).filter(
             (item) =>
               item.discovery_mode === mode &&
               (category === 'all' || item.category === category)
           ),
-    [category, items, mode]
+    [category, items, mode, similarItems]
   )
+
+  const findSimilar = async (item: DiscoveryItem) => {
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/discovery/similar?id=${encodeURIComponent(item.id)}`
+      )
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Ricerca non disponibile')
+      setSimilarItems(payload.items || [])
+      setSimilarTitle(item.title || 'questa reference')
+      setMode('mix')
+      setCategory('all')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch {
+      setSimilarItems([])
+      setSimilarTitle(item.title || 'questa reference')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
@@ -244,6 +282,8 @@ export default function ScopriPage() {
             type="button"
             onClick={() => {
               setLoading(true)
+              setSimilarItems(null)
+              setSimilarTitle('')
               setSeed((current) => current + 1)
             }}
             className="rounded-full bg-[#0F0F10] px-3 py-2 text-[9px] font-black uppercase text-grow-yellow"
@@ -251,6 +291,29 @@ export default function ScopriPage() {
             Cambia selezione
           </button>
         </header>
+
+        {similarItems && (
+          <div className="mb-5 flex items-center justify-between gap-3 rounded-[1.2rem] bg-grow-yellow px-4 py-3 text-black">
+            <div className="min-w-0">
+              <p className="text-[8px] font-black uppercase tracking-[0.16em] text-black/50">
+                Costellazione visuale
+              </p>
+              <p className="mt-0.5 truncate text-xs font-black">
+                Simili a {similarTitle}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSimilarItems(null)
+                setSimilarTitle('')
+              }}
+              className="shrink-0 rounded-full bg-black px-3 py-2 text-[8px] font-black uppercase text-grow-yellow"
+            >
+              Torna al mix
+            </button>
+          </div>
+        )}
 
         <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
           {[
@@ -320,10 +383,15 @@ export default function ScopriPage() {
                     item={item}
                     saved={savedIds.has(item.id)}
                     onLess={(id) =>
-                      setItems((current) =>
-                        current.filter((candidate) => candidate.id !== id)
-                      )
+                      similarItems
+                        ? setSimilarItems((current) =>
+                            (current || []).filter((candidate) => candidate.id !== id)
+                          )
+                        : setItems((current) =>
+                            current.filter((candidate) => candidate.id !== id)
+                          )
                     }
+                    onSimilar={(candidate) => void findSimilar(candidate)}
                   />
                 </div>
               )
@@ -337,6 +405,8 @@ export default function ScopriPage() {
               onClick={() => {
                 setMode('mix')
                 setCategory('all')
+                setSimilarItems(null)
+                setSimilarTitle('')
               }}
               className="mt-3 rounded-full bg-grow-yellow px-4 py-2 text-[9px] font-black uppercase text-black"
             >

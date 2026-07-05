@@ -37,6 +37,53 @@ function terms(value: string) {
     .slice(0, 18)
 }
 
+type ReferenceFeatures = {
+  category?: string | null
+  platform?: string | null
+  title?: string | null
+  summary?: string | null
+  artist_name?: string | null
+  dominant_color?: string | null
+  tags?: string[] | string | null
+}
+
+export function referenceSimilarity(
+  reference: ReferenceFeatures,
+  candidate: ReferenceFeatures
+) {
+  let score = 0
+  if (reference.category && reference.category === candidate.category) score += 5
+  if (reference.artist_name && reference.artist_name === candidate.artist_name) score += 3.5
+  if (
+    reference.dominant_color &&
+    reference.dominant_color === candidate.dominant_color
+  ) {
+    score += 2
+  }
+  if (reference.platform && reference.platform === candidate.platform) score += 0.25
+
+  const referenceTerms = new Set(
+    terms(
+      `${reference.title || ''} ${reference.summary || ''} ${
+        Array.isArray(reference.tags) ? reference.tags.join(' ') : reference.tags || ''
+      }`
+    )
+  )
+  const candidateTerms = new Set(
+    terms(
+      `${candidate.title || ''} ${candidate.summary || ''} ${
+        Array.isArray(candidate.tags) ? candidate.tags.join(' ') : candidate.tags || ''
+      }`
+    )
+  )
+  let overlap = 0
+  for (const term of referenceTerms) {
+    if (candidateTerms.has(term)) overlap++
+  }
+  score += Math.min(6, overlap * 1.5)
+  return score
+}
+
 function actionValue(action: string, seconds = 0) {
   if (action === 'more_like_this') return 6
   if (action === 'save') return 5
