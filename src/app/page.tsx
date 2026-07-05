@@ -132,12 +132,15 @@ function ImageCard({
   item,
   saved,
   onDwell,
+  onLess,
 }: {
   item: FeedItem
   saved: boolean
   onDwell: (id: string, seconds: number) => void
+  onLess: (id: string) => void
 }) {
   const enteredAt = useRef(0)
+  const [preference, setPreference] = useState<'more' | 'less' | null>(null)
   const image =
     item.image_url ||
     placeholders[item.category || 'design'] ||
@@ -145,8 +148,34 @@ function ImageCard({
   const href = item.url && item.url !== '#' ? item.url : undefined
 
   const stopDwell = () => {
+    if (!enteredAt.current) return
     const seconds = (Date.now() - enteredAt.current) / 1000
-    if (seconds > 1) onDwell(item.id, seconds)
+    enteredAt.current = 0
+    if (seconds >= 3) onDwell(item.id, seconds)
+  }
+
+  const teachFeed = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    direction: 'more' | 'less'
+  ) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (preference) return
+    setPreference(direction)
+    try {
+      const response = await fetch('/api/interact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content_id: item.id,
+          action: direction === 'more' ? 'more_like_this' : 'less_like_this',
+        }),
+      })
+      if (!response.ok) throw new Error('Feedback non salvato')
+      if (direction === 'less') onLess(item.id)
+    } catch {
+      setPreference(null)
+    }
   }
 
   return (
@@ -175,6 +204,36 @@ function ImageCard({
           {PLATFORM_LABELS[item.platform]}
         </span>
       )}
+      <div className="absolute bottom-2 right-2 z-30 flex gap-1">
+        <button
+          type="button"
+          onClick={(event) => void teachFeed(event, 'less')}
+          aria-label="Meno contenuti così"
+          title="Meno così"
+          className={[
+            'flex h-7 w-7 items-center justify-center rounded-full border border-white/25 text-sm font-black backdrop-blur-xl transition',
+            preference === 'less'
+              ? 'bg-white text-black'
+              : 'bg-black/35 text-white/80 hover:bg-white hover:text-black',
+          ].join(' ')}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={(event) => void teachFeed(event, 'more')}
+          aria-label="Più contenuti così"
+          title="Più così"
+          className={[
+            'flex h-7 w-7 items-center justify-center rounded-full border border-white/25 text-sm font-black backdrop-blur-xl transition',
+            preference === 'more'
+              ? 'bg-grow-yellow text-black'
+              : 'bg-black/35 text-white/80 hover:bg-grow-yellow hover:text-black',
+          ].join(' ')}
+        >
+          +
+        </button>
+      </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent">
         <div className="absolute inset-x-0 bottom-0 p-3">
           {item.artist_name && (
@@ -408,7 +467,11 @@ export default function Home() {
       await fetch('/api/interact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId, action: 'dwell', seconds }),
+        body: JSON.stringify({
+          content_id: itemId,
+          action: 'dwell',
+          read_seconds: Math.round(seconds),
+        }),
       })
     } catch {}
   }
@@ -754,6 +817,11 @@ export default function Home() {
                       item={item}
                       saved={savedIds.has(item.id)}
                       onDwell={handleDwell}
+                      onLess={(itemId) =>
+                        setImages((current) =>
+                          current.filter((candidate) => candidate.id !== itemId)
+                        )
+                      }
                     />
                   </div>
                 )

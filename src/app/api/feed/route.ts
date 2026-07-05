@@ -1,18 +1,28 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import {
+  buildTasteProfile,
+  deterministicJitter,
+  tasteBoost,
+} from '@/lib/recommendations'
 
-function seededShuffle<T>(arr: T[], seed: number): T[] {
-  const out = [...arr]
-  let s = seed
-  for (let i = out.length - 1; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) >>> 0
-    const j = s % (i + 1)
-    ;[out[i], out[j]] = [out[j], out[i]]
-  }
-  return out
+type FeedRow = {
+  id: string
+  category?: string | null
+  platform?: string | null
+  title?: string | null
+  summary?: string | null
+  artist_name?: string | null
+  image_url?: string | null
+  url?: string | null
+  published_at?: string | null
+  created_at?: string | null
+  [key: string]: unknown
 }
 
-function scoreItem(item: any, weights: Record<string, number>, dwellWeights: Record<string, number>) {
+type ScoredFeedRow = FeedRow & { _score: number }
+
+function scoreItem(item: FeedRow, weights: Record<string, number>, dwellWeights: Record<string, number>) {
   const cat = item.category || 'design'
   const catWeight = weights[cat] ?? 0.65
   const dwellBoost = Math.min(0.35, (dwellWeights[cat] || 0) / 45)
@@ -70,6 +80,24 @@ export async function GET(request: Request) {
 
     const dwellWeights: Record<string, number> = profile?.dwell_weights || {}
 
+    const { data: recentInteractions } = await supabase
+      .from('interactions')
+      .select('content_id, action, read_seconds, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(400)
+
+    const interactionIds = [
+      ...new Set((recentInteractions || []).map((row) => row.content_id).filter(Boolean)),
+    ]
+    const { data: signalItems } = interactionIds.length
+      ? await supabase
+          .from('content_items')
+          .select('id, category, platform, title, summary, artist_name')
+          .in('id', interactionIds)
+      : { data: [] }
+    const taste = buildTasteProfile(recentInteractions || [], signalItems || [])
+
     // Home/Scopri deve essere SOLO piattaforme immagini/reference.
     // Niente RSS, niente articoli, niente news.
     if (typeFilter === 'image' || !typeFilter) {
@@ -87,38 +115,94 @@ export async function GET(request: Request) {
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-      const raw = data || []
+      const raw = (data || []) as FeedRow[]
 
       const scored = raw
-        .map((item: any) => ({
+        .map((item) => ({
           ...item,
-          _score: scoreItem(item, weights, dwellWeights),
+          _score:
+            scoreItem(item, weights, dwellWeights) +
+            tasteBoost(item, taste) +
+            deterministicJitter(String(item.id), seed) * 0.14,
         }))
-        .filter((item: any) => item.image_url && item._score > -1)
-        .sort((a: any, b: any) => b._score - a._score)
+        .filter((item) => item.image_url && item._score > -1)
+        .sort((a, b) => b._score - a._score)
 
-      // Mix controllato: Are.na resta principale, stock solo supporto.
-      const arena = seededShuffle(scored.filter((i: any) => i.platform === 'arena'), seed)
-      const unsplash = seededShuffle(scored.filter((i: any) => i.platform === 'unsplash'), seed + 17)
-      const pexels = seededShuffle(scored.filter((i: any) => i.platform === 'pexels'), seed + 31)
+      const exploration = raw
+        .filter((item) => item.image_url && !taste.negativeIds.has(item.id))
+        .map((item) => {
+          const familiarCategory = Math.max(
+            0,
+            taste.categories[item.category || ''] || 0
+          )
+          const familiarArtist = Math.max(
+            0,
+            taste.artists[item.artist_name || ''] || 0
+          )
+          return {
+            ...item,
+            _score:
+              scoreItem(item, {}, {}) -
+              familiarCategory / 22 -
+              familiarArtist / 16 +
+              deterministicJitter(String(item.id), seed + 97) * 0.55,
+          }
+        })
+        .sort((a, b) => b._score - a._score)
 
-      const mixed: any[] = []
+      // Mantiene il ranking appreso. Il piccolo jitter sopra evita un feed immobile.
+      const arena = scored.filter((item) => item.platform === 'arena')
+      const unsplash = scored.filter((item) => item.platform === 'unsplash')
+      const pexels = scored.filter((item) => item.platform === 'pexels')
+
+      const personalized: ScoredFeedRow[] = []
       let ai = 0
       let ui = 0
       let pi = 0
 
       for (let i = 0; i < totalNeeded + 40; i++) {
-        // Pattern: Are.na, Are.na, Unsplash/Pexels, Are.na...
-        if (i % 5 === 2 && ui < unsplash.length) mixed.push(unsplash[ui++])
-        else if (i % 7 === 4 && pi < pexels.length) mixed.push(pexels[pi++])
-        else if (ai < arena.length) mixed.push(arena[ai++])
-        else if (ui < unsplash.length) mixed.push(unsplash[ui++])
-        else if (pi < pexels.length) mixed.push(pexels[pi++])
+        // 75% Are.na; stock solo per varietà e copertura.
+        if (i % 8 === 3 && ui < unsplash.length) personalized.push(unsplash[ui++])
+        else if (i % 8 === 7 && pi < pexels.length) personalized.push(pexels[pi++])
+        else if (ai < arena.length) personalized.push(arena[ai++])
+        else if (ui < unsplash.length) personalized.push(unsplash[ui++])
+        else if (pi < pexels.length) personalized.push(pexels[pi++])
       }
 
-      // De-duplica URL/immagini
+      // 80% gusto appreso, 20% caos controllato di qualità.
+      const mixed: ScoredFeedRow[] = []
+      const selected = new Set<string>()
+      let personalIndex = 0
+      let explorationIndex = 0
+      const takeNext = (pool: ScoredFeedRow[], start: number) => {
+        let index = start
+        while (index < pool.length && selected.has(pool[index].id)) index++
+        return { item: pool[index], next: index + 1 }
+      }
+
+      for (let index = 0; index < totalNeeded + 40; index++) {
+        const useExploration = index % 5 === 4
+        let picked = useExploration
+          ? takeNext(exploration, explorationIndex)
+          : takeNext(personalized, personalIndex)
+        if (useExploration) explorationIndex = picked.next
+        else personalIndex = picked.next
+
+        if (!picked.item) {
+          picked = useExploration
+            ? takeNext(personalized, personalIndex)
+            : takeNext(exploration, explorationIndex)
+          if (useExploration) personalIndex = picked.next
+          else explorationIndex = picked.next
+        }
+        if (!picked.item) break
+        selected.add(picked.item.id)
+        mixed.push(picked.item)
+      }
+
+      // De-duplica anche URL/immagini equivalenti.
       const seen = new Set<string>()
-      const unique = mixed.filter((item: any) => {
+      const unique = mixed.filter((item) => {
         const key = item.url || item.image_url || item.id
         if (seen.has(key)) return false
         seen.add(key)
