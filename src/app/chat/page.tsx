@@ -74,9 +74,9 @@ function LinkPreview({ url }: { url: string }) {
 
   if (!done) {
     return (
-      <div className="mt-2 flex items-center gap-2 rounded-[0.9rem] border border-grow-border bg-grow-soft px-3 py-2">
+      <div className="mt-2 flex items-center gap-2 rounded-[0.9rem] border border-white/10 bg-white/5 px-3 py-2">
         <div className="h-1.5 w-1.5 animate-ping rounded-full bg-grow-yellow" />
-        <span className="text-[10px] text-grow-muted">{new URL(url).hostname.replace('www.', '')}</span>
+        <span className="text-[10px] text-white/45">{new URL(url).hostname.replace('www.', '')}</span>
       </div>
     )
   }
@@ -88,7 +88,7 @@ function LinkPreview({ url }: { url: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-2 block overflow-hidden rounded-[0.9rem] border border-black/10 bg-grow-soft transition-opacity active:opacity-70"
+      className="mt-2 block overflow-hidden rounded-[0.9rem] border border-white/10 bg-black/20 transition-opacity active:opacity-70"
     >
       {data.image && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -100,12 +100,12 @@ function LinkPreview({ url }: { url: string }) {
         />
       )}
       <div className="px-3 py-2">
-        <p className="text-[9px] font-black uppercase tracking-widest text-grow-muted">{data.domain}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-white/45">{data.domain}</p>
         {data.title && (
-          <p className="mt-0.5 line-clamp-2 text-[12px] font-bold leading-tight text-grow-text">{data.title}</p>
+          <p className="mt-0.5 line-clamp-2 text-[12px] font-bold leading-tight text-white">{data.title}</p>
         )}
         {data.description && (
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-grow-muted">{data.description}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/55">{data.description}</p>
         )}
       </div>
     </a>
@@ -131,7 +131,7 @@ function InputPreview({ url, onDismiss }: { url: string; onDismiss: () => void }
   if (done && !data) return null
 
   return (
-    <div className="mb-2 flex items-center gap-3 overflow-hidden rounded-[1rem] border border-grow-border bg-grow-card px-3 py-2.5">
+    <div className="mb-2 flex items-center gap-3 overflow-hidden rounded-[1rem] border border-white/10 bg-white/[0.07] px-3 py-2.5">
       {!done && <div className="h-1.5 w-1.5 animate-ping rounded-full bg-grow-yellow" />}
       {data?.image && done && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -139,12 +139,12 @@ function InputPreview({ url, onDismiss }: { url: string; onDismiss: () => void }
           onError={e => { (e.target as HTMLElement).style.display = 'none' }} />
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[9px] font-black uppercase tracking-widest text-grow-muted">
-          {done ? (data?.domain ?? new URL(url).hostname.replace('www.', '')) : 'Carico anteprima…'}
+        <p className="text-[9px] font-black uppercase tracking-widest text-white/45">
+          {done ? (data?.domain ?? new URL(url).hostname.replace('www.', '')) : 'Carico anteprima...'}
         </p>
-        {data?.title && <p className="line-clamp-1 text-[12px] font-bold text-grow-text">{data.title}</p>}
+        {data?.title && <p className="line-clamp-1 text-[12px] font-bold text-white">{data.title}</p>}
       </div>
-      <button onClick={onDismiss} className="shrink-0 text-grow-muted" aria-label="Chiudi">
+      <button onClick={onDismiss} className="shrink-0 text-white/45" aria-label="Chiudi">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
         </svg>
@@ -168,7 +168,7 @@ function Bubble({
   return (
     <div className="group flex items-end gap-2">
       <div className="max-w-[86%] flex-1">
-        <div className="rounded-[1.1rem] rounded-bl-[0.35rem] border border-grow-border bg-grow-card px-3.5 py-2.5">
+        <div className="rounded-[1.1rem] rounded-bl-[0.35rem] border border-white/10 bg-white/[0.07] px-3.5 py-2.5 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
 
           {/* Image */}
           {item.image_url && (
@@ -178,7 +178,7 @@ function Bubble({
 
           {/* Text with clickable links */}
           {item.content && (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-grow-text">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/90">
               {parseContent(item.content)}
             </p>
           )}
@@ -186,15 +186,15 @@ function Bubble({
           {/* Bare URL field (no content) */}
           {!item.content && item.url && !item.image_url && (
             <a href={item.url} target="_blank" rel="noopener noreferrer"
-              className="break-all text-sm font-semibold underline decoration-grow-yellow underline-offset-2">
+              className="break-all text-sm font-semibold text-white underline decoration-grow-yellow underline-offset-2">
               {item.url}
             </a>
           )}
 
-          {/* Link preview card — one per message, self-fetching */}
+          {/* Link preview card, one per message, self-fetching */}
           {linkUrl && <LinkPreview url={linkUrl} />}
 
-          <p className="mt-1.5 text-[10px] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>
+          <p className="mt-1.5 text-[10px] text-white/35" style={{ fontFamily: 'DM Mono, monospace' }}>
             {timeAgo(item.created_at)}
           </p>
         </div>
@@ -204,14 +204,14 @@ function Bubble({
       <div className="flex shrink-0 flex-col gap-1 pb-1 opacity-0 transition-opacity group-hover:opacity-100">
         {(item.content || item.url) && (
           <button onClick={() => onCopy(item)} aria-label="Copia"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-grow-soft text-grow-text">
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white">
             {copiedId === item.id
               ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>}
           </button>
         )}
         <button onClick={() => onRemove(item.id)} aria-label="Elimina"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-grow-muted">
+          className="flex h-8 w-8 items-center justify-center rounded-full text-white/35">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
           </svg>
@@ -346,20 +346,20 @@ export default function ChatPage() {
   ]
 
   return (
-    <main className="flex min-h-screen flex-col bg-grow-bg text-grow-text">
+    <main className="flex min-h-screen flex-col bg-[#0F0F10] text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 pb-32 pt-8">
 
         {/* Header */}
         <header className="mb-4 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45" style={{ fontFamily: 'DM Mono, monospace' }}>
               Telefono ↔ Computer
             </p>
             <h1 className="text-[26px] font-black uppercase tracking-tight">
               Chat veloce<span className="text-grow-yellow">.</span>
             </h1>
           </div>
-          <Link href="/inbox" className="text-[10px] font-bold uppercase text-grow-muted hover:text-grow-text">
+          <Link href="/inbox" className="text-[10px] font-bold uppercase text-white/45 hover:text-grow-yellow">
             Inbox →
           </Link>
         </header>
@@ -370,12 +370,12 @@ export default function ChatPage() {
             <button key={t.key} onClick={() => setFilter(t.key)}
               className={[
                 'shrink-0 rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-wide transition-colors',
-                filter === t.key ? 'bg-grow-yellow text-[#0F0F10]' : 'border border-black/10 bg-white/60 text-grow-muted',
+                filter === t.key ? 'bg-grow-yellow text-[#0F0F10]' : 'border border-white/10 bg-white/[0.06] text-white/45',
               ].join(' ')}>
               {t.label}
             </button>
           ))}
-          <span className="ml-auto shrink-0 text-[10px] font-bold text-grow-muted" style={{ fontFamily: 'DM Mono, monospace' }}>
+          <span className="ml-auto shrink-0 text-[10px] font-bold text-white/35" style={{ fontFamily: 'DM Mono, monospace' }}>
             {items.length}
           </span>
         </div>
@@ -383,13 +383,13 @@ export default function ChatPage() {
         {/* Messages */}
         <div className="flex-1 space-y-3">
           {filtered.length === 0 && (
-            <div className="rounded-[1.3rem] border border-grow-border bg-grow-card px-5 py-10 text-center">
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/[0.06] px-5 py-10 text-center">
               <p className="text-[13px] font-bold">
                 {filter === 'all' ? 'Niente ancora.' : `Nessun ${tabs.find(t => t.key === filter)?.label.toLowerCase()} salvato.`}
               </p>
               {filter === 'all' && (
-                <p className="mt-1 text-sm text-grow-muted">
-                  Manda un link, un&apos;immagine o del testo dal telefono — lo trovi qui.
+                <p className="mt-1 text-sm text-white/55">
+                  Manda un link, un&apos;immagine o del testo dal telefono. Lo trovi qui.
                 </p>
               )}
             </div>
@@ -409,7 +409,7 @@ export default function ChatPage() {
 
         {/* Composer */}
         <div
-          className="sticky bottom-20 rounded-[1.3rem] border border-grow-border bg-grow-card p-2 shadow-md"
+          className="sticky bottom-20 rounded-[1.3rem] border border-white/10 bg-[#171717]/95 p-2 shadow-[0_18px_46px_rgba(0,0,0,0.42)] backdrop-blur"
           onDragOver={e => e.preventDefault()}
           onDrop={e => {
             e.preventDefault()
@@ -430,10 +430,10 @@ export default function ChatPage() {
             }}
             placeholder="Scrivi, incolla un link o trascina un'immagine…"
             rows={1}
-            className="max-h-32 w-full resize-none bg-transparent px-2 py-2 text-sm text-grow-text placeholder:text-grow-muted focus:outline-none"
+            className="max-h-32 w-full resize-none bg-transparent px-2 py-2 text-sm text-white placeholder:text-white/35 focus:outline-none"
           />
           <div className="flex items-center justify-between px-2 pb-1">
-            <label className="cursor-pointer text-grow-muted hover:text-grow-text">
+            <label className="cursor-pointer text-white/45 hover:text-grow-yellow">
               <input type="file" accept="image/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) void uploadImage(f); e.target.value = '' }} />
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
