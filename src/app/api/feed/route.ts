@@ -5,6 +5,10 @@ import {
   deterministicJitter,
   tasteBoost,
 } from '@/lib/recommendations'
+import {
+  discoveryQualityScore,
+  isHighQualityDiscoveryItem,
+} from '@/lib/discovery-quality'
 
 type FeedRow = {
   id: string
@@ -35,19 +39,21 @@ function scoreItem(item: FeedRow, weights: Record<string, number>, dwellWeights:
   const freshness = Math.max(0.55, 1 - (hoursAgo / 24 / 45) * 0.35)
 
   const platformBoost =
-    item.platform === 'arena' ? 0.62 :
-    item.platform === 'unsplash' ? 0.16 :
-    item.platform === 'pexels' ? 0.12 :
+    item.platform === 'arena' ? 0.92 :
+    item.platform === 'unsplash' ? -0.12 :
+    item.platform === 'pexels' ? -0.18 :
     -2
 
   const categoryBoost =
     ['branding', 'typography', 'design', 'web', 'fashion', 'interior_design', 'art'].includes(cat)
-      ? 0.20
-      : -0.15
+      ? 0.34
+      : -0.65
 
   const imageBoost = item.image_url ? 0.18 : -3
 
-  return (catWeight + dwellBoost + platformBoost + categoryBoost + imageBoost) * freshness
+  const qualityBoost = discoveryQualityScore(item) * 0.32
+
+  return (catWeight + dwellBoost + platformBoost + categoryBoost + imageBoost + qualityBoost) * freshness
 }
 
 export async function GET(request: Request) {
@@ -121,6 +127,7 @@ export async function GET(request: Request) {
       const raw = (data || []) as FeedRow[]
 
       const scored = raw
+        .filter(isHighQualityDiscoveryItem)
         .map((item) => ({
           ...item,
           _score:
@@ -128,11 +135,12 @@ export async function GET(request: Request) {
             tasteBoost(item, taste) +
             deterministicJitter(String(item.id), seed) * 0.14,
         }))
-        .filter((item) => item.image_url && item._score > -1)
+        .filter((item) => item.image_url && item._score > 0.8)
         .sort((a, b) => b._score - a._score)
 
       const exploration = raw
         .filter((item) => item.image_url && !taste.negativeIds.has(item.id))
+        .filter(isHighQualityDiscoveryItem)
         .map((item) => {
           const familiarCategory = Math.max(
             0,
@@ -148,6 +156,7 @@ export async function GET(request: Request) {
               scoreItem(item, {}, {}) -
               familiarCategory / 22 -
               familiarArtist / 16 +
+              discoveryQualityScore(item) * 0.36 +
               deterministicJitter(String(item.id), seed + 97) * 0.55,
           }
         })
@@ -164,12 +173,12 @@ export async function GET(request: Request) {
       let pi = 0
 
       for (let i = 0; i < totalNeeded + 40; i++) {
-        // 75% Are.na; stock solo per varietà e copertura.
-        if (i % 8 === 3 && ui < unsplash.length) personalized.push(unsplash[ui++])
-        else if (i % 8 === 7 && pi < pexels.length) personalized.push(pexels[pi++])
+        // Are.na prima. Stock solo come accento raro, mai come base del gusto.
+        if (i % 14 === 6 && ui < unsplash.length) personalized.push(unsplash[ui++])
+        else if (i % 14 === 13 && pi < pexels.length) personalized.push(pexels[pi++])
         else if (ai < arena.length) personalized.push(arena[ai++])
-        else if (ui < unsplash.length) personalized.push(unsplash[ui++])
-        else if (pi < pexels.length) personalized.push(pexels[pi++])
+        else if (ui < unsplash.length && personalized.length < limit) personalized.push(unsplash[ui++])
+        else if (pi < pexels.length && personalized.length < limit) personalized.push(pexels[pi++])
       }
 
       // 80% gusto appreso, 20% caos controllato di qualità.

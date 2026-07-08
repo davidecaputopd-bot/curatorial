@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { deterministicJitter, referenceSimilarity } from '@/lib/recommendations'
+import {
+  discoveryQualityScore,
+  isHighQualityDiscoveryItem,
+} from '@/lib/discovery-quality'
 
 type ReferenceRow = {
   id: string
@@ -50,11 +54,13 @@ export async function GET(request: Request) {
 
   const seed = Math.floor(Date.now() / 86_400_000)
   const items = ((data || []) as ReferenceRow[])
+    .filter(isHighQualityDiscoveryItem)
     .map((item) => ({
       ...item,
       discovery_mode: 'for_you' as const,
       similarity:
         referenceSimilarity(reference as ReferenceRow, item) +
+        discoveryQualityScore(item) * 0.24 +
         deterministicJitter(item.id, seed) * 0.2,
     }))
     .filter((item) => item.similarity >= 2)
