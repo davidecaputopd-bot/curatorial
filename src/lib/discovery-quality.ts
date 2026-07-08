@@ -18,10 +18,10 @@ const STRONG_CATEGORIES = new Set([
   'interior_design',
   'art',
   'web',
+  'ai',
 ])
 
 const WEAK_CATEGORIES = new Set([
-  'ai',
   'growth',
   'lifestyle',
   'social_design',
@@ -55,10 +55,20 @@ const CURATED_TERMS = [
   'type',
   'print',
   'motion identity',
+  'ai art',
+  'generative art',
+  'digital art',
+  'computational art',
+  'algorithmic art',
+  'new media art',
+  'media art',
+  'synthetic photography',
+  'ai cinema',
+  'ai film',
+  'latent space',
 ]
 
 const SLOP_TERMS = [
-  'artificial intelligence',
   'machine learning',
   'neural network',
   'technology abstract',
@@ -80,6 +90,13 @@ const SLOP_TERMS = [
   'smiling',
   'teamwork',
   'influencer',
+  'prompt',
+  'midjourney prompt',
+  'stable diffusion prompt',
+  'chatgpt',
+  'robot',
+  'cyber',
+  'metaverse',
 ]
 
 const GENERIC_TITLES = new Set([
@@ -129,6 +146,23 @@ export function discoveryQualityScore(item: DiscoveryCandidate) {
   if (item.artist_name && item.artist_name.trim().length > 2) score += 0.35
 
   if (includesAny(text, CURATED_TERMS)) score += 1.15
+  if (
+    category === 'ai' &&
+    includesAny(text, [
+      'ai art',
+      'generative art',
+      'digital art',
+      'computational art',
+      'algorithmic art',
+      'new media art',
+      'media art',
+      'synthetic photography',
+      'ai cinema',
+      'ai film',
+    ])
+  ) {
+    score += 1.25
+  }
   if (includesAny(text, SLOP_TERMS)) score -= platform === 'arena' ? 1.4 : 3.2
 
   if (item.width && item.height) {

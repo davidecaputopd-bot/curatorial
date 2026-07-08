@@ -94,12 +94,23 @@ function isUsefulChannel(channel: ArenaChannel, topic: DiscoveryTopic) {
     text.includes('still life') ||
     text.includes('signage') ||
     text.includes('modernist') ||
-    text.includes('graphic')
+    text.includes('graphic') ||
+    text.includes('generative-art') ||
+    text.includes('generative art') ||
+    text.includes('ai-art') ||
+    text.includes('ai art') ||
+    text.includes('new-media') ||
+    text.includes('new media') ||
+    text.includes('computational-art') ||
+    text.includes('computational art') ||
+    text.includes('digital art')
 
   const weak =
     text.includes('meme') ||
     text.includes('ai generated') ||
     text.includes('prompt') ||
+    text.includes('midjourney prompt') ||
+    text.includes('stable diffusion prompt') ||
     text.includes('crypto') ||
     text.includes('startup') ||
     text.includes('marketing tips') ||

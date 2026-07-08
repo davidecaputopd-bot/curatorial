@@ -30,6 +30,10 @@ export const ARENA_CURATED_CHANNELS: DiscoveryChannelSeed[] = [
   { slug: 'italian-graphic-design', title: 'Italian graphic design', category: 'design', lane: 'wildcard' },
   { slug: 'modernist-graphic-design', title: 'Modernist graphic design', category: 'design', lane: 'wildcard' },
   { slug: 'exhibition-design', title: 'Exhibition design', category: 'art', lane: 'wildcard' },
+  { slug: 'generative-art', title: 'Generative art', category: 'ai', lane: 'wildcard' },
+  { slug: 'ai-art', title: 'AI art', category: 'ai', lane: 'wildcard' },
+  { slug: 'new-media-art', title: 'New media art', category: 'ai', lane: 'wildcard' },
+  { slug: 'computational-art', title: 'Computational art', category: 'ai', lane: 'wildcard' },
 ]
 
 export const ARENA_DISCOVERY_TOPICS: DiscoveryTopic[] = [
@@ -57,6 +61,10 @@ export const ARENA_DISCOVERY_TOPICS: DiscoveryTopic[] = [
   { query: 'gallery invitation poster typography', category: 'typography', lane: 'wildcard' },
   { query: 'architectural signage identity system', category: 'interior_design', lane: 'client' },
   { query: 'restaurant photography art direction still life', category: 'design', lane: 'client' },
+  { query: 'generative art exhibition', category: 'ai', lane: 'wildcard' },
+  { query: 'ai art editorial visual culture', category: 'ai', lane: 'wildcard' },
+  { query: 'new media art generative image', category: 'ai', lane: 'wildcard' },
+  { query: 'computational art visual system', category: 'ai', lane: 'wildcard' },
 ]
 
 export function topicsForToday(date = new Date(), count = 6) {

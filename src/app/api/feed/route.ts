@@ -81,8 +81,8 @@ export async function GET(request: Request) {
       fashion: 0.78,
       interior_design: 0.76,
       art: 0.72,
+      ai: 0.68,
       social_design: 0.66,
-      ai: 0.55,
       lifestyle: 0.45,
       growth: 0.35,
     }
