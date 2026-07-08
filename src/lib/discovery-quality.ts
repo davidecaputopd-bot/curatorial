@@ -182,6 +182,12 @@ export function isHighQualityDiscoveryItem(item: DiscoveryCandidate) {
   return score >= 2.9
 }
 
+export function isDisplayableDiscoveryItem(item: DiscoveryCandidate) {
+  const score = discoveryQualityScore(item)
+  if (item.platform === 'arena') return score >= 1.15
+  return score >= 0.65
+}
+
 export function isAllowedStockQuery(query: string, category: string) {
   const haystack = `${query} ${category}`.toLocaleLowerCase('it-IT')
   if (includesAny(haystack, SLOP_TERMS)) return false

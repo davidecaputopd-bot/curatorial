@@ -7,7 +7,7 @@ import {
 } from '@/lib/recommendations'
 import {
   discoveryQualityScore,
-  isHighQualityDiscoveryItem,
+  isDisplayableDiscoveryItem,
 } from '@/lib/discovery-quality'
 
 type FeedRow = {
@@ -45,7 +45,7 @@ function scoreItem(item: FeedRow, weights: Record<string, number>, dwellWeights:
     -2
 
   const categoryBoost =
-    ['branding', 'typography', 'design', 'web', 'fashion', 'interior_design', 'art'].includes(cat)
+    ['branding', 'typography', 'design', 'web', 'fashion', 'interior_design', 'art', 'ai'].includes(cat)
       ? 0.34
       : -0.65
 
@@ -125,9 +125,9 @@ export async function GET(request: Request) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
       const raw = (data || []) as FeedRow[]
+      const displayable = raw.filter(isDisplayableDiscoveryItem)
 
-      const scored = raw
-        .filter(isHighQualityDiscoveryItem)
+      const scored = displayable
         .map((item) => ({
           ...item,
           _score:
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
 
       const exploration = raw
         .filter((item) => item.image_url && !taste.negativeIds.has(item.id))
-        .filter(isHighQualityDiscoveryItem)
+        .filter(isDisplayableDiscoveryItem)
         .map((item) => {
           const familiarCategory = Math.max(
             0,
@@ -177,8 +177,8 @@ export async function GET(request: Request) {
         if (i % 14 === 6 && ui < unsplash.length) personalized.push(unsplash[ui++])
         else if (i % 14 === 13 && pi < pexels.length) personalized.push(pexels[pi++])
         else if (ai < arena.length) personalized.push(arena[ai++])
-        else if (ui < unsplash.length && personalized.length < limit) personalized.push(unsplash[ui++])
-        else if (pi < pexels.length && personalized.length < limit) personalized.push(pexels[pi++])
+        else if (ui < unsplash.length && personalized.length < totalNeeded + 40) personalized.push(unsplash[ui++])
+        else if (pi < pexels.length && personalized.length < totalNeeded + 40) personalized.push(pexels[pi++])
       }
 
       // 80% gusto appreso, 20% caos controllato di qualità.
