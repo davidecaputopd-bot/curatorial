@@ -48,7 +48,7 @@ type CalItem = {
 }
 
 type ViewMode = 'agenda' | 'pipeline'
-type GrowthMood = 'quiet' | 'moving' | 'loaded' | 'bloom'
+type GrowthMood = 'quiet' | 'moving' | 'bloom'
 
 function localDateKey(date: Date) {
   const year = date.getFullYear()
@@ -169,7 +169,7 @@ export default function CalendarioPage() {
   const focusItems = [...overdue, ...todayItems, ...readyNotScheduled].slice(0, 4)
   const growthMood: GrowthMood =
     overdue.length > 0
-      ? 'loaded'
+      ? 'quiet'
       : todayItems.length === 0 && weekCount <= 2
         ? 'quiet'
         : inMotion.length >= 4 || weekCount >= 7
@@ -234,7 +234,7 @@ export default function CalendarioPage() {
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
       <div className="mx-auto max-w-lg px-4 pt-9 lg:max-w-5xl">
         <header className="mb-5">
-          <div className="flex min-h-[8.5rem] items-start justify-between gap-4 overflow-hidden">
+          <div className="flex min-h-[7.25rem] items-start justify-between gap-4 overflow-hidden">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
                 GROW Piano
@@ -246,12 +246,12 @@ export default function CalendarioPage() {
                 Non un calendario. Il prossimo lavoro da chiudere.
               </p>
             </div>
-            <div className="relative -mr-3 flex w-[8.25rem] shrink-0 flex-col items-end">
+            <div className="relative -mr-1 flex w-[6.25rem] shrink-0 flex-col items-end">
               <GrowthMark mood={growthMood} />
               <button
                 type="button"
                 onClick={() => openModal()}
-                className="-mt-2 mr-3 rounded-full bg-grow-yellow px-4 py-3 text-[10px] font-black uppercase text-grow-text shadow-[0_10px_24px_rgba(255,229,0,0.28)] active:scale-[0.98]"
+                className="-mt-1 mr-1 rounded-full bg-grow-yellow px-4 py-3 text-[10px] font-black uppercase text-grow-text shadow-[0_10px_24px_rgba(255,229,0,0.28)] active:scale-[0.98]"
               >
                 Nuovo
               </button>
@@ -570,28 +570,23 @@ function GrowthMark({ mood }: { mood: GrowthMood }) {
     quiet: {
       src: '/icon-1.svg',
       label: 'Seme GROW',
-      className: 'w-[7rem] translate-y-1',
+      className: 'w-[4.6rem]',
     },
     moving: {
       src: '/icon-3.svg',
       label: 'Germoglio GROW',
-      className: 'w-[7.6rem] translate-x-1 translate-y-2',
-    },
-    loaded: {
-      src: '/icon-2.svg',
-      label: 'GROW in movimento',
-      className: 'w-[7.3rem] translate-y-1',
+      className: 'w-[5.15rem] translate-x-0.5 translate-y-1',
     },
     bloom: {
       src: '/icon-5.svg',
       label: 'Fiore GROW',
-      className: 'w-[8.2rem] -translate-y-1',
+      className: 'w-[5.45rem] -translate-y-0.5',
     },
   }
   const current = mark[mood]
 
   return (
-    <div className="relative flex h-[7.4rem] w-[8.25rem] items-center justify-center overflow-visible">
+    <div className="relative flex h-[5.65rem] w-[6.25rem] items-center justify-center overflow-visible">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={current.src}
