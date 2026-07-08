@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
@@ -40,12 +41,12 @@ function DiscoveryCard({
   item,
   saved,
   onLess,
-  onSimilar,
+  onSelect,
 }: {
   item: DiscoveryItem
   saved: boolean
   onLess: (id: string) => void
-  onSimilar: (item: DiscoveryItem) => void
+  onSelect: (item: DiscoveryItem) => void
 }) {
   const enteredAt = useRef(0)
   const [preference, setPreference] = useState<'more' | 'less' | null>(null)
@@ -102,22 +103,12 @@ function DiscoveryCard({
       onTouchEnd={recordDwell}
       className="group relative block h-full overflow-hidden rounded-[1.35rem] bg-grow-soft"
     >
-      {item.url && (
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Apri ${item.title || 'reference'}`}
-          onClick={() => {
-            void fetch('/api/interact', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content_id: item.id, action: 'open' }),
-            })
-          }}
-          className="absolute inset-0 z-10"
-        />
-      )}
+      <button
+        type="button"
+        aria-label={`Esplora ${item.title || 'reference'}`}
+        onClick={() => onSelect(item)}
+        className="absolute inset-0 z-10"
+      />
       <SaveHeart itemId={item.id} initialSaved={saved} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -155,19 +146,6 @@ function DiscoveryCard({
       <div className="absolute bottom-2 right-2 z-30 flex gap-1">
         <button
           type="button"
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onSimilar(item)
-          }}
-          aria-label="Trova reference simili"
-          title="Trova simili"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-black/40 text-[11px] font-black text-white backdrop-blur-xl hover:bg-white hover:text-black"
-        >
-          ≈
-        </button>
-        <button
-          type="button"
           onClick={(event) => void teach(event, 'less')}
           aria-label="Meno contenuti così"
           className="flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-black/40 text-sm font-black text-white backdrop-blur-xl hover:bg-white hover:text-black"
@@ -196,6 +174,7 @@ export default function ScopriPage() {
   const [items, setItems] = useState<DiscoveryItem[]>([])
   const [similarItems, setSimilarItems] = useState<DiscoveryItem[] | null>(null)
   const [similarTitle, setSimilarTitle] = useState('')
+  const [selected, setSelected] = useState<DiscoveryItem | null>(null)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [mode, setMode] = useState<DiscoveryMode>('mix')
   const [category, setCategory] = useState<CategoryMode>('all')
@@ -261,6 +240,15 @@ export default function ScopriPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const selectReference = (item: DiscoveryItem) => {
+    setSelected(item)
+    void fetch('/api/interact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_id: item.id, action: 'open' }),
+    })
   }
 
   return (
@@ -391,7 +379,7 @@ export default function ScopriPage() {
                             current.filter((candidate) => candidate.id !== id)
                           )
                     }
-                    onSimilar={(candidate) => void findSimilar(candidate)}
+                    onSelect={selectReference}
                   />
                 </div>
               )
@@ -415,6 +403,103 @@ export default function ScopriPage() {
           </div>
         )}
       </div>
+
+      {selected && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end bg-black/45 backdrop-blur-sm"
+          onClick={() => setSelected(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={selected.title || 'Reference selezionata'}
+            onClick={(event) => event.stopPropagation()}
+            className="mx-auto max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-[2rem] bg-grow-bg shadow-[0_-24px_80px_rgba(15,15,16,0.25)]"
+          >
+            <div className="relative max-h-[52dvh] min-h-72 overflow-hidden bg-grow-soft">
+              <SaveHeart
+                itemId={selected.id}
+                initialSaved={savedIds.has(selected.id)}
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={selected.image_url || ''}
+                alt={selected.title || 'Reference'}
+                className="max-h-[52dvh] min-h-72 w-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Chiudi"
+                className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-lg font-bold text-white backdrop-blur-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-5 pb-8">
+              <div className="flex flex-wrap items-center gap-2 text-[9px] font-black uppercase tracking-wide text-grow-muted">
+                {selected.category && <span>{selected.category}</span>}
+                {selected.platform && PLATFORM_LABELS[selected.platform] && (
+                  <>
+                    <span>·</span>
+                    <span>{PLATFORM_LABELS[selected.platform]}</span>
+                  </>
+                )}
+                {selected.discovery_mode === 'outside_bubble' && (
+                  <span className="rounded-full bg-grow-yellow px-2 py-1 text-black">
+                    Fuori bolla
+                  </span>
+                )}
+              </div>
+              <h2 className="mt-2 text-2xl font-black leading-[1.02] tracking-tight">
+                {selected.title || 'Reference senza titolo'}
+              </h2>
+              {selected.artist_name && (
+                <p className="mt-2 text-xs font-bold text-grow-muted">
+                  {selected.artist_name}
+                </p>
+              )}
+              {selected.summary && (
+                <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-grow-muted">
+                  {selected.summary}
+                </p>
+              )}
+
+              <div className="mt-6 grid grid-cols-2 gap-2">
+                <Link
+                  href={`/ai?ref=${encodeURIComponent(selected.id)}&title=${encodeURIComponent(selected.title || '')}&image=${encodeURIComponent(selected.image_url || '')}&url=${encodeURIComponent(selected.url || '')}&category=${encodeURIComponent(selected.category || '')}`}
+                  className="flex min-h-12 items-center justify-center rounded-full bg-grow-yellow px-4 text-center text-[10px] font-black uppercase text-black active:scale-[0.98]"
+                >
+                  Usa con AI
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = selected
+                    setSelected(null)
+                    void findSimilar(item)
+                  }}
+                  className="min-h-12 rounded-full bg-[#0F0F10] px-4 text-[10px] font-black uppercase text-grow-yellow active:scale-[0.98]"
+                >
+                  Trova simili
+                </button>
+              </div>
+
+              {selected.url && (
+                <a
+                  href={selected.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 block text-center text-[9px] font-black uppercase text-grow-muted underline decoration-grow-border underline-offset-4"
+                >
+                  Apri fonte originale
+                </a>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
       <BottomNav />
     </main>
   )
