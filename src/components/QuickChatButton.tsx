@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 export default function QuickChatButton() {
   const pathname = usePathname()
   if (
+    pathname === '/' ||
     pathname === '/chat' ||
     pathname === '/login' ||
     pathname.startsWith('/auth/')

@@ -515,6 +515,56 @@ export default function Home() {
           </div>
         </header>
 
+        <section className="mb-5 grid grid-cols-3 gap-2 lg:hidden">
+          <Link
+            href="/chat"
+            className="relative min-h-[76px] rounded-[1.25rem] bg-[#0F0F10] p-3 text-white shadow-[0_14px_34px_rgba(15,15,16,0.16)] active:scale-[0.98]"
+          >
+            {hasUnreadChat && (
+              <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-grow-yellow" />
+            )}
+            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-yellow">
+              Chat
+            </span>
+            <span className="mt-2 block text-[12px] font-black uppercase leading-tight">
+              Veloce
+            </span>
+            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-white/40">
+              Telefono
+            </span>
+          </Link>
+
+          <Link
+            href="/inbox"
+            className="min-h-[76px] rounded-[1.25rem] border border-grow-border bg-white p-3 text-grow-text active:scale-[0.98]"
+          >
+            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-muted">
+              Nota
+            </span>
+            <span className="mt-2 block text-[12px] font-black uppercase leading-tight">
+              Inbox
+            </span>
+            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-grow-muted">
+              Taccuino
+            </span>
+          </Link>
+
+          <Link
+            href="/ai"
+            className="min-h-[76px] rounded-[1.25rem] bg-grow-yellow p-3 text-[#0F0F10] shadow-[0_14px_34px_rgba(255,229,0,0.22)] active:scale-[0.98]"
+          >
+            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-black/55">
+              AI
+            </span>
+            <span className="mt-2 block text-[12px] font-black uppercase leading-tight">
+              Regia
+            </span>
+            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-black/45">
+              Ragiona
+            </span>
+          </Link>
+        </section>
+
         <section className="grid gap-3 lg:grid-cols-[1.45fr_0.8fr]">
           <div className="rounded-[1.5rem] bg-[#0F0F10] p-5 text-white">
             <div className="flex items-center justify-between gap-3">
@@ -706,30 +756,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mt-6 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
-          <Link
-            href="/chat"
-            className="relative flex items-center justify-between rounded-[1.4rem] bg-[#0F0F10] px-5 py-4 text-white"
-          >
-            {hasUnreadChat && (
-              <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center">
-                <span className="absolute h-full w-full animate-ping rounded-full bg-grow-yellow opacity-75" />
-                <span className="relative h-2.5 w-2.5 rounded-full bg-grow-yellow" />
-              </span>
-            )}
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
-                Telefono ↔ Computer
-              </p>
-              <p className="mt-1 text-base font-black uppercase">
-                Chat veloce
-              </p>
-            </div>
-            <span className="rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-black uppercase text-black">
-              Apri →
-            </span>
-          </Link>
-
+        <section className="mt-6">
           <div className="rounded-[1.4rem] border border-grow-border bg-grow-card px-5 py-4">
             <div className="flex items-center justify-between">
               <div>
