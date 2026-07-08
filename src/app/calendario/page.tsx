@@ -190,6 +190,17 @@ export default function CalendarioPage() {
     })
   }
 
+  const updateItem = async (id: string, fields: Partial<CalItem>) => {
+    setItems((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, ...fields } : item))
+    )
+    await fetch('/api/calendar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...fields }),
+    })
+  }
+
   const remove = async (id: string) => {
     setItems((previous) => previous.filter((item) => item.id !== id))
     await fetch('/api/calendar', {
@@ -365,6 +376,7 @@ export default function CalendarioPage() {
               items={todayItems}
               todayKey={todayKey}
               onChangeStatus={changeStatus}
+              onUpdate={updateItem}
               onRemove={remove}
             />
             <AgendaSection
@@ -373,6 +385,7 @@ export default function CalendarioPage() {
               items={overdue}
               todayKey={todayKey}
               onChangeStatus={changeStatus}
+              onUpdate={updateItem}
               onRemove={remove}
               danger
             />
@@ -382,6 +395,7 @@ export default function CalendarioPage() {
               items={upcoming}
               todayKey={todayKey}
               onChangeStatus={changeStatus}
+              onUpdate={updateItem}
               onRemove={remove}
             />
             <AgendaSection
@@ -390,6 +404,7 @@ export default function CalendarioPage() {
               items={unscheduled}
               todayKey={todayKey}
               onChangeStatus={changeStatus}
+              onUpdate={updateItem}
               onRemove={remove}
             />
           </div>
@@ -422,6 +437,7 @@ export default function CalendarioPage() {
                           item={item}
                           todayKey={todayKey}
                           onChangeStatus={changeStatus}
+                          onUpdate={updateItem}
                           onRemove={remove}
                         />
                       ))}
@@ -679,6 +695,7 @@ function AgendaSection({
   items,
   todayKey,
   onChangeStatus,
+  onUpdate,
   onRemove,
   danger,
 }: {
@@ -687,6 +704,7 @@ function AgendaSection({
   items: CalItem[]
   todayKey: string
   onChangeStatus: (id: string, status: string) => void
+  onUpdate: (id: string, fields: Partial<CalItem>) => void
   onRemove: (id: string) => void
   danger?: boolean
 }) {
@@ -704,6 +722,7 @@ function AgendaSection({
               todayKey={todayKey}
               danger={danger}
               onChangeStatus={onChangeStatus}
+              onUpdate={onUpdate}
               onRemove={onRemove}
             />
           ))}
@@ -718,17 +737,24 @@ function PlanCard({
   todayKey,
   danger,
   onChangeStatus,
+  onUpdate,
   onRemove,
 }: {
   item: CalItem
   todayKey: string
   danger?: boolean
   onChangeStatus: (id: string, status: string) => void
+  onUpdate: (id: string, fields: Partial<CalItem>) => void
   onRemove: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const statusIndex = STATUSES.indexOf(item.status)
   const nextStatus = STATUSES[Math.min(STATUSES.length - 1, Math.max(0, statusIndex + 1))]
+  const quickDates = [
+    { label: 'Oggi', value: todayKey },
+    { label: 'Domani', value: localDateKey(addDays(dateFromKey(todayKey), 1)) },
+    { label: '+7', value: localDateKey(addDays(dateFromKey(todayKey), 7)) },
+  ]
 
   return (
     <article
@@ -784,6 +810,37 @@ function PlanCard({
               {item.notes}
             </p>
           )}
+          <div className="mb-3 rounded-[1rem] bg-grow-card px-3 py-3">
+            <p className="mb-2 text-[9px] font-black uppercase tracking-wide text-grow-muted">
+              Piazza nel piano
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {quickDates.map((date) => (
+                <button
+                  key={date.label}
+                  type="button"
+                  onClick={() => onUpdate(item.id, { scheduled_date: date.value })}
+                  className={[
+                    'rounded-full px-3 py-1.5 text-[9px] font-black uppercase',
+                    item.scheduled_date === date.value
+                      ? 'bg-grow-yellow text-grow-text'
+                      : 'border border-grow-border text-grow-muted',
+                  ].join(' ')}
+                >
+                  {date.label}
+                </button>
+              ))}
+              {item.scheduled_date && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate(item.id, { scheduled_date: null })}
+                  className="rounded-full border border-grow-border px-3 py-1.5 text-[9px] font-black uppercase text-grow-muted"
+                >
+                  Togli data
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             {item.status !== 'pubblicato' && (
               <button
