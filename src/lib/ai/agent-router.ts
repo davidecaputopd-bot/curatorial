@@ -20,7 +20,14 @@ type AgentToolChoice =
   | 'none'
   | {
       type: 'function'
-      function: { name: 'web_search' | 'fetch_webpage' | 'create_memory' | 'project_radar' }
+      function: {
+        name:
+          | 'web_search'
+          | 'fetch_webpage'
+          | 'create_memory'
+          | 'project_radar'
+          | 'get_operational_context'
+      }
     }
 
 type AgentProvider = {
@@ -164,6 +171,14 @@ function firstToolFor(message: string): AgentToolChoice {
 
   if (/\b(radar|segnali|opportunità|ispirazioni)\b.{0,50}\b(AN23|ANventitre|Exousia|Cantina Don Carlo|ACI Copertino|TRAMA)\b/i.test(message)) {
     return { type: 'function', function: { name: 'project_radar' } }
+  }
+
+  const needsGrowContext =
+    /\b(cosa faccio|che faccio|oggi|domani|settimana|priorit[àa]|piano|calendario|in sospeso|arretrati|da chiudere|continua|continuiamo|migliora|miglioriamo|organizza|riordina|situazione|stato|dashboard)\b/i.test(message) ||
+    /\b(inbox|archivio|reference|salvati|note|clienti|contenuti|lavori aperti)\b/i.test(message)
+
+  if (needsGrowContext) {
+    return { type: 'function', function: { name: 'get_operational_context' } }
   }
 
   if (/\b(ricorda|ricordati|memorizza|tieni a mente|da ora in poi)\b/i.test(message)) {

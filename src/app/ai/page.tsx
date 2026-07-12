@@ -40,6 +40,7 @@ type Citation = {
 type Conversation = { conversation_id: string; title: string; updated_at: string }
 
 const TOOL_LABELS: Record<string, string> = {
+  get_operational_context: 'Letto contesto GROW',
   list_calendar_items: 'Letto calendario',
   create_calendar_item: 'Creato contenuto calendario',
   update_calendar_status: 'Aggiornato stato calendario',
@@ -96,6 +97,13 @@ const CLIENT_NOTES: Record<string, string> = {
   'ACI Copertino': 'Tono istituzionale ma accessibile, comunicazione locale.',
   TRAMA: 'Vintage contemporaneo. Apertura store ottobre 2026.',
 }
+
+const QUICK_PROMPTS = [
+  'Leggi GROW e dimmi da dove riparto oggi.',
+  'Trova una cosa utile nella mia Inbox e trasformala in lavoro.',
+  'Controlla Piano e dimmi cosa sto ignorando.',
+  'Cerca nel mio Archivio una direzione visiva per il prossimo contenuto.',
+]
 
 function messageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -520,10 +528,25 @@ export default function AiPage() {
 
         <div className="flex-1 space-y-4 overflow-y-auto pb-4">
           {messages.length === 0 && (
-            <div className="rounded-[1.6rem] border border-grow-border bg-grow-card px-5 py-10 text-center">
-              <p className="text-sm text-grow-muted">
-                Scrivi qualsiasi cosa — brief, brainstorming, una domanda su un cliente. Posso anche leggere e modificare calendario, inbox e archivio mentre parliamo.
+            <div className="rounded-[1.6rem] border border-grow-border bg-grow-card px-5 py-6">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+                Cabina GROW
               </p>
+              <p className="mt-2 text-sm leading-relaxed text-grow-muted">
+                Posso leggere Piano, Inbox e Archivio prima di rispondere. Usami per decidere, trasformare e chiudere lavoro.
+              </p>
+              <div className="mt-4 grid gap-2">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => void send(prompt)}
+                    className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-left text-xs font-bold leading-snug text-grow-text active:scale-[0.99]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

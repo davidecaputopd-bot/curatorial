@@ -4,6 +4,19 @@ export const AGENT_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_operational_context',
+      description: 'Legge lo stato operativo reale di GROW: calendario, contenuti in ritardo, lavoro di oggi, inbox recente, reference salvate e output pubblicati nel mese. Usalo prima di rispondere a richieste vaghe o operative.',
+      parameters: {
+        type: 'object',
+        properties: {
+          client: { type: 'string', description: 'Cliente opzionale da filtrare, es. ANventitre, Exousia, TRAMA' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'list_calendar_items',
       description: 'Elenca i contenuti del calendario editoriale, opzionalmente filtrati per cliente o stato.',
       parameters: {
@@ -192,6 +205,53 @@ function buildImageUrl(prompt: string): string {
 
 type ToolArgs = Record<string, unknown>
 
+function localDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(date.getDate() + days)
+  return next
+}
+
+function compactCalendarItem(item: Record<string, unknown>) {
+  return {
+    id: item.id,
+    client: item.client,
+    title: item.title,
+    type: item.content_type,
+    status: item.status,
+    date: item.scheduled_date,
+    notes: item.notes,
+  }
+}
+
+function compactInboxItem(item: Record<string, unknown>) {
+  return {
+    id: item.id,
+    content: String(item.content || item.url || '').slice(0, 220),
+    url: item.url,
+    type: item.note_type,
+    client: item.client,
+    created_at: item.created_at,
+  }
+}
+
+function compactReference(item: Record<string, unknown>) {
+  return {
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    artist: item.artist_name,
+    platform: item.platform,
+    url: item.url,
+  }
+}
+
 export async function executeAgentTool(
   name: string,
   args: ToolArgs,
@@ -199,6 +259,108 @@ export async function executeAgentTool(
   userId: string
 ): Promise<unknown> {
   switch (name) {
+    case 'get_operational_context': {
+      const today = new Date()
+      const todayKey = localDateKey(today)
+      const next14Key = localDateKey(addDays(today, 14))
+      const client = typeof args.client === 'string' && args.client.trim() ? args.client.trim() : ''
+
+      let calendarQuery = supabase
+        .from('calendar_items')
+        .select('*')
+        .eq('user_id', userId)
+        .order('scheduled_date', { ascending: true })
+        .limit(120)
+      if (client) calendarQuery = calendarQuery.eq('client', client)
+
+      let inboxQuery = supabase
+        .from('inbox_items')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(18)
+      if (client) inboxQuery = inboxQuery.eq('client', client)
+
+      const [calendarResult, inboxResult, savesResult] = await Promise.all([
+        calendarQuery,
+        inboxQuery,
+        supabase
+          .from('interactions')
+          .select('content_id, created_at')
+          .eq('user_id', userId)
+          .eq('action', 'save')
+          .order('created_at', { ascending: false })
+          .limit(12),
+      ])
+
+      if (calendarResult.error) return { error: calendarResult.error.message }
+      if (inboxResult.error) return { error: inboxResult.error.message }
+      if (savesResult.error) return { error: savesResult.error.message }
+
+      const calendar = (calendarResult.data || []) as Record<string, unknown>[]
+      const inbox = (inboxResult.data || []) as Record<string, unknown>[]
+      const savedIds = [...new Set((savesResult.data || []).map((item) => item.content_id).filter(Boolean))]
+      const savedResult = savedIds.length
+        ? await supabase
+            .from('content_items')
+            .select('id, title, category, artist_name, platform, url')
+            .in('id', savedIds)
+        : { data: [], error: null }
+
+      if (savedResult.error) return { error: savedResult.error.message }
+
+      const active = calendar.filter((item) => item.status !== 'pubblicato')
+      const overdue = active.filter((item) => item.scheduled_date && String(item.scheduled_date) < todayKey)
+      const todayItems = active.filter((item) => item.scheduled_date === todayKey)
+      const next14 = active.filter((item) => {
+        const date = String(item.scheduled_date || '')
+        return date > todayKey && date <= next14Key
+      })
+      const readyUnscheduled = active.filter((item) => item.status === 'pronto' && !item.scheduled_date)
+      const production = active.filter((item) => item.status === 'in_produzione' || item.status === 'pronto')
+      const publishedThisMonth = calendar.filter((item) => {
+        if (item.status !== 'pubblicato' || !item.scheduled_date) return false
+        const date = new Date(`${item.scheduled_date}T12:00:00`)
+        return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
+      })
+      const outputByClient = publishedThisMonth.reduce<Record<string, number>>((acc, item) => {
+        const key = String(item.client || 'Altro')
+        acc[key] = (acc[key] || 0) + 1
+        return acc
+      }, {})
+
+      return {
+        today: todayKey,
+        client_filter: client || null,
+        counts: {
+          active_calendar_items: active.length,
+          overdue: overdue.length,
+          today: todayItems.length,
+          next_14_days: next14.length,
+          ready_without_date: readyUnscheduled.length,
+          in_motion: production.length,
+          recent_inbox: inbox.length,
+          saved_references_sample: savedIds.length,
+        },
+        calendar: {
+          overdue: overdue.slice(0, 8).map(compactCalendarItem),
+          today: todayItems.slice(0, 8).map(compactCalendarItem),
+          next_14_days: next14.slice(0, 12).map(compactCalendarItem),
+          ready_without_date: readyUnscheduled.slice(0, 8).map(compactCalendarItem),
+          in_motion: production.slice(0, 10).map(compactCalendarItem),
+        },
+        inbox_recent: inbox.slice(0, 12).map(compactInboxItem),
+        saved_references_recent: ((savedResult.data || []) as Record<string, unknown>[]).map(compactReference),
+        published_this_month: outputByClient,
+        suggested_lens: [
+          overdue.length ? 'Prima elimina o riprogramma gli arretrati.' : '',
+          readyUnscheduled.length ? 'Ci sono contenuti pronti ma non piazzati in calendario.' : '',
+          todayItems.length ? 'Oggi ha gia materiale operativo.' : 'Oggi e scarico: proponi una sola azione utile.',
+          inbox.length ? 'Usa la inbox recente come serbatoio, non come lista da svuotare tutta.' : '',
+        ].filter(Boolean),
+      }
+    }
+
     case 'list_calendar_items': {
       let query = supabase.from('calendar_items').select('*').eq('user_id', userId).order('scheduled_date', { ascending: true })
       if (args.client) query = query.eq('client', args.client)
