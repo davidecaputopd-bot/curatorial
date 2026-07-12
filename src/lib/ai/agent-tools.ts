@@ -187,6 +187,11 @@ export const AGENT_TOOLS = [
         properties: {
           query: { type: 'string', description: 'Query di ricerca precisa' },
           max_results: { type: 'number', description: 'Numero di risultati, da 1 a 10. Default 5.' },
+          mode: {
+            type: 'string',
+            enum: ['general', 'authority', 'community', 'creative', 'all'],
+            description: 'Modalita ricerca. all combina fonti autorevoli, Reddit/forum/community e siti creativi. Default general.',
+          },
         },
         required: ['query'],
       },
@@ -221,6 +226,7 @@ function buildImageUrl(prompt: string): string {
 }
 
 type ToolArgs = Record<string, unknown>
+type SearchMode = 'general' | 'authority' | 'community' | 'creative' | 'all'
 
 function localDateKey(date: Date) {
   const year = date.getFullYear()
@@ -499,22 +505,25 @@ export async function executeAgentTool(
     case 'web_search': {
       if (!args.query || typeof args.query !== 'string') return { error: 'query richiesta' }
       const requested = typeof args.max_results === 'number' ? args.max_results : 5
-      return webSearch(args.query, Math.min(Math.max(Math.round(requested), 1), 10))
+      const mode = typeof args.mode === 'string' ? (args.mode as SearchMode) : 'general'
+      return webSearch(args.query, Math.min(Math.max(Math.round(requested), 1), 10), mode)
     }
 
     case 'project_radar': {
       if (!args.project || typeof args.project !== 'string') return { error: 'project richiesto' }
       const topic = typeof args.topic === 'string' ? args.topic.trim() : ''
-      return searchWeb(buildRadarQuery(args.project, topic), 5)
+      return webSearch(buildRadarQuery(args.project, topic), 5, 'all')
     }
 
     case 'market_forecast': {
       if (!args.idea || typeof args.idea !== 'string') return { error: 'idea richiesta' }
       const queries = buildForecastQueries(args)
       const searches = await Promise.all(
-        queries.map(async (query) => ({
+        queries.map(async ({ lane, query, domains }) => ({
+          lane,
           query,
-          result: await searchWeb(query, 4),
+          domains,
+          result: await searchWeb(query, 4, { includeDomains: domains }),
         }))
       )
 
@@ -637,6 +646,42 @@ const RADAR_CONTEXT: Record<string, string> = {
   trama: 'contemporary vintage fashion retail store launch campaigns',
 }
 
+const AUTHORITY_DOMAINS = [
+  'thinkwithgoogle.com',
+  'mckinsey.com',
+  'deloitte.com',
+  'gartner.com',
+  'forrester.com',
+  'hubspot.com',
+  'sproutsocial.com',
+  'hootsuite.com',
+  'statista.com',
+  'insiderintelligence.com',
+]
+
+const COMMUNITY_DOMAINS = [
+  'reddit.com',
+  'www.reddit.com',
+  'quora.com',
+  'news.ycombinator.com',
+  'indiehackers.com',
+  'producthunt.com',
+  'discord.com',
+]
+
+const CREATIVE_DOMAINS = [
+  'itsnicethat.com',
+  'thedieline.com',
+  'behance.net',
+  'dribbble.com',
+  'awwwards.com',
+  'designweek.co.uk',
+  'campaignlive.co.uk',
+  'adage.com',
+  'adweek.com',
+  'lbbonline.com',
+]
+
 export function buildRadarQuery(project: string, topic = '') {
   const context = RADAR_CONTEXT[project.toLocaleLowerCase('it-IT')] || 'creative brand communication'
   return [project, context, topic, 'recent campaign trend case study 2026'].filter(Boolean).join(' ')
@@ -655,15 +700,48 @@ function buildForecastQueries(args: ToolArgs) {
   const base = [idea, project, market, audience, context].filter(Boolean).join(' ')
 
   return [
-    `${base} consumer trend 2026 marketing social media`,
-    `${base} successful campaign case study brand strategy`,
-    `${base} failure risk audience insight creative campaign`,
-  ].map((query) => query.replace(/\s+/g, ' ').trim())
+    {
+      lane: 'authority',
+      query: `${base} consumer trend 2026 marketing social media report insight`,
+      domains: AUTHORITY_DOMAINS,
+    },
+    {
+      lane: 'community',
+      query: `${base} reddit forum community opinion problem complaint desire Discord public`,
+      domains: COMMUNITY_DOMAINS,
+    },
+    {
+      lane: 'creative',
+      query: `${base} successful campaign case study brand strategy design social`,
+      domains: CREATIVE_DOMAINS,
+    },
+    {
+      lane: 'risk',
+      query: `${base} failure risk audience insight creative campaign backlash`,
+      domains: undefined,
+    },
+  ].map((item) => ({ ...item, query: item.query.replace(/\s+/g, ' ').trim() }))
+}
+
+function englishResearchQuery(query: string, mode: SearchMode) {
+  const cleaned = query.replace(/\s+/g, ' ').trim()
+  if (mode === 'community') return `${cleaned} reddit forum community opinion discussion Discord public`
+  if (mode === 'creative') return `${cleaned} design campaign case study visual identity social creative direction`
+  if (mode === 'authority') return `${cleaned} market trend report consumer insight marketing 2026`
+  return `${cleaned} marketing trend consumer insight social media 2026`
+}
+
+function modeDomains(mode: SearchMode) {
+  if (mode === 'authority') return AUTHORITY_DOMAINS
+  if (mode === 'community') return COMMUNITY_DOMAINS
+  if (mode === 'creative') return CREATIVE_DOMAINS
+  return undefined
 }
 
 export async function searchWeb(
   query: string,
-  maxResults: number
+  maxResults: number,
+  options: { includeDomains?: string[] } = {}
 ): Promise<{ results: SearchResult[] } | { error: string }> {
   const apiKey = process.env.TAVILY_API_KEY || process.env.Tavily
   if (!apiKey) return { error: 'Tavily non configurato: manca TAVILY_API_KEY' }
@@ -681,6 +759,7 @@ export async function searchWeb(
         search_depth: 'basic',
         include_answer: false,
         include_raw_content: false,
+        include_domains: options.includeDomains,
       }),
       signal: AbortSignal.timeout(10_000),
     })
@@ -707,7 +786,57 @@ export async function searchWeb(
   }
 }
 
-const webSearch = searchWeb
+async function researchWeb(query: string, maxResults: number, mode: SearchMode) {
+  if (mode !== 'all') {
+    const normalized = englishResearchQuery(query, mode)
+    const result = await searchWeb(normalized, maxResults, {
+      includeDomains: modeDomains(mode),
+    })
+    return {
+      mode,
+      language: 'english-query',
+      query: normalized,
+      ...result,
+    }
+  }
+
+  const lanes: Array<{ lane: SearchMode; max: number }> = [
+    { lane: 'authority', max: Math.max(2, Math.ceil(maxResults / 3)) },
+    { lane: 'community', max: Math.max(2, Math.ceil(maxResults / 3)) },
+    { lane: 'creative', max: Math.max(2, Math.ceil(maxResults / 3)) },
+  ]
+  const searches = await Promise.all(
+    lanes.map(async ({ lane, max }) => {
+      const normalized = englishResearchQuery(query, lane)
+      return {
+        lane,
+        query: normalized,
+        result: await searchWeb(normalized, max, {
+          includeDomains: modeDomains(lane),
+        }),
+      }
+    })
+  )
+  const results = searches.flatMap((search) =>
+    'results' in search.result
+      ? search.result.results.map((item) => ({ ...item, lane: search.lane, query: search.query }))
+      : []
+  )
+  const errors = searches.flatMap((search) =>
+    'error' in search.result ? [{ lane: search.lane, query: search.query, error: search.result.error }] : []
+  )
+  return {
+    mode,
+    language: 'english-query',
+    lanes: searches.map(({ lane, query }) => ({ lane, query })),
+    results: results.slice(0, maxResults),
+    errors,
+    note:
+      'Community search includes public/indexed forums. Closed Discord servers or private communities are not scraped.',
+  }
+}
+
+const webSearch = researchWeb
 
 function isBlockedHostname(hostname: string) {
   const host = hostname.toLowerCase()
