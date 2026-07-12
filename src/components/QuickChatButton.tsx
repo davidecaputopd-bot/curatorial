@@ -7,6 +7,7 @@ export default function QuickChatButton() {
   const pathname = usePathname()
   if (
     pathname === '/' ||
+    pathname === '/ai' ||
     pathname === '/chat' ||
     pathname === '/login' ||
     pathname.startsWith('/auth/')

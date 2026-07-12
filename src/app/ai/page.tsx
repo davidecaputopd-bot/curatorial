@@ -106,6 +106,15 @@ const QUICK_PROMPTS = [
   'Valuta se questa idea puo funzionare sul mercato.',
 ]
 
+const COMMAND_KEYS = [
+  { label: 'Oggi', prompt: 'Leggi GROW e dimmi la priorita di oggi.' },
+  { label: 'Inbox', prompt: 'Guarda la mia Inbox recente e trova uno spunto utile.' },
+  { label: 'Piano', prompt: 'Controlla il Piano e dimmi cosa rischio di lasciare indietro.' },
+  { label: 'Mercato', prompt: 'Valuta questa idea sul mercato: ' },
+  { label: 'Reddit', prompt: 'Cerca online in inglese, includendo Reddit e forum pubblici: ' },
+  { label: 'Archivio', prompt: 'Cerca nel mio Archivio una direzione visiva per: ' },
+]
+
 function messageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -184,6 +193,7 @@ export default function AiPage() {
   const [citeQuery, setCiteQuery] = useState('')
   const [citeResults, setCiteResults] = useState<Citation[]>([])
   const [citations, setCitations] = useState<Citation[]>([])
+  const [composerFocused, setComposerFocused] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const referenceContext = useMemo(() => buildReferenceContext(reference), [reference])
@@ -367,6 +377,8 @@ export default function AiPage() {
   async function send(raw: string) {
     const text = raw.trim()
     if (!text || loading) return
+    const activeConversationId = conversationId || newConversationId()
+    if (!conversationId) setConversationId(activeConversationId)
 
     const userMessage: Message = { id: messageId(), role: 'user', content: text }
     const next = [...messages, userMessage]
@@ -388,7 +400,7 @@ export default function AiPage() {
         body: JSON.stringify({
           message: messageForApi,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
-          conversationId,
+          conversationId: activeConversationId,
         }),
       })
 
@@ -449,8 +461,8 @@ export default function AiPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-grow-bg text-grow-text">
-      <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 pb-28 pt-8">
+    <main className="flex h-[100dvh] overflow-hidden bg-grow-bg text-grow-text">
+      <div className="mx-auto flex h-full w-full max-w-xl flex-col px-4 pt-8">
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">GROW</p>
@@ -527,7 +539,7 @@ export default function AiPage() {
           </section>
         )}
 
-        <div className="flex-1 space-y-4 overflow-y-auto pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
           {messages.length === 0 && (
             <div className="rounded-[1.6rem] border border-grow-border bg-grow-card px-5 py-6">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
@@ -698,7 +710,7 @@ export default function AiPage() {
           <div ref={bottomRef} />
         </div>
 
-        <div className="fixed bottom-[92px] left-0 right-0 z-40 px-4">
+        <div className="shrink-0 pb-3">
           <div className="mx-auto max-w-xl">
             {citations.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">
@@ -742,6 +754,27 @@ export default function AiPage() {
               </div>
             )}
 
+            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+              {COMMAND_KEYS.map((key) => (
+                <button
+                  key={key.label}
+                  type="button"
+                  onClick={() => {
+                    if (key.prompt.endsWith(': ')) {
+                      setInput(key.prompt)
+                      setComposerFocused(true)
+                    } else {
+                      void send(key.prompt)
+                    }
+                  }}
+                  disabled={loading}
+                  className="shrink-0 rounded-full border border-black/10 bg-white px-3 py-2 text-[10px] font-black uppercase text-grow-muted disabled:opacity-40"
+                >
+                  {key.label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex items-center gap-2 rounded-[2rem] border border-black/10 bg-[#F7F4EE]/95 p-2 shadow-[0_18px_50px_rgba(15,15,16,0.12)] backdrop-blur-xl">
               <button
                 type="button"
@@ -751,9 +784,11 @@ export default function AiPage() {
               >
                 @
               </button>
-              <input
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onFocus={() => setComposerFocused(true)}
+                onBlur={() => window.setTimeout(() => setComposerFocused(false), 160)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -762,7 +797,8 @@ export default function AiPage() {
                 }}
                 placeholder="Scrivi qualsiasi cosa..."
                 aria-label="Messaggio per GROW AI"
-                className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-grow-muted"
+                rows={1}
+                className="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-snug outline-none placeholder:text-grow-muted"
               />
               <button
                 type="button"
@@ -780,7 +816,7 @@ export default function AiPage() {
         </div>
       </div>
 
-      <BottomNav />
+      {!composerFocused && !showCitePicker && <BottomNav />}
     </main>
   )
 }
