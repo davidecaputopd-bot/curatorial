@@ -124,6 +124,23 @@ export const AGENT_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'market_forecast',
+      description: 'Analizza probabilita di successo/insuccesso di un concept, campagna, brand, contenuto social o scelta creativa usando ricerche recenti, segnali di mercato e contesto cliente. Non restituisce certezze: restituisce scenari, rischi, segnali e raccomandazione.',
+      parameters: {
+        type: 'object',
+        properties: {
+          project: { type: 'string', description: 'Cliente/progetto opzionale, es. ANventitre, Exousia, TRAMA' },
+          idea: { type: 'string', description: 'Idea, concept, campagna, prodotto o contenuto da valutare' },
+          market: { type: 'string', description: 'Mercato/settore opzionale, es. vino naturale, retail vintage, consulenza PMI, social locale' },
+          audience: { type: 'string', description: 'Target opzionale' },
+        },
+        required: ['idea'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_monthly_output_summary',
       description: 'Riassume quanti contenuti sono stati pubblicati questo mese, raggruppati per cliente.',
       parameters: { type: 'object', properties: {} },
@@ -491,6 +508,57 @@ export async function executeAgentTool(
       return searchWeb(buildRadarQuery(args.project, topic), 5)
     }
 
+    case 'market_forecast': {
+      if (!args.idea || typeof args.idea !== 'string') return { error: 'idea richiesta' }
+      const queries = buildForecastQueries(args)
+      const searches = await Promise.all(
+        queries.map(async (query) => ({
+          query,
+          result: await searchWeb(query, 4),
+        }))
+      )
+
+      const allResults = searches.flatMap((search) =>
+        'results' in search.result
+          ? search.result.results.map((result) => ({ ...result, query: search.query }))
+          : []
+      )
+      const errors = searches.flatMap((search) =>
+        'error' in search.result ? [{ query: search.query, error: search.result.error }] : []
+      )
+
+      const sourceCount = allResults.length
+      const confidence =
+        sourceCount >= 9 ? 'media' :
+        sourceCount >= 4 ? 'bassa-media' :
+        'bassa'
+
+      return {
+        idea: args.idea,
+        project: args.project || null,
+        market: args.market || null,
+        audience: args.audience || null,
+        confidence,
+        limitation:
+          'Forecast qualitativo basato su segnali recenti e fonti web. Non e una previsione garantita ne una stima statistica.',
+        searches,
+        signals: allResults.slice(0, 10),
+        errors,
+        forecast_framework: {
+          evaluate: [
+            'desiderabilita: qualcuno lo vuole davvero?',
+            'distintivita: si distingue dal rumore visivo/social?',
+            'credibilita: il brand puo permettersi questa promessa?',
+            'timing: il mercato e pronto o saturo?',
+            'produzione: Davide puo produrlo bene con risorse realistiche?',
+            'rischio: cosa puo farlo sembrare cheap, confuso o fuori tempo?',
+          ],
+          output_required:
+            'Dai percentuale indicativa solo come stima qualitativa, spiega perche, indica segnali pro/contro e una modifica per aumentare le chance.',
+        },
+      }
+    }
+
     case 'fetch_webpage': {
       if (!args.url || typeof args.url !== 'string') return { error: 'url richiesto' }
       const requested = typeof args.max_chars === 'number' ? args.max_chars : 4000
@@ -572,6 +640,25 @@ const RADAR_CONTEXT: Record<string, string> = {
 export function buildRadarQuery(project: string, topic = '') {
   const context = RADAR_CONTEXT[project.toLocaleLowerCase('it-IT')] || 'creative brand communication'
   return [project, context, topic, 'recent campaign trend case study 2026'].filter(Boolean).join(' ')
+}
+
+function projectMarketContext(project: string) {
+  return RADAR_CONTEXT[project.toLocaleLowerCase('it-IT')] || 'creative brand communication social marketing'
+}
+
+function buildForecastQueries(args: ToolArgs) {
+  const idea = String(args.idea || '').trim()
+  const project = String(args.project || '').trim()
+  const market = String(args.market || '').trim()
+  const audience = String(args.audience || '').trim()
+  const context = project ? projectMarketContext(project) : ''
+  const base = [idea, project, market, audience, context].filter(Boolean).join(' ')
+
+  return [
+    `${base} consumer trend 2026 marketing social media`,
+    `${base} successful campaign case study brand strategy`,
+    `${base} failure risk audience insight creative campaign`,
+  ].map((query) => query.replace(/\s+/g, ' ').trim())
 }
 
 export async function searchWeb(

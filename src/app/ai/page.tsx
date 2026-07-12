@@ -49,6 +49,7 @@ const TOOL_LABELS: Record<string, string> = {
   create_memory: 'Nuovo ricordo',
   search_saved_content: 'Cercato in archivio',
   project_radar: 'Radar cliente aggiornato',
+  market_forecast: 'Forecast mercato',
   get_monthly_output_summary: 'Calcolato output mensile',
   generate_image: 'Immagine generata',
   web_search: 'Ricerca web completata',
@@ -102,7 +103,7 @@ const QUICK_PROMPTS = [
   'Leggi GROW e dimmi da dove riparto oggi.',
   'Trova una cosa utile nella mia Inbox e trasformala in lavoro.',
   'Controlla Piano e dimmi cosa sto ignorando.',
-  'Cerca nel mio Archivio una direzione visiva per il prossimo contenuto.',
+  'Valuta se questa idea puo funzionare sul mercato.',
 ]
 
 function messageId() {
@@ -533,7 +534,7 @@ export default function AiPage() {
                 Cabina GROW
               </p>
               <p className="mt-2 text-sm leading-relaxed text-grow-muted">
-                Posso leggere Piano, Inbox e Archivio prima di rispondere. Usami per decidere, trasformare e chiudere lavoro.
+                Posso leggere Piano, Inbox e Archivio prima di rispondere. Posso anche valutare idee, campagne e contenuti con segnali di mercato.
               </p>
               <div className="mt-4 grid gap-2">
                 {QUICK_PROMPTS.map((prompt) => (

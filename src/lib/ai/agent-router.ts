@@ -27,6 +27,7 @@ type AgentToolChoice =
           | 'create_memory'
           | 'project_radar'
           | 'get_operational_context'
+          | 'market_forecast'
       }
     }
 
@@ -167,6 +168,13 @@ function firstToolFor(message: string): AgentToolChoice {
 
   if (needsFreshResearch) {
     return { type: 'function', function: { name: 'web_search' } }
+  }
+
+  const needsMarketForecast =
+    /\b(funzioner[àa]|funziona|successo|insuccesso|flop|prevedi|previsione|forecast|mercato|marketing|strategia social|campagna|lancio|posizionamento|target|pubblico|engagement|conversione|rischio)\b/i.test(message)
+
+  if (needsMarketForecast) {
+    return { type: 'function', function: { name: 'market_forecast' } }
   }
 
   if (/\b(radar|segnali|opportunità|ispirazioni)\b.{0,50}\b(AN23|ANventitre|Exousia|Cantina Don Carlo|ACI Copertino|TRAMA)\b/i.test(message)) {
