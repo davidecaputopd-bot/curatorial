@@ -147,7 +147,8 @@ export default function CaptureSetupPage() {
             <p className="text-sm font-black">Accesso limitato</p>
             <p className="mt-1 text-xs leading-relaxed text-grow-muted">
               Il token può soltanto aggiungere elementi alla tua Inbox. Non può
-              leggere Archivio, chat o calendario.
+              leggere Archivio, chat o calendario. Scade dopo 180 giorni e può
+              essere sostituito tornando in questa pagina.
             </p>
           </div>
         </section>

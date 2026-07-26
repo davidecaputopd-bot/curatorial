@@ -14,7 +14,11 @@ function LoginInner() {
   const [message, setMessage] = useState('')
 
   const email = process.env.NEXT_PUBLIC_GROW_LOGIN_EMAIL
-  const next = searchParams.get('next') || '/'
+  const requestedNext = searchParams.get('next')
+  const next =
+    requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
+      ? requestedNext
+      : '/'
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

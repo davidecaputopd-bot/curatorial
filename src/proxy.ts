@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isGrowOwner } from '@/lib/auth/owner'
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -24,19 +25,20 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  const owner = isGrowOwner(user) ? user : null
 
   const isAuthRoute =
     request.nextUrl.pathname === '/login' ||
     request.nextUrl.pathname.startsWith('/auth/')
 
-  if (!user && !isAuthRoute) {
+  if (!owner && !isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('next', request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  if (owner && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     url.search = ''

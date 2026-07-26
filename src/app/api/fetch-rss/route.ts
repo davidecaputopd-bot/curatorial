@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import Parser from 'rss-parser'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 
@@ -14,10 +14,21 @@ const parser = new Parser({
   }
 })
 
-function extractImage(item: any): string | null {
+type RssImageItem = {
+  mediaContent?: { $?: { url?: string } }
+  mediaThumbnail?: { $?: { url?: string } }
+  enclosure?: { url?: string; type?: string }
+  contentEncoded?: string
+  content?: string
+  summary?: string
+  creator?: string
+  author?: string
+}
+
+function extractImage(item: RssImageItem): string | null {
   // Prova tutti i campi possibili dove può nascondersi un'immagine
-  if (item.mediaContent?.$.url) return item.mediaContent.$.url
-  if (item.mediaThumbnail?.$.url) return item.mediaThumbnail.$.url
+  if (item.mediaContent?.$?.url) return item.mediaContent.$.url
+  if (item.mediaThumbnail?.$?.url) return item.mediaThumbnail.$.url
   if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) return item.enclosure.url
 
   // Cerca nel contenuto HTML
@@ -49,6 +60,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    const supabase = createAdminSupabaseClient()
     const { data: sources } = await supabase
       .from('sources')
       .select('*')
@@ -65,8 +77,9 @@ export async function GET(request: Request) {
 
         for (const item of items) {
           if (!item.title || !item.link) continue
+          const imageItem = item as RssImageItem
 
-          let imageUrl = extractImage(item)
+          let imageUrl = extractImage(imageItem)
           if (!imageUrl && item.link) {
             imageUrl = await fetchOgImage(item.link)
           }
@@ -80,7 +93,7 @@ export async function GET(request: Request) {
               title: item.title,
               url: item.link,
               summary: item.contentSnippet?.slice(0, 300),
-              author: (item as any).creator || (item as any).author,
+              author: imageItem.creator || imageItem.author,
               published_at: item.pubDate
                 ? new Date(item.pubDate).toISOString()
                 : new Date().toISOString(),

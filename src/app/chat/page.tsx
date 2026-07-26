@@ -120,7 +120,6 @@ function InputPreview({ url, onDismiss }: { url: string; onDismiss: () => void }
 
   useEffect(() => {
     let cancelled = false
-    setData(null); setDone(false)
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
       .then(r => r.ok ? r.json() : null)
       .then((json: OGPreview | null) => { if (!cancelled) { setData(json); setDone(true) } })
@@ -247,9 +246,12 @@ export default function ChatPage() {
   }, [])
 
   useEffect(() => {
-    load()
+    const initial = window.setTimeout(load, 0)
     const t = setInterval(load, 6000)
-    return () => clearInterval(t)
+    return () => {
+      clearTimeout(initial)
+      clearInterval(t)
+    }
   }, [load])
 
   useEffect(() => {
@@ -293,15 +295,16 @@ export default function ChatPage() {
     try {
       const { createBrowserSupabaseClient } = await import('@/lib/supabase/client')
       const sb = createBrowserSupabaseClient()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) throw new Error('Unauthorized')
       const ext = file.name.split('.').pop() || 'jpg'
-      const path = `chat-${Date.now()}.${ext}`
+      const path = `${user.id}/chat-${Date.now()}.${ext}`
       const { error } = await sb.storage.from('inbox-images').upload(path, file, { contentType: file.type })
       if (error) throw error
-      const { data } = sb.storage.from('inbox-images').getPublicUrl(path)
       const r = await fetch('/api/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: data.publicUrl, source: 'chat' }),
+        body: JSON.stringify({ image_url: path, source: 'chat' }),
       })
       const saved = await r.json()
       if (saved.item) {
@@ -404,7 +407,7 @@ export default function ChatPage() {
 
         {/* Input preview (shows when URL detected in input) */}
         {inputUrl && (
-          <InputPreview url={inputUrl} onDismiss={() => setInputUrl(null)} />
+          <InputPreview key={inputUrl} url={inputUrl} onDismiss={() => setInputUrl(null)} />
         )}
 
         {/* Composer */}

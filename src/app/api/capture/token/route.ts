@@ -18,8 +18,16 @@ export async function GET() {
     )
   }
 
-  return NextResponse.json({
-    token: createCaptureDeviceToken(user.id),
-    endpoint: '/api/capture',
-  })
+  return NextResponse.json(
+    {
+      token: createCaptureDeviceToken(user.id),
+      endpoint: '/api/capture',
+      expires_in_days: 180,
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    }
+  )
 }

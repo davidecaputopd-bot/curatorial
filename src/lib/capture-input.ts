@@ -8,9 +8,24 @@ export type CaptureInput = {
 }
 
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/i
+const MAX_BODY_BYTES = 12_000_000
+const MAX_CONTENT_LENGTH = 20_000
+const MAX_URL_LENGTH = 4_000
 
-function cleanText(value: unknown) {
-  return typeof value === 'string' ? value.trim() : ''
+function cleanText(value: unknown, maxLength = MAX_CONTENT_LENGTH) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
+}
+
+function sanitizeCaptureInput(value: CaptureInput | null) {
+  if (!value || typeof value !== 'object') return null
+  return {
+    content: cleanText(value.content),
+    url: cleanText(value.url, MAX_URL_LENGTH),
+    image_base64: cleanText(value.image_base64, 11_000_000),
+    image_mime: cleanText(value.image_mime, 100),
+    client: cleanText(value.client, 100),
+    source: cleanText(value.source, 40),
+  } satisfies CaptureInput
 }
 
 export function extractSharedUrl(value: string) {
@@ -65,9 +80,12 @@ export function detectCaptureSource(url: string | null, fallback?: string) {
 
 export async function parseCaptureInput(request: Request): Promise<CaptureInput | null> {
   const contentType = request.headers.get('content-type') || ''
+  const declaredLength = Number(request.headers.get('content-length') || '0')
+  if (declaredLength > MAX_BODY_BYTES) return null
 
   if (contentType.includes('application/json')) {
-    return (await request.json().catch(() => null)) as CaptureInput | null
+    const value = (await request.json().catch(() => null)) as CaptureInput | null
+    return sanitizeCaptureInput(value)
   }
 
   if (
@@ -78,16 +96,17 @@ export async function parseCaptureInput(request: Request): Promise<CaptureInput 
     if (!form) return null
     return {
       content: cleanText(form.get('content') || form.get('text')),
-      url: cleanText(form.get('url')),
-      client: cleanText(form.get('client')),
-      source: cleanText(form.get('source')),
+      url: cleanText(form.get('url'), MAX_URL_LENGTH),
+      client: cleanText(form.get('client'), 100),
+      source: cleanText(form.get('source'), 40),
     }
   }
 
   if (contentType.includes('text/plain')) {
-    const text = (await request.text()).trim()
+    const text = cleanText(await request.text())
     return text ? { content: text } : null
   }
 
-  return (await request.json().catch(() => null)) as CaptureInput | null
+  const value = (await request.json().catch(() => null)) as CaptureInput | null
+  return sanitizeCaptureInput(value)
 }

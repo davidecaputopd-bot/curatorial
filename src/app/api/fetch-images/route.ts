@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 import { isAllowedStockQuery } from '@/lib/discovery-quality'
 
@@ -24,7 +24,11 @@ const QUERIES: { q: string; cat: string }[] = [
   { q: 'motion identity title sequence frames', cat: 'branding' },
 ]
 
-async function fetchUnsplash(q: string, cat: string): Promise<number> {
+async function fetchUnsplash(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  q: string,
+  cat: string
+): Promise<number> {
   if (!UNSPLASH_KEY || !isAllowedStockQuery(q, cat)) return 0
   let saved = 0
   try {
@@ -58,7 +62,11 @@ async function fetchUnsplash(q: string, cat: string): Promise<number> {
   return saved
 }
 
-async function fetchPexels(q: string, cat: string): Promise<number> {
+async function fetchPexels(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  q: string,
+  cat: string
+): Promise<number> {
   if (!PEXELS_KEY || !isAllowedStockQuery(q, cat)) return 0
   let saved = 0
   try {
@@ -96,12 +104,13 @@ export async function GET(request: Request) {
   if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const supabase = createAdminSupabaseClient()
   let totalSaved = 0
 
   for (const { q, cat } of QUERIES) {
     const [u, p] = await Promise.all([
-      fetchUnsplash(q, cat),
-      fetchPexels(q, cat),
+      fetchUnsplash(supabase, q, cat),
+      fetchPexels(supabase, q, cat),
     ])
     totalSaved += u + p
     await new Promise(r => setTimeout(r, 300))

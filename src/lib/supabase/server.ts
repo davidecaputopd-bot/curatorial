@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { isGrowOwner } from '@/lib/auth/owner'
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
@@ -32,5 +33,5 @@ export async function getAuthenticatedSupabase() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  return { supabase, user }
+  return { supabase, user: isGrowOwner(user) ? user : null }
 }

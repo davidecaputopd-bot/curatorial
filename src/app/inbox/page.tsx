@@ -135,15 +135,16 @@ export default function InboxPage() {
     setError('')
     try {
       const supabase = createBrowserSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Unauthorized')
       const ext = file.name.split('.').pop() || 'jpg'
-      const path = `manual-${Date.now()}.${ext}`
+      const path = `${user.id}/manual-${Date.now()}.${ext}`
       const { error: uploadError } = await supabase.storage.from('inbox-images').upload(path, file, { contentType: file.type })
       if (uploadError) throw uploadError
-      const { data } = supabase.storage.from('inbox-images').getPublicUrl(path)
       const res = await fetch('/api/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: data.publicUrl, source: 'manual' }),
+        body: JSON.stringify({ image_url: path, source: 'manual' }),
       })
       const saved = await res.json()
       if (saved.item) setItems(prev => [saved.item as Item, ...prev])

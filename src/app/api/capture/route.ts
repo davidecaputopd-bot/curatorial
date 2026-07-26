@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { fetchLinkTitle } from '@/lib/link-preview'
 import { classifyInboxItem } from '@/lib/inbox/classify'
-import {
-  isLegacyCaptureToken,
-  readCaptureDeviceToken,
-} from '@/lib/capture-auth'
+import { readCaptureDeviceToken } from '@/lib/capture-auth'
 import {
   detectCaptureSource,
   extractSharedUrl,
@@ -18,20 +15,15 @@ function bearerToken(request: Request) {
   return header.replace(/^Bearer\s+/i, '').trim()
 }
 
-async function getOwnerUserId(supabase: ReturnType<typeof createAdminSupabaseClient>) {
-  const { data, error } = await supabase.auth.admin.listUsers({ perPage: 1 })
-  if (error || !data.users.length) return null
-  return data.users[0].id
-}
-
 async function uploadImage(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
+  userId: string,
   base64: string,
   mime: string
 ) {
   const buffer = Buffer.from(base64, 'base64')
   const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
-  const path = `capture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const path = `${userId}/capture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
   const { error } = await supabase.storage
     .from('inbox-images')
@@ -39,16 +31,14 @@ async function uploadImage(
 
   if (error) return null
 
-  const { data } = supabase.storage.from('inbox-images').getPublicUrl(path)
-  return data.publicUrl
+  return path
 }
 
 export async function POST(request: Request) {
   const token = bearerToken(request)
   const tokenUserId = readCaptureDeviceToken(token)
-  const legacyAuthorized = isLegacyCaptureToken(token)
 
-  if (!tokenUserId && !legacyAuthorized) {
+  if (!tokenUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -59,10 +49,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminSupabaseClient()
-  const userId = tokenUserId || (await getOwnerUserId(supabase))
-  if (!userId) {
-    return NextResponse.json({ error: 'Nessun utente GROW trovato' }, { status: 500 })
-  }
+  const userId = tokenUserId
 
   const sharedUrl = body.url || extractSharedUrl(body.content || '')
   const normalizedUrl = sharedUrl ? normalizeSharedUrl(sharedUrl) : null
@@ -85,13 +72,19 @@ export async function POST(request: Request) {
 
   let imageUrl: string | null = null
   if (body.image_base64) {
-    if (body.image_base64.length > 11_000_000) {
+    const supportedMime = ['image/jpeg', 'image/png', 'image/webp']
+    const mime = body.image_mime || 'image/jpeg'
+    if (
+      !supportedMime.includes(mime) ||
+      body.image_base64.length > 11_000_000 ||
+      Buffer.byteLength(body.image_base64, 'base64') > 8_000_000
+    ) {
       return NextResponse.json(
-        { error: 'Immagine troppo grande: massimo 8 MB' },
+        { error: 'Immagine non valida o troppo grande: massimo 8 MB' },
         { status: 413 }
       )
     }
-    imageUrl = await uploadImage(supabase, body.image_base64, body.image_mime || 'image/jpeg')
+    imageUrl = await uploadImage(supabase, userId, body.image_base64, mime)
   }
 
   let content = body.content || null

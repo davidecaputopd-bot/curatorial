@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 import {
   curatedChannelsForToday,
@@ -145,6 +145,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const supabase = createAdminSupabaseClient()
   let saved = 0
   let failed = 0
   let skipped = 0
