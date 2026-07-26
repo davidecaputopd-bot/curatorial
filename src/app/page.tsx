@@ -4,6 +4,11 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
+import type {
+  BrainFeedbackSignal,
+  DailyBrainBrief,
+  DailyBrainCard,
+} from '@/lib/brain/daily-brief'
 
 const PAGE_SIZE = 18
 const FEED_CEILING = 18
@@ -64,24 +69,6 @@ type InboxItem = {
   created_at: string
 }
 
-type DailyBrief = {
-  focus: string
-  risk: string
-  opportunity: string
-  prompt: string
-}
-
-type RadarSignal = {
-  title: string
-  url: string
-  snippet: string
-}
-
-type DailyRadar = {
-  project: string
-  signals: RadarSignal[]
-}
-
 function localDateKey(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -125,6 +112,103 @@ function SafeImage({
       onError={() => setFailed(true)}
       loading="lazy"
     />
+  )
+}
+
+const FEEDBACK_LABELS: Array<{
+  signal: BrainFeedbackSignal
+  label: string
+}> = [
+  { signal: 'useful_now', label: 'Utile' },
+  { signal: 'nourishment', label: 'Nutrimento' },
+  { signal: 'personal', label: 'Personale' },
+  { signal: 'not_for_me', label: 'Non per me' },
+  { signal: 'used', label: 'Già usato' },
+]
+
+function BrainBriefCard({
+  card,
+  feedback,
+  onFeedback,
+}: {
+  card: DailyBrainCard
+  feedback?: BrainFeedbackSignal
+  onFeedback: (card: DailyBrainCard, signal: BrainFeedbackSignal) => void
+}) {
+  return (
+    <article className="rounded-[1.15rem] border border-white/10 bg-white/[0.055] p-4">
+      <div className="flex items-start gap-3">
+        <span
+          className={[
+            'mt-1 h-8 w-1 shrink-0 rounded-full',
+            card.kind === 'dont_miss' ? 'bg-grow-yellow' : 'bg-white/20',
+          ].join(' ')}
+        />
+        <div className="min-w-0 flex-1">
+          <p
+            className={[
+              'text-[9px] font-black uppercase tracking-[0.16em]',
+              card.kind === 'dont_miss'
+                ? 'text-grow-yellow'
+                : 'text-white/40',
+            ].join(' ')}
+          >
+            {card.eyebrow}
+          </p>
+          <h3 className="mt-1 text-sm font-black leading-tight text-white">
+            {card.title}
+          </h3>
+          <p className="mt-1.5 text-xs leading-relaxed text-white/55">
+            {card.summary}
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Link
+              href={card.href}
+              className={[
+                'rounded-full px-3 py-2 text-[9px] font-black uppercase tracking-wide active:scale-[0.98]',
+                card.kind === 'dont_miss'
+                  ? 'bg-grow-yellow text-black'
+                  : 'bg-white text-black',
+              ].join(' ')}
+            >
+              {card.action_label} →
+            </Link>
+            <details className="group">
+              <summary className="cursor-pointer list-none rounded-full border border-white/10 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-white/45">
+                Perché
+              </summary>
+              <div className="mt-2 rounded-xl bg-black/25 p-3">
+                <p className="max-w-md text-[10px] leading-relaxed text-white/60">
+                  {card.reason}
+                </p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-white/30">
+                  {card.evidence.filter(Boolean).join(' · ')}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {FEEDBACK_LABELS.map((option) => (
+                    <button
+                      key={option.signal}
+                      type="button"
+                      disabled={Boolean(feedback)}
+                      onClick={() => onFeedback(card, option.signal)}
+                      className={[
+                        'rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide transition disabled:cursor-default',
+                        feedback === option.signal
+                          ? 'border-grow-yellow bg-grow-yellow text-black'
+                          : 'border-white/10 text-white/45 hover:border-white/25 hover:text-white/70 disabled:opacity-35',
+                      ].join(' ')}
+                    >
+                      {feedback === option.signal ? 'Registrato' : option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -260,27 +344,6 @@ function ImageCard({
   )
 }
 
-function CalendarRow({ item }: { item: CalendarItem }) {
-  return (
-    <Link
-      href="/calendario"
-      className="flex items-center gap-3 border-t border-white/10 py-3 first:border-t-0"
-    >
-      <span className="h-8 w-1 shrink-0 rounded-full bg-grow-yellow" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold">{item.title}</span>
-        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-white/45">
-          {item.client}
-          {item.content_type ? ` · ${item.content_type}` : ''}
-        </span>
-      </span>
-      <span className="shrink-0 text-[9px] font-black uppercase text-grow-yellow">
-        {STATUS_LABELS[item.status] || item.status}
-      </span>
-    </Link>
-  )
-}
-
 export default function Home() {
   const [images, setImages] = useState<FeedItem[]>([])
   const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([])
@@ -291,8 +354,12 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
-  const [dailyBrief, setDailyBrief] = useState<DailyBrief | null>(null)
-  const [dailyRadar, setDailyRadar] = useState<DailyRadar | null>(null)
+  const [inboxTotal, setInboxTotal] = useState(0)
+  const [dailyBrief, setDailyBrief] = useState<DailyBrainBrief | null>(null)
+  const [loadingBrain, setLoadingBrain] = useState(true)
+  const [brainFeedback, setBrainFeedback] = useState<
+    Record<string, BrainFeedbackSignal>
+  >({})
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const fetchFeedPage = (offset: number) =>
@@ -309,8 +376,11 @@ export default function Home() {
       fetch('/api/calendar').then((response) => response.json()),
       fetch('/api/inbox').then((response) => response.json()),
       fetch('/api/inbox?source=chat').then((response) => response.json()),
+      fetch('/api/inbox?lane=notes&limit=12').then((response) =>
+        response.json()
+      ),
     ])
-      .then(([feed, saved, calendar, inbox, chat]) => {
+      .then(([feed, saved, calendar, inbox, chat, manualInbox]) => {
         if (cancelled) return
         const feedItems = (feed.items || []) as FeedItem[]
         const chatItems = (chat.items || []) as InboxItem[]
@@ -325,7 +395,8 @@ export default function Home() {
           )
         )
         setCalendarItems((calendar.items || []) as CalendarItem[])
-        setInboxItems((inbox.items || []) as InboxItem[])
+        setInboxTotal(Number(inbox.total || inbox.items?.length || 0))
+        setInboxItems((manualInbox.items || []) as InboxItem[])
         setHasUnreadChat(
           Boolean(
             latestChat &&
@@ -351,59 +422,17 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    const key = `grow-daily-radar-${localDateKey(new Date())}`
-    try {
-      const cached = localStorage.getItem(key)
-      if (cached) {
-        const parsed = JSON.parse(cached) as DailyRadar
-        queueMicrotask(() => setDailyRadar(parsed))
-        return
-      }
-    } catch {}
-
-    let cancelled = false
-    fetch('/api/ai/radar')
-      .then((response) => response.json())
-      .then((data) => {
-        if (cancelled || !data.project || !data.signals?.length) return
-        const radar = {
-          project: data.project,
-          signals: data.signals as RadarSignal[],
-        }
-        setDailyRadar(radar)
-        try {
-          localStorage.setItem(key, JSON.stringify(radar))
-        } catch {}
-      })
-      .catch(() => {})
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    const key = `grow-daily-brief-${localDateKey(new Date())}`
-    try {
-      const cached = localStorage.getItem(key)
-      if (cached) {
-        const parsed = JSON.parse(cached) as DailyBrief
-        queueMicrotask(() => setDailyBrief(parsed))
-        return
-      }
-    } catch {}
-
     let cancelled = false
     fetch('/api/ai/brief')
       .then((response) => response.json())
       .then((data) => {
         if (cancelled || !data.brief) return
-        setDailyBrief(data.brief as DailyBrief)
-        try {
-          localStorage.setItem(key, JSON.stringify(data.brief))
-        } catch {}
+        setDailyBrief(data.brief as DailyBrainBrief)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingBrain(false)
+      })
 
     return () => {
       cancelled = true
@@ -441,11 +470,36 @@ export default function Home() {
     return () => observer.disconnect()
   }, [hasMore, images.length, loadingImages, loadingMore])
 
+  const registerBrainFeedback = async (
+    card: DailyBrainCard,
+    signal: BrainFeedbackSignal
+  ) => {
+    if (brainFeedback[card.id]) return
+    setBrainFeedback((current) => ({ ...current, [card.id]: signal }))
+    try {
+      const response = await fetch('/api/brain/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signal,
+          source_type: card.source_type,
+          source_id: card.source_id,
+          content_id: card.content_id,
+          title: card.title,
+        }),
+      })
+      if (!response.ok) throw new Error('Feedback non salvato')
+    } catch {
+      setBrainFeedback((current) => {
+        const next = { ...current }
+        delete next[card.id]
+        return next
+      })
+    }
+  }
+
   const now = new Date()
   const today = localDateKey(now)
-  const todayItems = calendarItems.filter(
-    (item) => item.scheduled_date === today && item.status !== 'pubblicato'
-  )
   const upcomingItems = calendarItems
     .filter(
       (item) =>
@@ -570,67 +624,46 @@ export default function Home() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
-                  Priorità
+                  Cervello operativo
                 </p>
                 <h2 className="mt-1 text-xl font-black uppercase">
-                  Da chiudere oggi
+                  Regia di oggi
                 </h2>
               </div>
               <Link
-                href="/calendario"
-                className="rounded-full bg-grow-yellow px-3 py-2 text-[10px] font-black uppercase text-black"
+                href="/ai?brief=Leggi%20GROW%20e%20dimmi%20la%20singola%20mossa%20pi%C3%B9%20utile%20ora."
+                className="rounded-full border border-white/15 px-3 py-2 text-[9px] font-black uppercase text-white/60"
               >
-                Piano →
+                Chiedi a GROW →
               </Link>
             </div>
 
-            <div className="mt-4">
-              {dailyBrief && (
-                <div className="mb-3">
-                  <Link
-                    href={`/ai?brief=${encodeURIComponent(dailyBrief.prompt)}`}
-                    className="block rounded-[1.1rem] bg-grow-yellow p-3 text-black"
-                  >
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-black/50">
-                      Focus GROW
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-sm font-black">
-                      {dailyBrief.focus}
-                    </p>
-                  </Link>
-                  <details className="mt-2 rounded-xl border border-white/10 px-3 py-2 text-[10px] text-white/55">
-                    <summary className="cursor-pointer font-black uppercase tracking-wide text-white/45">
-                      Perché questo focus
-                    </summary>
-                    <p className="mt-2">
-                      <strong className="text-white/75">Rischio:</strong>{' '}
-                      {dailyBrief.risk}
-                    </p>
-                    <p className="mt-1">
-                      <strong className="text-white/75">Opportunità:</strong>{' '}
-                      {dailyBrief.opportunity}
-                    </p>
-                  </details>
-                </div>
-              )}
-              {loadingWork ? (
-                <div className="space-y-2">
-                  {[1, 2].map((item) => (
+            <div className="mt-4 space-y-2">
+              {loadingBrain ? (
+                <>
+                  {[1, 2, 3].map((item) => (
                     <div
                       key={item}
-                      className="h-12 animate-pulse rounded-xl bg-white/5"
+                      className="h-28 animate-pulse rounded-[1.15rem] bg-white/5"
                     />
                   ))}
-                </div>
-              ) : todayItems.length ? (
-                todayItems.slice(0, 4).map((item) => (
-                  <CalendarRow key={item.id} item={item} />
+                </>
+              ) : dailyBrief?.cards.length ? (
+                dailyBrief.cards.map((card) => (
+                  <BrainBriefCard
+                    key={card.id}
+                    card={card}
+                    feedback={brainFeedback[card.id]}
+                    onFeedback={(selected, signal) =>
+                      void registerBrainFeedback(selected, signal)
+                    }
+                  />
                 ))
               ) : (
                 <div className="rounded-[1.1rem] border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-bold">Nessuna consegna oggi.</p>
+                  <p className="text-sm font-bold">Nessun segnale forte.</p>
                   <p className="mt-1 text-xs leading-relaxed text-white/45">
-                    Usa questo spazio per avanzare un lavoro già aperto.
+                    GROW non inventa una priorità quando i dati non bastano.
                   </p>
                 </div>
               )}
@@ -653,9 +686,9 @@ export default function Home() {
               </span>
             </div>
             <div>
-              <p className="text-4xl font-black">{inboxItems.length}</p>
+              <p className="text-4xl font-black">{inboxTotal}</p>
               <p className="mt-1 text-xs leading-relaxed text-grow-muted">
-                Note, link e screenshot. Nessun obbligo di organizzarli subito.
+                Note, link e salvati social. Li interpreta GROW quando servono.
               </p>
             </div>
           </Link>
@@ -777,30 +810,6 @@ export default function Home() {
             </div>
           </div>
         </section>
-
-        {dailyRadar?.signals[0] && (
-          <section className="mt-6 rounded-[1.5rem] border border-grow-border bg-grow-card p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                  Radar · {dailyRadar.project}
-                </p>
-                <h2 className="mt-1 line-clamp-2 text-base font-black leading-tight">
-                  {dailyRadar.signals[0].title}
-                </h2>
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-grow-muted">
-                  {dailyRadar.signals[0].snippet}
-                </p>
-              </div>
-              <Link
-                href={`/ai?project=${encodeURIComponent(dailyRadar.project)}&brief=${encodeURIComponent(`Analizza questo segnale del radar e trasformalo in un'idea applicabile: ${dailyRadar.signals[0].url}`)}`}
-                className="shrink-0 rounded-full bg-[#0F0F10] px-3 py-2 text-[9px] font-black uppercase text-grow-yellow"
-              >
-                Sviluppa →
-              </Link>
-            </div>
-          </section>
-        )}
 
         <section id="scopri" className="mt-10 scroll-mt-6">
           <div className="mb-4 flex items-end justify-between gap-4">

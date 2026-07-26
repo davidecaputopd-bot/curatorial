@@ -11,6 +11,10 @@ import {
   type InboxNoteType,
 } from '@/lib/inbox/classify'
 import { isTikTokUrl, tiktokVideoId } from '@/lib/tiktok'
+import type {
+  ContentIntelligence,
+  ContentRole,
+} from '@/lib/brain/content-intelligence'
 
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime()
@@ -46,6 +50,7 @@ type Item = {
   note_type?: InboxNoteType
   source?: string
   created_at: string
+  intelligence?: ContentIntelligence
 }
 
 function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
@@ -169,7 +174,10 @@ function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
 }
 
 export default function InboxPage() {
+  const [lane, setLane] = useState<'notes' | 'social'>('notes')
   const [items, setItems] = useState<Item[]>([])
+  const [total, setTotal] = useState(0)
+  const [resultTotal, setResultTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -180,16 +188,52 @@ export default function InboxPage() {
   const [uploading, setUploading] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | InboxNoteType>('all')
+  const [roleFilter, setRoleFilter] = useState<'all' | ContentRole>('all')
   const [copied, setCopied] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const selectLane = (nextLane: 'notes' | 'social') => {
+    if (nextLane === lane) return
+    setLoading(true)
+    setItems([])
+    setTotal(0)
+    setResultTotal(0)
+    setHasMore(false)
+    setQuery('')
+    setExpanded(null)
+    setError('')
+    setFilter('all')
+    setRoleFilter('all')
+    setLane(nextLane)
+  }
+
+  const selectRole = (nextRole: 'all' | ContentRole) => {
+    if (nextRole === roleFilter) return
+    setLoading(true)
+    setItems([])
+    setResultTotal(0)
+    setHasMore(false)
+    setQuery('')
+    setExpanded(null)
+    setError('')
+    setRoleFilter(nextRole)
+  }
+
   useEffect(() => {
     let cancelled = false
-    fetch('/api/inbox')
+    const roleParam =
+      lane === 'social' && roleFilter !== 'all'
+        ? `&role=${encodeURIComponent(roleFilter)}`
+        : ''
+    fetch(`/api/inbox?lane=${lane}${roleParam}`)
       .then((response) => response.json())
       .then((data) => {
         if (!cancelled) {
           setItems(data.items || [])
+          setTotal(
+            Number(data.all_total ?? data.total ?? data.items?.length ?? 0)
+          )
+          setResultTotal(Number(data.total ?? data.items?.length ?? 0))
           setHasMore(Boolean(data.has_more))
         }
       })
@@ -200,14 +244,18 @@ export default function InboxPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [lane, roleFilter])
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
+      const roleParam =
+        lane === 'social' && roleFilter !== 'all'
+          ? `&role=${encodeURIComponent(roleFilter)}`
+          : ''
       const response = await fetch(
-        `/api/inbox?offset=${items.length}&limit=100`
+        `/api/inbox?lane=${lane}${roleParam}&offset=${items.length}&limit=100`
       )
       const data = await response.json()
       if (response.ok) {
@@ -233,7 +281,13 @@ export default function InboxPage() {
       })
       const data = await res.json()
       if (data.item) {
-        setItems(prev => [data.item as Item, ...prev])
+        if (lane === 'notes') {
+          setItems((prev) => [data.item as Item, ...prev])
+          setTotal((current) => current + 1)
+          setResultTotal((current) => current + 1)
+        } else {
+          selectLane('notes')
+        }
         setText('')
       } else {
         setError(data.error || 'Salvataggio non riuscito.')
@@ -261,14 +315,23 @@ export default function InboxPage() {
         body: JSON.stringify({ image_url: path, source: 'manual' }),
       })
       const saved = await res.json()
-      if (saved.item) setItems(prev => [saved.item as Item, ...prev])
-      else setError(saved.error || 'Upload non riuscito.')
+      if (saved.item) {
+        if (lane === 'notes') {
+          setItems((prev) => [saved.item as Item, ...prev])
+          setTotal((current) => current + 1)
+          setResultTotal((current) => current + 1)
+        } else {
+          selectLane('notes')
+        }
+      } else setError(saved.error || 'Upload non riuscito.')
     } catch { setError('Upload non riuscito.') }
     setUploading(false)
   }
 
   const remove = async (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id))
+    setTotal((current) => Math.max(0, current - 1))
+    setResultTotal((current) => Math.max(0, current - 1))
     fetch('/api/inbox', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -301,7 +364,16 @@ export default function InboxPage() {
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('it-IT')
     return typedItems.filter((item) => {
-      if (filter !== 'all' && item.note_type !== filter) return false
+      if (lane === 'notes' && filter !== 'all' && item.note_type !== filter) {
+        return false
+      }
+      if (
+        lane === 'social' &&
+        roleFilter !== 'all' &&
+        item.intelligence?.role !== roleFilter
+      ) {
+        return false
+      }
       if (!normalizedQuery) return true
       return [item.content, item.url, item.og_title, item.og_description]
         .filter(Boolean)
@@ -309,7 +381,7 @@ export default function InboxPage() {
           String(value).toLocaleLowerCase('it-IT').includes(normalizedQuery)
         )
     })
-  }, [filter, query, typedItems])
+  }, [filter, lane, query, roleFilter, typedItems])
 
   const isDetectedUrl = /^https?:\/\//.test(text.trim())
 
@@ -323,15 +395,41 @@ export default function InboxPage() {
             <h1 className="text-[28px] font-black uppercase tracking-tight">
               Inbox<span className="text-grow-yellow">.</span>
             </h1>
-            <p className="mt-1 text-sm text-grow-muted">Cattura tutto. Organizza dopo.</p>
+            <p className="mt-1 text-sm text-grow-muted">
+              {lane === 'notes'
+                ? 'Il tuo taccuino. Nessun progetto obbligatorio.'
+                : 'Instagram e TikTok, separati dalle tue note.'}
+            </p>
           </div>
           <Link href="/chat" className="mt-1 shrink-0 rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-bold uppercase text-grow-black">
             Chat veloce →
           </Link>
         </header>
 
+        <div className="mb-5 grid grid-cols-2 rounded-full bg-[#EDE8DE] p-1">
+          {[
+            { key: 'notes' as const, label: 'Taccuino' },
+            { key: 'social' as const, label: 'Salvati social' },
+          ].map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => selectLane(option.key)}
+              className={[
+                'min-h-11 rounded-full px-4 text-[10px] font-black uppercase tracking-[0.12em] transition active:scale-[0.98]',
+                lane === option.key
+                  ? 'bg-[#0F0F10] text-grow-yellow'
+                  : 'text-grow-muted',
+              ].join(' ')}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         {/* Composer */}
-        <div
+        {lane === 'notes' && (
+          <div
           className="mb-6 space-y-3 rounded-[1.5rem] border border-black/10 bg-white p-4"
           onDragOver={e => e.preventDefault()}
           onDrop={e => {
@@ -386,22 +484,28 @@ export default function InboxPage() {
             </button>
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
-        </div>
+          </div>
+        )}
 
-        <Link
-          href="/impostazioni/cattura"
-          className="mb-6 flex min-h-14 items-center justify-between gap-4 rounded-[1.25rem] bg-[#0F0F10] px-4 py-3 text-white transition active:scale-[0.98]"
-        >
-          <span>
-            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-yellow">
-              Instagram · TikTok · Safari
-            </span>
-            <span className="mt-1 block text-sm font-bold">
-              Salva in GROW dal menu Condividi
-            </span>
-          </span>
-          <span className="text-grow-yellow">→</span>
-        </Link>
+        {lane === 'social' && (
+          <>
+            <Link
+              href="/impostazioni/cattura"
+              className="mb-6 flex min-h-14 items-center justify-between gap-4 rounded-[1.25rem] bg-[#0F0F10] px-4 py-3 text-white transition active:scale-[0.98]"
+            >
+              <span>
+                <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-yellow">
+                  {total} materiali
+                </span>
+                <span className="mt-1 block text-sm font-bold">
+                  Aggiungi da Instagram o TikTok
+                </span>
+              </span>
+              <span className="text-grow-yellow">→</span>
+            </Link>
+            {error && <p className="-mt-3 mb-4 text-xs text-red-500">{error}</p>}
+          </>
+        )}
 
         <div className="mb-4">
           <div className="relative">
@@ -421,39 +525,74 @@ export default function InboxPage() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cerca nelle note..."
+              placeholder={
+                lane === 'notes'
+                  ? 'Cerca nelle note...'
+                  : 'Cerca nei salvati social...'
+              }
               className="w-full rounded-2xl border border-black/10 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-grow-yellow"
             />
           </div>
           <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
-            {[
-              { key: 'all' as const, label: 'Tutto' },
-              ...INBOX_NOTE_TYPES.map((type) => ({
-                key: type,
-                label: INBOX_NOTE_LABELS[type],
-              })),
-            ].map((option) => {
-              const count =
-                option.key === 'all'
-                  ? typedItems.length
-                  : typedItems.filter((item) => item.note_type === option.key)
-                      .length
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setFilter(option.key)}
-                  className={[
-                    'shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wide',
-                    filter === option.key
-                      ? 'bg-[#0F0F10] text-grow-yellow'
-                      : 'border border-black/10 bg-white text-grow-muted',
-                  ].join(' ')}
-                >
-                  {option.label} · {count}
-                </button>
-              )
-            })}
+            {lane === 'notes'
+              ? [
+                  { key: 'all' as const, label: 'Tutto' },
+                  ...INBOX_NOTE_TYPES.map((type) => ({
+                    key: type,
+                    label: INBOX_NOTE_LABELS[type],
+                  })),
+                ].map((option) => {
+                  const count =
+                    option.key === 'all'
+                      ? total
+                      : typedItems.filter(
+                          (item) => item.note_type === option.key
+                        ).length
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setFilter(option.key)}
+                      className={[
+                        'shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wide',
+                        filter === option.key
+                          ? 'bg-[#0F0F10] text-grow-yellow'
+                          : 'border border-black/10 bg-white text-grow-muted',
+                      ].join(' ')}
+                    >
+                      {option.label} · {count}
+                    </button>
+                  )
+                })
+              : [
+                  { key: 'all' as const, label: 'Tutto' },
+                  { key: 'work_direct' as const, label: 'Lavoro' },
+                  {
+                    key: 'creative_nourishment' as const,
+                    label: 'Nutrimento',
+                  },
+                  { key: 'personal' as const, label: 'Personale' },
+                  { key: 'uncertain' as const, label: 'Da capire' },
+                ].map((option) => {
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => selectRole(option.key)}
+                      className={[
+                        'shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wide',
+                        roleFilter === option.key
+                          ? 'bg-[#0F0F10] text-grow-yellow'
+                          : 'border border-black/10 bg-white text-grow-muted',
+                      ].join(' ')}
+                    >
+                      {option.label}
+                      {option.key === 'all' || roleFilter === option.key
+                        ? ` · ${option.key === 'all' ? total : resultTotal}`
+                        : ''}
+                    </button>
+                  )
+                })}
           </div>
         </div>
 
@@ -467,10 +606,20 @@ export default function InboxPage() {
         ) : filteredItems.length === 0 ? (
           <div className="rounded-[1.5rem] border border-black/10 bg-white px-6 py-16 text-center">
             <p className="text-sm font-semibold text-grow-text">
-              {items.length ? 'Nessuna nota trovata.' : 'Nessuna nota ancora.'}
+              {items.length
+                ? lane === 'notes'
+                  ? 'Nessuna nota trovata.'
+                  : 'Nessun salvato in questa categoria.'
+                : lane === 'notes'
+                  ? 'Nessuna nota ancora.'
+                  : 'Nessun salvato social ancora.'}
             </p>
             <p className="mt-1 text-xs text-grow-muted">
-              {items.length ? 'Prova un altro filtro.' : 'Scrivi la prima.'}
+              {items.length
+                ? 'Prova un altro filtro.'
+                : lane === 'notes'
+                  ? 'Scrivi la prima.'
+                  : 'Importa i tuoi preferiti da Instagram o TikTok.'}
             </p>
           </div>
         ) : (
@@ -515,9 +664,27 @@ export default function InboxPage() {
 
                     {/* Meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-[10px] font-bold text-grow-muted">
-                        {INBOX_NOTE_LABELS[item.note_type]}
-                      </span>
+                      {lane === 'notes' ? (
+                        <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-[10px] font-bold text-grow-muted">
+                          {INBOX_NOTE_LABELS[item.note_type]}
+                        </span>
+                      ) : (
+                        <>
+                          <span
+                            className={[
+                              'rounded-full px-2 py-0.5 text-[10px] font-black',
+                              item.intelligence?.role === 'work_direct'
+                                ? 'bg-grow-yellow text-grow-text'
+                                : 'bg-[#F1EDE5] text-grow-muted',
+                            ].join(' ')}
+                          >
+                            {item.intelligence?.role_label || 'Da capire'}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase text-grow-muted">
+                            {item.source || 'social'}
+                          </span>
+                        </>
+                      )}
                       {item.url && !item.og_title && (
                         <a href={item.url} target="_blank" rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
@@ -529,6 +696,36 @@ export default function InboxPage() {
                         {timeAgo(item.created_at)}
                       </span>
                     </div>
+
+                    {lane === 'social' &&
+                      expanded === item.id &&
+                      item.intelligence && (
+                        <div className="mt-3 rounded-[1rem] bg-[#F4F0E8] p-3">
+                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-grow-muted">
+                            Lettura GROW · {Math.round(item.intelligence.confidence * 100)}%
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-grow-text">
+                            {item.intelligence.rationale}
+                          </p>
+                          {item.intelligence.craft_labels.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {item.intelligence.craft_labels.slice(0, 4).map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-full border border-black/10 bg-white px-2 py-1 text-[9px] font-bold text-grow-muted"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {item.intelligence.needs_review && (
+                            <p className="mt-2 text-[10px] leading-relaxed text-grow-muted">
+                              Dati insufficienti: GROW non forza una classificazione.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                     {/* AI handoff */}
                     {expanded === item.id && (
