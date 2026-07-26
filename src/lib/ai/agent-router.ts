@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AGENT_TOOLS, executeAgentTool } from './agent-tools'
+import { routeAI } from './router'
 
 export type AgentMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -209,6 +210,41 @@ export type AgentCallbacks = {
   onToken?: (token: string) => void
 }
 
+async function runTextFallback(
+  system: string,
+  userMessage: string,
+  history: { role: 'user' | 'assistant'; content: string }[],
+  actions: AgentAction[],
+  callbacks?: AgentCallbacks
+): Promise<AgentResult> {
+  const toolContext = actions.length
+    ? [
+        'RISULTATI GIA LETTI DA GROW:',
+        ...actions.map(
+          (action) =>
+            `${action.tool}: ${JSON.stringify(action.result).slice(0, 6000)}`
+        ),
+        'Usa questi risultati come dati reali. Non dichiarare di avere eseguito azioni ancora in attesa di conferma.',
+      ].join('\n')
+    : ''
+  const result = await routeAI({
+    system,
+    message: [userMessage, toolContext].filter(Boolean).join('\n\n'),
+    history,
+    taskType: 'text',
+    temperature: 0.4,
+    maxTokens: 1200,
+  })
+
+  callbacks?.onToken?.(result.reply)
+  return {
+    reply: result.reply,
+    actions,
+    provider: result.provider,
+    imageUrl: extractImageUrl(actions),
+  }
+}
+
 export async function runAgent(
   system: string,
   userMessage: string,
@@ -219,7 +255,7 @@ export async function runAgent(
 ): Promise<AgentResult> {
   const providers = getProviders()
   if (!providers.length) {
-    throw new Error('Nessun provider AI con function calling configurato (serve GROQ_API_KEY o OPENROUTER_API_KEY)')
+    return runTextFallback(system, userMessage, history, [], callbacks)
   }
 
   const messages: AgentMessage[] = [
@@ -259,12 +295,31 @@ export async function runAgent(
     }
 
     if (!result) {
-      return {
-        reply:
-          'I provider AI non hanno completato la richiesta. Riprova tra poco. Dettaglio: ' +
-          (lastError instanceof Error ? lastError.message.slice(0, 160) : String(lastError)),
-        actions,
-        provider: activeProvider.id,
+      console.warn(
+        '[AI_AGENT] function-calling provider failed, using text fallback',
+        lastError instanceof Error ? lastError.message.slice(0, 240) : String(lastError)
+      )
+      try {
+        return await runTextFallback(
+          system,
+          userMessage,
+          history,
+          actions,
+          callbacks
+        )
+      } catch (fallbackError) {
+        console.error(
+          '[AI_AGENT] text fallback failed',
+          fallbackError instanceof Error
+            ? fallbackError.message.slice(0, 240)
+            : String(fallbackError)
+        )
+        return {
+          reply:
+            'GROW AI non riesce a completare la richiesta in questo momento. Riprova tra poco.',
+          actions,
+          provider: activeProvider.id,
+        }
       }
     }
 

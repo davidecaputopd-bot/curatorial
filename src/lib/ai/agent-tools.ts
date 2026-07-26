@@ -77,7 +77,6 @@ export const AGENT_TOOLS = [
         type: 'object',
         properties: {
           client: { type: 'string' },
-          limit: { type: 'number' },
         },
       },
     },
@@ -191,7 +190,6 @@ export const AGENT_TOOLS = [
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Query di ricerca precisa' },
-          max_results: { type: 'number', description: 'Numero di risultati, da 1 a 10. Default 5.' },
           mode: {
             type: 'string',
             enum: ['general', 'authority', 'community', 'creative', 'all'],
@@ -211,7 +209,6 @@ export const AGENT_TOOLS = [
         type: 'object',
         properties: {
           url: { type: 'string', description: 'URL pubblico completo http/https' },
-          max_chars: { type: 'number', description: 'Massimo testo restituito, da 500 a 8000 caratteri. Default 4000.' },
         },
         required: ['url'],
       },
