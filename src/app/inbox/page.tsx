@@ -10,6 +10,7 @@ import {
   INBOX_NOTE_TYPES,
   type InboxNoteType,
 } from '@/lib/inbox/classify'
+import { isTikTokUrl, tiktokVideoId } from '@/lib/tiktok'
 
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime()
@@ -47,40 +48,131 @@ type Item = {
   created_at: string
 }
 
-function OGCard({ item }: { item: Item }) {
+function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const requested = useRef(false)
+  const [preview, setPreview] = useState({
+    title: item.og_title || null,
+    description: item.og_description || null,
+    image: item.og_image || null,
+  })
   const url = item.url
+  const isTikTok = isTikTokUrl(url)
+  const videoId = tiktokVideoId(url)
+
+  useEffect(() => {
+    const element = cardRef.current
+    if (
+      !element ||
+      !url ||
+      requested.current ||
+      preview.title ||
+      preview.image
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        requested.current = true
+        observer.disconnect()
+        fetch('/api/inbox/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id }),
+        })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((payload) => {
+            if (payload?.preview) {
+              setPreview({
+                title: payload.preview.title || null,
+                description: payload.preview.description || null,
+                image: payload.preview.image || null,
+              })
+            }
+          })
+          .catch(() => {})
+      },
+      { rootMargin: '180px' }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [item.id, preview.image, preview.title, url])
+
   if (!url) return null
-  // show card only if we have at least a title or image from OG
-  const hasPreview = item.og_title || item.og_image
-  if (!hasPreview) return null
+
+  if (!preview.title && !preview.image && !isTikTok) {
+    return <div ref={cardRef} />
+  }
+
+  if (!preview.title && !preview.image && isTikTok) {
+    return (
+      <div ref={cardRef} className="mt-2">
+        {expanded && videoId ? (
+          <iframe
+            src={`https://www.tiktok.com/player/v1/${videoId}?autoplay=0&controls=1&description=1`}
+            title="Anteprima TikTok"
+            loading="lazy"
+            allow="fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="aspect-[9/14] max-h-[34rem] w-full rounded-[1rem] border-0 bg-black"
+          />
+        ) : (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            className="flex items-center gap-3 rounded-[0.9rem] bg-[#0F0F10] p-3 text-white"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-grow-yellow text-base font-black text-black">
+              ▶
+            </span>
+            <span>
+              <span className="block text-xs font-black">Anteprima TikTok</span>
+              <span className="mt-0.5 block text-[10px] text-white/50">
+                Tocca la nota per vedere il video
+              </span>
+            </span>
+          </a>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer"
-      onClick={e => e.stopPropagation()}
-      className="mt-2 block overflow-hidden rounded-[0.85rem] border border-black/10 bg-white transition-opacity active:opacity-70">
-      {item.og_image && (
+    <div ref={cardRef}>
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        className="mt-2 block overflow-hidden rounded-[0.85rem] border border-black/10 bg-white transition-opacity active:opacity-70">
+      {preview.image && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.og_image} alt="" className="h-36 w-full object-cover"
+        <img src={preview.image} alt="" className="h-36 w-full object-cover"
           onError={e => { (e.target as HTMLElement).style.display = 'none' }} />
       )}
       <div className="px-3 py-2">
         <p className="text-[9px] font-black uppercase tracking-widest text-grow-muted">
           {new URL(url).hostname.replace('www.', '')}
         </p>
-        {item.og_title && (
-          <p className="mt-0.5 line-clamp-2 text-[12px] font-bold leading-tight text-grow-text">{item.og_title}</p>
+        {preview.title && (
+          <p className="mt-0.5 line-clamp-2 text-[12px] font-bold leading-tight text-grow-text">{preview.title}</p>
         )}
-        {item.og_description && (
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-grow-muted">{item.og_description}</p>
+        {preview.description && (
+          <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-grow-muted">{preview.description}</p>
         )}
       </div>
-    </a>
+      </a>
+    </div>
   )
 }
 
 export default function InboxPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -96,7 +188,10 @@ export default function InboxPage() {
     fetch('/api/inbox')
       .then((response) => response.json())
       .then((data) => {
-        if (!cancelled) setItems(data.items || [])
+        if (!cancelled) {
+          setItems(data.items || [])
+          setHasMore(Boolean(data.has_more))
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -106,6 +201,25 @@ export default function InboxPage() {
       cancelled = true
     }
   }, [])
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const response = await fetch(
+        `/api/inbox?offset=${items.length}&limit=100`
+      )
+      const data = await response.json()
+      if (response.ok) {
+        setItems((current) => [...current, ...(data.items || [])])
+        setHasMore(Boolean(data.has_more))
+      }
+    } catch {
+      setError('Non riesco a caricare altre note.')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const save = async () => {
     if (!text.trim() || saving) return
@@ -360,8 +474,9 @@ export default function InboxPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-black/10 rounded-[1.5rem] border border-black/10 bg-white">
-            {filteredItems.map(item => (
+          <>
+            <div className="divide-y divide-black/10 rounded-[1.5rem] border border-black/10 bg-white">
+              {filteredItems.map(item => (
               <div key={item.id} className="px-4 py-3.5">
                 <div className="flex items-start gap-3">
                   {/* Thumbnail immagine (se c'è) */}
@@ -396,7 +511,7 @@ export default function InboxPage() {
                     </button>
 
                     {/* OG preview card (da DB) — sempre visibile se disponibile */}
-                    <OGCard item={item} />
+                    <OGCard item={item} expanded={expanded === item.id} />
 
                     {/* Meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -443,8 +558,19 @@ export default function InboxPage() {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            {hasMore && (
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={() => void loadMore()}
+                className="mt-4 min-h-12 w-full rounded-full border border-black/12 bg-white text-xs font-black uppercase tracking-wide disabled:opacity-50"
+              >
+                {loadingMore ? 'Carico…' : 'Carica altri 100'}
+              </button>
+            )}
+          </>
         )}
       </div>
       <BottomNav />

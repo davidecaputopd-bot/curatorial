@@ -21,13 +21,18 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const source = searchParams.get('source')
+  const limit = Math.min(
+    100,
+    Math.max(1, Number(searchParams.get('limit')) || 100)
+  )
+  const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
 
   let query = supabase
     .from('inbox_items')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
 
   query = source ? query.eq('source', source) : query.neq('source', 'chat')
 
@@ -48,7 +53,7 @@ export async function GET(request: Request) {
     }))
   )
 
-  return NextResponse.json({ items })
+  return NextResponse.json({ items, has_more: items.length === limit })
 }
 
 export async function POST(request: Request) {

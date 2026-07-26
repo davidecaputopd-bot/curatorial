@@ -10,6 +10,7 @@ type ImportCandidate = {
   url?: string
   content?: string
   source?: string
+  saved_at?: string
 }
 
 function missingNoteTypeColumn(error: { code?: string; message?: string } | null) {
@@ -84,6 +85,12 @@ export async function POST(request: Request) {
         client: null,
         source,
         note_type: classifyInboxItem({ content, url }),
+        created_at:
+          candidate.saved_at &&
+          Number.isFinite(Date.parse(candidate.saved_at)) &&
+          Date.parse(candidate.saved_at) <= Date.now() + 86_400_000
+            ? new Date(candidate.saved_at).toISOString()
+            : new Date().toISOString(),
       }
     })
 
@@ -107,6 +114,7 @@ export async function POST(request: Request) {
           image_url: item.image_url,
           client: item.client,
           source: item.source,
+          created_at: item.created_at,
         }))
       )
       .select('id')

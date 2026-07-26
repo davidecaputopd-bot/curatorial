@@ -11,11 +11,23 @@ security definer
 set search_path = ''
 as $$
   select auth.uid() is not null
-    and auth.uid() = (
-      select id
-      from auth.users
-      order by created_at asc
-      limit 1
+    and (
+      exists (
+        select 1 from public.user_profile
+        where user_id = auth.uid()
+      )
+      or exists (
+        select 1 from public.saved_items
+        where user_id = auth.uid()
+      )
+      or exists (
+        select 1 from public.chat_history
+        where user_id = auth.uid()
+      )
+      or exists (
+        select 1 from public.inbox_items
+        where user_id = auth.uid()
+      )
     );
 $$;
 

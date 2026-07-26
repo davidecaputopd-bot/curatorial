@@ -17,13 +17,20 @@ import {
 type ImportItem = {
   url: string
   source: string
+  content?: string
+  saved_at?: string
 }
 
 const URL_PATTERN = /https?:\/\/[^\s<>"'\\]+/gi
 
-function urlsFromValue(value: unknown, output: string[]) {
+type ParsedUrl = {
+  url: string
+  saved_at?: string
+}
+
+function urlsFromValue(value: unknown, output: ParsedUrl[]) {
   if (typeof value === 'string') {
-    output.push(...(value.match(URL_PATTERN) || []))
+    output.push(...(value.match(URL_PATTERN) || []).map((url) => ({ url })))
     return
   }
   if (Array.isArray(value)) {
@@ -37,33 +44,61 @@ function urlsFromValue(value: unknown, output: string[]) {
 
 async function urlsFromFile(file: File) {
   const text = await file.text()
-  const urls: string[] = []
+  const urls: ParsedUrl[] = []
+  const isTikTokText = file.name.toLocaleLowerCase('it-IT').endsWith('.txt')
+
+  if (isTikTokText) {
+    const entries = text.matchAll(
+      /Data:\s*([^\r\n]+)\r?\nLink:\s*(https?:\/\/[^\s<>"'\\]+)/gi
+    )
+    for (const entry of entries) {
+      const savedAt = new Date(entry[1].replace(/\s+UTC$/i, 'Z'))
+      urls.push({
+        url: entry[2],
+        saved_at: Number.isNaN(savedAt.getTime())
+          ? undefined
+          : savedAt.toISOString(),
+      })
+    }
+    if (urls.length) return urls
+  }
 
   if (file.name.toLowerCase().endsWith('.json')) {
     try {
       urlsFromValue(JSON.parse(text), urls)
     } catch {
-      urls.push(...(text.match(URL_PATTERN) || []))
+      urls.push(...(text.match(URL_PATTERN) || []).map((url) => ({ url })))
     }
   } else if (file.name.toLowerCase().endsWith('.html')) {
     const document = new DOMParser().parseFromString(text, 'text/html')
     document
       .querySelectorAll<HTMLAnchorElement>('a[href]')
-      .forEach((anchor) => urls.push(anchor.href))
-    urls.push(...(text.match(URL_PATTERN) || []))
+      .forEach((anchor) => urls.push({ url: anchor.href }))
+    urls.push(...(text.match(URL_PATTERN) || []).map((url) => ({ url })))
   } else {
-    urls.push(...(text.match(URL_PATTERN) || []))
+    urls.push(...(text.match(URL_PATTERN) || []).map((url) => ({ url })))
   }
 
   return urls
 }
 
-function socialItem(value: string): ImportItem | null {
-  const url = normalizeSharedUrl(value.replace(/[),.;!?]+$/, ''))
+function socialItem(value: ParsedUrl, fileName: string): ImportItem | null {
+  const url = normalizeSharedUrl(value.url.replace(/[),.;!?]+$/, ''))
   if (!url) return null
   const source = detectCaptureSource(url)
   if (!['instagram', 'tiktok'].includes(source)) return null
-  return { url, source }
+  const liked = fileName.toLocaleLowerCase('it-IT').includes('mi-piace')
+  return {
+    url,
+    source,
+    saved_at: value.saved_at,
+    content:
+      source === 'tiktok'
+        ? liked
+          ? 'Mi piace su TikTok'
+          : 'Video preferito su TikTok'
+        : 'Salvato da Instagram',
+  }
 }
 
 export default function ImportSavedPage() {
@@ -72,6 +107,7 @@ export default function ImportSavedPage() {
   const [fileNames, setFileNames] = useState<string[]>([])
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [processed, setProcessed] = useState(0)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{
     imported: number
@@ -92,15 +128,24 @@ export default function ImportSavedPage() {
     setResult(null)
     try {
       const selected = Array.from(files)
-      const allUrls = (
-        await Promise.all(selected.map((file) => urlsFromFile(file)))
-      ).flat()
       const unique = new Map<string, ImportItem>()
-      allUrls.forEach((value) => {
-        const item = socialItem(value)
-        if (item) unique.set(item.url, item)
+      const parsedFiles = await Promise.all(
+        selected.map(async (file) => ({
+          name: file.name,
+          urls: await urlsFromFile(file),
+        }))
+      )
+      parsedFiles.forEach(({ name, urls }) => {
+        urls.forEach((value) => {
+          const item = socialItem(value, name)
+          if (item) unique.set(item.url, item)
+        })
       })
-      setItems([...unique.values()])
+      setItems(
+        [...unique.values()].sort((a, b) =>
+          (b.saved_at || '').localeCompare(a.saved_at || '')
+        )
+      )
       setFileNames(selected.map((file) => file.name))
       if (!unique.size) {
         setError(
@@ -115,18 +160,28 @@ export default function ImportSavedPage() {
   const importItems = async () => {
     if (!items.length || importing) return
     setImporting(true)
+    setProcessed(0)
     setError('')
     try {
-      const response = await fetch('/api/inbox/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || 'Importazione fallita')
+      let imported = 0
+      let duplicates = 0
+      const chunkSize = 200
+      for (let index = 0; index < items.length; index += chunkSize) {
+        const chunk = items.slice(index, index + chunkSize)
+        const response = await fetch('/api/inbox/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: chunk }),
+        })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Importazione fallita')
+        imported += payload.imported || 0
+        duplicates += payload.duplicates || 0
+        setProcessed(Math.min(index + chunk.length, items.length))
+      }
       setResult({
-        imported: payload.imported || 0,
-        duplicates: payload.duplicates || 0,
+        imported,
+        duplicates,
       })
     } catch (cause) {
       setError(
@@ -224,7 +279,7 @@ export default function ImportSavedPage() {
               className="mt-4 min-h-12 w-full rounded-full bg-grow-yellow px-5 text-sm font-black text-black disabled:opacity-55"
             >
               {importing
-                ? 'Importazione…'
+                ? `Importazione ${processed} / ${items.length}…`
                 : result
                   ? 'Importazione completata'
                   : `Importa ${items.length} salvati`}

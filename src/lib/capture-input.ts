@@ -40,11 +40,20 @@ export function normalizeSharedUrl(value: string) {
 
     url.hash = ''
     const hostname = url.hostname.toLowerCase().replace(/^www\./, '')
+    const exportedTikTokId =
+      hostname === 'tiktokv.com' || hostname.endsWith('.tiktokv.com')
+        ? url.pathname.match(/\/(?:share\/)?video\/(\d+)/i)?.[1]
+        : null
+    if (exportedTikTokId) {
+      return `https://www.tiktok.com/@/video/${exportedTikTokId}`
+    }
     const isSocial =
       hostname === 'instagram.com' ||
       hostname.endsWith('.instagram.com') ||
       hostname === 'tiktok.com' ||
-      hostname.endsWith('.tiktok.com')
+      hostname.endsWith('.tiktok.com') ||
+      hostname === 'tiktokv.com' ||
+      hostname.endsWith('.tiktokv.com')
 
     if (isSocial) {
       url.search = ''
@@ -72,7 +81,7 @@ export function detectCaptureSource(url: string | null, fallback?: string) {
   try {
     const host = new URL(url).hostname.toLowerCase()
     if (host.includes('instagram.com')) return 'instagram'
-    if (host.includes('tiktok.com')) return 'tiktok'
+    if (host.includes('tiktok.com') || host.includes('tiktokv.com')) return 'tiktok'
   } catch {}
 
   return fallback || 'shortcut'
