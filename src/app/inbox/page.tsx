@@ -273,6 +273,21 @@ export default function InboxPage() {
           {error && <p className="text-xs text-red-500">{error}</p>}
         </div>
 
+        <Link
+          href="/impostazioni/cattura"
+          className="mb-6 flex min-h-14 items-center justify-between gap-4 rounded-[1.25rem] bg-[#0F0F10] px-4 py-3 text-white transition active:scale-[0.98]"
+        >
+          <span>
+            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-yellow">
+              Instagram · TikTok · Safari
+            </span>
+            <span className="mt-1 block text-sm font-bold">
+              Salva in GROW dal menu Condividi
+            </span>
+          </span>
+          <span className="text-grow-yellow">→</span>
+        </Link>
+
         <div className="mb-4">
           <div className="relative">
             <svg
