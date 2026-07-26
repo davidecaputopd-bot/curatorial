@@ -3,6 +3,11 @@ import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { fetchLinkPreview } from '@/lib/link-preview'
 import { classifyInboxItem } from '@/lib/inbox/classify'
 import {
+  analyzeContentSignal,
+  CONTENT_ROLES,
+  type ContentRole,
+} from '@/lib/brain/content-intelligence'
+import {
   inboxImageStoragePath,
   signedInboxImageUrl,
 } from '@/lib/inbox/images'
@@ -15,45 +20,126 @@ function missingNoteTypeColumn(error: { code?: string; message?: string } | null
   )
 }
 
+const CONTENT_ROLE_SET = new Set<string>(CONTENT_ROLES)
+
 export async function GET(request: Request) {
   const { supabase, user } = await getAuthenticatedSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const source = searchParams.get('source')
+  const lane = searchParams.get('lane')
+  const requestedRole = searchParams.get('role')
+  const role =
+    requestedRole && CONTENT_ROLE_SET.has(requestedRole)
+      ? (requestedRole as ContentRole)
+      : null
   const limit = Math.min(
     100,
     Math.max(1, Number(searchParams.get('limit')) || 100)
   )
   const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
 
+  if (lane === 'social' && role) {
+    const { data, error, count } = await supabase
+      .from('inbox_items')
+      .select('*', { count: 'exact' })
+      .eq('user_id', user.id)
+      .in('source', ['instagram', 'tiktok'])
+      .order('created_at', { ascending: false })
+      .limit(1000)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    const classified = (data || [])
+      .map((item) => ({
+        item,
+        intelligence: analyzeContentSignal({
+          content: item.content,
+          title: item.og_title,
+          description: item.og_description,
+          source: item.source,
+          url: item.url,
+        }),
+      }))
+      .filter((entry) => entry.intelligence.role === role)
+    const page = classified.slice(offset, offset + limit)
+    const items = await Promise.all(
+      page.map(async ({ item, intelligence }) => ({
+        ...item,
+        image_url: await signedInboxImageUrl(supabase, item.image_url),
+        note_type:
+          item.note_type ||
+          classifyInboxItem({
+            content: item.content,
+            url: item.url,
+            imageUrl: item.image_url,
+          }),
+        intelligence,
+      }))
+    )
+
+    return NextResponse.json({
+      items,
+      total: classified.length,
+      all_total: count ?? data?.length ?? 0,
+      has_more: offset + items.length < classified.length,
+      classification_sampled: (count || 0) > (data?.length || 0),
+    })
+  }
+
   let query = supabase
     .from('inbox_items')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  query = source ? query.eq('source', source) : query.neq('source', 'chat')
+  if (source) {
+    query = query.eq('source', source)
+  } else if (lane === 'social') {
+    query = query.in('source', ['instagram', 'tiktok'])
+  } else if (lane === 'notes') {
+    query = query.not('source', 'in', '("instagram","tiktok","chat")')
+  } else {
+    query = query.neq('source', 'chat')
+  }
 
-  const { data, error } = await query
+  const { data, error, count } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const items = await Promise.all(
-    (data || []).map(async (item) => ({
-      ...item,
-      image_url: await signedInboxImageUrl(supabase, item.image_url),
-      note_type:
+    (data || []).map(async (item) => {
+      const noteType =
         item.note_type ||
         classifyInboxItem({
           content: item.content,
           url: item.url,
           imageUrl: item.image_url,
+        })
+      return {
+        ...item,
+        image_url: await signedInboxImageUrl(supabase, item.image_url),
+        note_type: noteType,
+        intelligence: analyzeContentSignal({
+          content: item.content,
+          title: item.og_title,
+          description: item.og_description,
+          source: item.source,
+          url: item.url,
         }),
-    }))
+      }
+    })
   )
 
-  return NextResponse.json({ items, has_more: items.length === limit })
+  return NextResponse.json({
+    items,
+    total: count || 0,
+    all_total: count || 0,
+    has_more: offset + items.length < (count || 0),
+  })
 }
 
 export async function POST(request: Request) {
@@ -143,6 +229,13 @@ export async function POST(request: Request) {
           ...result.data,
           image_url: await signedInboxImageUrl(supabase, result.data.image_url),
           note_type: noteType,
+          intelligence: analyzeContentSignal({
+            content: result.data.content,
+            title: result.data.og_title,
+            description: result.data.og_description,
+            source: result.data.source,
+            url: result.data.url,
+          }),
         }
       : null,
   })

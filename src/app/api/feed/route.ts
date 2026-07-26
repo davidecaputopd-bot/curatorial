@@ -8,6 +8,7 @@ import {
 import {
   discoveryQualityScore,
   isDisplayableDiscoveryItem,
+  isHighQualityDiscoveryItem,
 } from '@/lib/discovery-quality'
 
 type FeedRow = {
@@ -21,6 +22,7 @@ type FeedRow = {
   url?: string | null
   published_at?: string | null
   created_at?: string | null
+  sources?: { name?: string | null; category?: string | null } | null
   [key: string]: unknown
 }
 
@@ -54,6 +56,31 @@ function scoreItem(item: FeedRow, weights: Record<string, number>, dwellWeights:
   const qualityBoost = discoveryQualityScore(item) * 0.32
 
   return (catWeight + dwellBoost + platformBoost + categoryBoost + imageBoost + qualityBoost) * freshness
+}
+
+function diversifyByCurator(items: ScoredFeedRow[]) {
+  const groups = new Map<string, ScoredFeedRow[]>()
+  for (const item of items) {
+    const curator =
+      item.artist_name ||
+      item.sources?.name ||
+      item.category ||
+      String(item.id)
+    const key = `${item.platform || 'unknown'}:${curator}`
+    const group = groups.get(key) || []
+    group.push(item)
+    groups.set(key, group)
+  }
+
+  const diversified: ScoredFeedRow[] = []
+  const queues = [...groups.values()]
+  while (queues.some((queue) => queue.length)) {
+    for (const queue of queues) {
+      const next = queue.shift()
+      if (next) diversified.push(next)
+    }
+  }
+  return diversified
 }
 
 export async function GET(request: Request) {
@@ -111,21 +138,41 @@ export async function GET(request: Request) {
     // Niente RSS, niente articoli, niente news.
     if (typeFilter === 'image' || !typeFilter) {
       const totalNeeded = offset + limit
-      const fetchLimit = Math.max(180, totalNeeded * 8)
+      const fetchLimit = Math.max(180, totalNeeded * 5)
+      const platformQuery = (platform: 'arena' | 'unsplash' | 'pexels') =>
+        supabase
+          .from('content_items')
+          .select('*, sources(name, category)')
+          .eq('type', 'image')
+          .eq('platform', platform)
+          .not('image_url', 'is', null)
+          .order('published_at', { ascending: false })
+          .limit(fetchLimit)
 
-      const { data, error } = await supabase
-        .from('content_items')
-        .select('*, sources(name, category)')
-        .eq('type', 'image')
-        .in('platform', ['arena', 'unsplash', 'pexels'])
-        .not('image_url', 'is', null)
-        .order('published_at', { ascending: false })
-        .limit(fetchLimit)
+      const [arenaResult, unsplashResult, pexelsResult] = await Promise.all([
+        platformQuery('arena'),
+        platformQuery('unsplash'),
+        platformQuery('pexels'),
+      ])
+      const sourceError =
+        arenaResult.error || unsplashResult.error || pexelsResult.error
+      if (sourceError) {
+        return NextResponse.json(
+          { error: sourceError.message },
+          { status: 500 }
+        )
+      }
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-      const raw = (data || []) as FeedRow[]
-      const displayable = raw.filter(isDisplayableDiscoveryItem)
+      const raw = [
+        ...(arenaResult.data || []),
+        ...(unsplashResult.data || []),
+        ...(pexelsResult.data || []),
+      ] as FeedRow[]
+      const displayable = raw.filter((item) =>
+        item.platform === 'arena'
+          ? isDisplayableDiscoveryItem(item)
+          : isHighQualityDiscoveryItem(item)
+      )
 
       const scored = displayable
         .map((item) => ({
@@ -138,9 +185,8 @@ export async function GET(request: Request) {
         .filter((item) => item.image_url && item._score > 0.8)
         .sort((a, b) => b._score - a._score)
 
-      const exploration = raw
+      const explorationScored = displayable
         .filter((item) => item.image_url && !taste.negativeIds.has(item.id))
-        .filter(isDisplayableDiscoveryItem)
         .map((item) => {
           const familiarCategory = Math.max(
             0,
@@ -161,9 +207,17 @@ export async function GET(request: Request) {
           }
         })
         .sort((a, b) => b._score - a._score)
+      const exploration = [
+        ...diversifyByCurator(
+          explorationScored.filter((item) => item.platform === 'arena')
+        ),
+        ...explorationScored.filter((item) => item.platform !== 'arena'),
+      ]
 
       // Mantiene il ranking appreso. Il piccolo jitter sopra evita un feed immobile.
-      const arena = scored.filter((item) => item.platform === 'arena')
+      const arena = diversifyByCurator(
+        scored.filter((item) => item.platform === 'arena')
+      )
       const unsplash = scored.filter((item) => item.platform === 'unsplash')
       const pexels = scored.filter((item) => item.platform === 'pexels')
 
@@ -173,9 +227,9 @@ export async function GET(request: Request) {
       let pi = 0
 
       for (let i = 0; i < totalNeeded + 40; i++) {
-        // Are.na prima. Stock solo come accento raro, mai come base del gusto.
-        if (i % 14 === 6 && ui < unsplash.length) personalized.push(unsplash[ui++])
-        else if (i % 14 === 13 && pi < pexels.length) personalized.push(pexels[pi++])
+        // Are.na è la base. Stock entra al massimo come accento del 10%.
+        if (i % 20 === 9 && ui < unsplash.length) personalized.push(unsplash[ui++])
+        else if (i % 20 === 19 && pi < pexels.length) personalized.push(pexels[pi++])
         else if (ai < arena.length) personalized.push(arena[ai++])
         else if (ui < unsplash.length && personalized.length < totalNeeded + 40) personalized.push(unsplash[ui++])
         else if (pi < pexels.length && personalized.length < totalNeeded + 40) personalized.push(pexels[pi++])

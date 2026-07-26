@@ -1,69 +1,26 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
-import { routeAI } from '@/lib/ai/router'
+import {
+  buildDailyBrainBrief,
+  type CalendarSignal,
+  type DiscoverySignal,
+} from '@/lib/brain/daily-brief'
+import type { PersonalBrainItem } from '@/lib/brain/retrieval'
+import { discoveryQualityScore } from '@/lib/discovery-quality'
 
-type CalendarRow = {
-  title: string
-  client: string
-  status: string
-  scheduled_date?: string | null
-  notes?: string | null
+type InteractionRow = {
+  content_id: string
+  action: string
+  created_at?: string | null
 }
 
-type DailyBrief = {
-  focus: string
-  risk: string
-  opportunity: string
-  prompt: string
-}
-
-function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function fallbackBrief(items: CalendarRow[]): DailyBrief {
-  const today = dateKey(new Date())
-  const open = items.filter((item) => item.status !== 'pubblicato')
-  const urgent = open.find(
-    (item) => item.scheduled_date && item.scheduled_date <= today
-  )
-  const active = open.find(
-    (item) => item.status === 'in_produzione' || item.status === 'pronto'
-  )
-  const focusItem = urgent || active || open[0]
-
-  return {
-    focus: focusItem
-      ? `${focusItem.title} · ${focusItem.client}`
-      : 'Scegli un lavoro concreto da far avanzare oggi.',
-    risk: urgent
-      ? `“${urgent.title}” è arrivato alla data prevista e non risulta pubblicato.`
-      : 'Nessuna urgenza evidente nei dati disponibili.',
-    opportunity: active
-      ? `Puoi chiudere o far avanzare “${active.title}” prima di aprire altro.`
-      : 'Usa una nota Inbox come punto di partenza, senza organizzare tutto.',
-    prompt: focusItem
-      ? `Aiutami a far avanzare oggi questo lavoro: ${focusItem.title} per ${focusItem.client}.`
-      : 'Aiutami a scegliere la priorità creativa più utile per oggi.',
-  }
-}
-
-function parseBrief(value: string, fallback: DailyBrief): DailyBrief {
-  try {
-    const match = value.match(/\{[\s\S]*\}/)
-    const parsed = JSON.parse(match?.[0] || value) as Partial<DailyBrief>
-    return {
-      focus: typeof parsed.focus === 'string' ? parsed.focus : fallback.focus,
-      risk: typeof parsed.risk === 'string' ? parsed.risk : fallback.risk,
-      opportunity:
-        typeof parsed.opportunity === 'string'
-          ? parsed.opportunity
-          : fallback.opportunity,
-      prompt: typeof parsed.prompt === 'string' ? parsed.prompt : fallback.prompt,
-    }
-  } catch {
-    return fallback
-  }
+function feedbackKey(content: string) {
+  const sourceType = content.match(/\bsource_type=([^\s]+)/)?.[1]
+  const sourceId = content.match(/\bsource_id=([^\s]+)/)?.[1]
+  const signal = content.match(/\bsignal=([^\s]+)/)?.[1]
+  if (!sourceType || !sourceId || !signal) return null
+  if (!['personal', 'not_for_me', 'used'].includes(signal)) return null
+  return `${sourceType}:${sourceId}`
 }
 
 export async function GET() {
@@ -72,54 +29,150 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const [calendarResult, inboxResult, memoriesResult] = await Promise.all([
+  const [
+    calendarResult,
+    inboxResult,
+    interactionsResult,
+    discoveryResult,
+    feedbackResult,
+  ] = await Promise.all([
     supabase
       .from('calendar_items')
-      .select('title, client, status, scheduled_date, notes')
+      .select('id, title, client, status, scheduled_date, notes')
       .eq('user_id', user.id)
       .order('scheduled_date', { ascending: true, nullsFirst: false })
-      .limit(24),
+      .limit(120),
     supabase
       .from('inbox_items')
-      .select('content, url, created_at')
+      .select(
+        'id, content, url, image_url, og_title, og_description, source, note_type, created_at',
+        { count: 'exact' }
+      )
+      .eq('user_id', user.id)
+      .neq('source', 'chat')
+      .order('created_at', { ascending: false })
+      .limit(300),
+    supabase
+      .from('interactions')
+      .select('content_id, action, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(6),
+      .limit(700),
+    supabase
+      .from('content_items')
+      .select(
+        'id, title, summary, category, tags, artist_name, platform, url, image_url, published_at, created_at'
+      )
+      .eq('type', 'image')
+      .eq('platform', 'arena')
+      .not('image_url', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(180),
     supabase
       .from('memories')
       .select('content')
       .eq('user_id', user.id)
+      .like('content', '[GROW_BRAIN_FEEDBACK]%')
       .order('created_at', { ascending: false })
-      .limit(6),
+      .limit(160),
   ])
 
-  const calendar = (calendarResult.data || []) as CalendarRow[]
-  const fallback = fallbackBrief(calendar)
-  const context = JSON.stringify({
-    date: dateKey(new Date()),
-    calendar,
-    recent_inbox: inboxResult.data || [],
-    confirmed_memories: memoriesResult.data || [],
+  const warnings = [
+    calendarResult.error?.message,
+    inboxResult.error?.message,
+    interactionsResult.error?.message,
+    discoveryResult.error?.message,
+    feedbackResult.error?.message,
+  ].filter((warning): warning is string => Boolean(warning))
+
+  const interactions = (interactionsResult.data || []) as InteractionRow[]
+  const savedAt = new Map<string, string>()
+  const negativeContentIds = new Set<string>()
+  for (const interaction of interactions) {
+    if (
+      interaction.action === 'save' &&
+      interaction.content_id &&
+      !savedAt.has(interaction.content_id)
+    ) {
+      savedAt.set(interaction.content_id, interaction.created_at || '')
+    }
+    if (
+      interaction.action === 'less_like_this' ||
+      interaction.action === 'skip'
+    ) {
+      negativeContentIds.add(interaction.content_id)
+    }
+  }
+
+  const savedIds = [...savedAt.keys()]
+  const archiveResult = savedIds.length
+    ? await supabase
+        .from('content_items')
+        .select(
+          'id, title, summary, category, tags, artist_name, platform, url, image_url, dominant_color'
+        )
+        .in('id', savedIds)
+    : { data: [], error: null }
+
+  if (archiveResult.error) warnings.push(archiveResult.error.message)
+
+  const inboxItems: PersonalBrainItem[] = (inboxResult.data || []).map(
+    (item) => ({
+      id: `inbox:${item.id}`,
+      origin: 'inbox',
+      content: item.content,
+      title: item.og_title || item.content,
+      description: item.og_description,
+      source: item.source,
+      url: item.url,
+      image_url: item.image_url,
+      created_at: item.created_at,
+      note_type: item.note_type,
+    })
+  )
+  const archiveItems: PersonalBrainItem[] = (archiveResult.data || []).map(
+    (item) => ({
+      id: `archive:${item.id}`,
+      content_id: item.id,
+      origin: 'archive',
+      title: item.title,
+      description: item.summary,
+      category: item.category,
+      tags: item.tags,
+      artist: item.artist_name,
+      source: item.platform,
+      url: item.url,
+      image_url: item.image_url,
+      dominant_color: item.dominant_color,
+      saved_at: savedAt.get(item.id),
+    })
+  )
+
+  const suppressed = new Set(
+    (feedbackResult.data || [])
+      .map((row) => feedbackKey(row.content))
+      .filter((key): key is string => Boolean(key))
+  )
+  const discovery: DiscoverySignal[] = (discoveryResult.data || []).map(
+    (item) => ({
+      ...item,
+      quality_score: discoveryQualityScore(item),
+    })
+  )
+  const brief = buildDailyBrainBrief({
+    calendar: (calendarResult.data || []) as CalendarSignal[],
+    personalItems: [...inboxItems, ...archiveItems],
+    discovery,
+    inboxTotal: inboxResult.count || inboxItems.length,
+    archiveTotal: savedIds.length,
+    suppressed,
+    negativeContentIds,
   })
 
-  try {
-    const result = await routeAI({
-      taskType: 'strategy',
-      temperature: 0.2,
-      maxTokens: 500,
-      system: `Sei il direttore operativo personale di Davide. Produci il briefing di oggi usando esclusivamente i dati forniti.
-Scegli un solo focus concreto. Segnala un rischio reale, non generico. Trova una piccola opportunita' utile.
-Non inventare clienti, date o lavori. Output SOLO JSON valido:
-{"focus":"...","risk":"...","opportunity":"...","prompt":"prompt pronto da inviare a GROW AI"}`,
-      message: context,
-    })
-
-    return NextResponse.json({
-      ok: true,
-      brief: parseBrief(result.reply, fallback),
-      source: 'ai',
-    })
-  } catch {
-    return NextResponse.json({ ok: true, brief: fallback, source: 'fallback' })
-  }
+  return NextResponse.json({
+    ok: true,
+    brief,
+    source: 'grounded',
+    warnings: warnings.length ? warnings : undefined,
+  })
 }

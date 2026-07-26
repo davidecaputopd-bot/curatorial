@@ -1,4 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { analyzeContentSignal } from '@/lib/brain/content-intelligence'
+import {
+  rankPersonalBrainItems,
+  type PersonalBrainItem,
+} from '@/lib/brain/retrieval'
 
 export const AGENT_TOOLS = [
   {
@@ -96,7 +101,7 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'search_saved_content',
-      description: 'Cerca in modo intelligente tra le reference dell’Archivio usando titolo, sintesi, tag, categoria, autore e concetti affini.',
+      description: 'Cerca davvero nella memoria personale di Davide: Inbox, salvataggi social e reference salvate in Archivio. Restituisce origine, ruolo personale, caratteristiche creative e grado di comprensione.',
       parameters: {
         type: 'object',
         properties: {
@@ -254,13 +259,22 @@ function compactCalendarItem(item: Record<string, unknown>) {
 }
 
 function compactInboxItem(item: Record<string, unknown>) {
+  const intelligence = analyzeContentSignal({
+    content: String(item.content || ''),
+    title: String(item.og_title || ''),
+    description: String(item.og_description || ''),
+    source: String(item.source || ''),
+    url: String(item.url || ''),
+  })
   return {
     id: item.id,
     content: String(item.content || item.url || '').slice(0, 220),
     url: item.url,
     type: item.note_type,
     client: item.client,
+    source: item.source,
     created_at: item.created_at,
+    intelligence,
   }
 }
 
@@ -298,10 +312,11 @@ export async function executeAgentTool(
 
       let inboxQuery = supabase
         .from('inbox_items')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', userId)
+        .neq('source', 'chat')
         .order('created_at', { ascending: false })
-        .limit(18)
+        .limit(1000)
       if (client) inboxQuery = inboxQuery.eq('client', client)
 
       const [calendarResult, inboxResult, savesResult] = await Promise.all([
@@ -322,6 +337,9 @@ export async function executeAgentTool(
 
       const calendar = (calendarResult.data || []) as Record<string, unknown>[]
       const inbox = (inboxResult.data || []) as Record<string, unknown>[]
+      const understoodInbox = inbox
+        .map(compactInboxItem)
+        .filter((item) => item.intelligence.understood)
       const savedIds = [...new Set((savesResult.data || []).map((item) => item.content_id).filter(Boolean))]
       const savedResult = savedIds.length
         ? await supabase
@@ -362,7 +380,8 @@ export async function executeAgentTool(
           next_14_days: next14.length,
           ready_without_date: readyUnscheduled.length,
           in_motion: production.length,
-          recent_inbox: inbox.length,
+          inbox_total: inboxResult.count || inbox.length,
+          inbox_sample_understood: understoodInbox.length,
           saved_references_sample: savedIds.length,
         },
         calendar: {
@@ -372,7 +391,7 @@ export async function executeAgentTool(
           ready_without_date: readyUnscheduled.slice(0, 8).map(compactCalendarItem),
           in_motion: production.slice(0, 10).map(compactCalendarItem),
         },
-        inbox_recent: inbox.slice(0, 12).map(compactInboxItem),
+        inbox_recent: understoodInbox.slice(0, 12),
         saved_references_recent: ((savedResult.data || []) as Record<string, unknown>[]).map(compactReference),
         published_this_month: outputByClient,
         suggested_lens: [
@@ -438,7 +457,7 @@ export async function executeAgentTool(
       if (args.client) query = query.eq('client', args.client)
       const { data, error } = await query.limit(typeof args.limit === 'number' ? args.limit : 30)
       if (error) return { error: error.message }
-      return { items: data }
+      return { items: (data || []).map((item) => compactInboxItem(item)) }
     }
 
     case 'create_inbox_item': {
@@ -453,14 +472,101 @@ export async function executeAgentTool(
     }
 
     case 'search_saved_content': {
-      let query = supabase
-        .from('content_items')
-        .select('id, title, summary, category, tags, artist_name, platform, url, image_url, dominant_color')
-      if (args.category) query = query.eq('category', args.category)
-      const { data, error } = await query.limit(120)
-      if (error) return { error: error.message }
       const search = typeof args.query === 'string' ? args.query : ''
-      return { items: rankArchiveItems(data || [], search).slice(0, 20), search_mode: 'hybrid' }
+      const [inboxResult, interactionsResult] = await Promise.all([
+        supabase
+          .from('inbox_items')
+          .select('id, content, url, image_url, og_title, og_description, source, note_type, created_at')
+          .eq('user_id', userId)
+          .neq('source', 'chat')
+          .order('created_at', { ascending: false })
+          .limit(1000),
+        supabase
+          .from('interactions')
+          .select('content_id, created_at')
+          .eq('user_id', userId)
+          .eq('action', 'save')
+          .order('created_at', { ascending: false })
+          .limit(500),
+      ])
+
+      if (inboxResult.error) return { error: inboxResult.error.message }
+      if (interactionsResult.error) return { error: interactionsResult.error.message }
+
+      const savedAt = new Map<string, string>()
+      for (const interaction of interactionsResult.data || []) {
+        if (interaction.content_id && !savedAt.has(interaction.content_id)) {
+          savedAt.set(interaction.content_id, interaction.created_at)
+        }
+      }
+      const savedIds = [...savedAt.keys()]
+      const archiveResult = savedIds.length
+        ? await supabase
+            .from('content_items')
+            .select('id, title, summary, category, tags, artist_name, platform, url, image_url, dominant_color')
+            .in('id', savedIds)
+        : { data: [], error: null }
+
+      if (archiveResult.error) return { error: archiveResult.error.message }
+
+      const personalItems: PersonalBrainItem[] = [
+        ...((inboxResult.data || []).map((item) => ({
+          id: `inbox:${item.id}`,
+          origin: 'inbox' as const,
+          content: item.content,
+          title: item.og_title || item.content,
+          description: item.og_description,
+          source: item.source,
+          url: item.url,
+          image_url: item.image_url,
+          created_at: item.created_at,
+          note_type: item.note_type,
+        }))),
+        ...((archiveResult.data || []).map((item) => ({
+          id: `archive:${item.id}`,
+          content_id: item.id,
+          origin: 'archive' as const,
+          title: item.title,
+          description: item.summary,
+          tags: item.tags,
+          category: item.category,
+          artist: item.artist_name,
+          source: item.platform,
+          url: item.url,
+          image_url: item.image_url,
+          dominant_color: item.dominant_color,
+          saved_at: savedAt.get(item.id),
+        }))),
+      ]
+
+      const category =
+        typeof args.category === 'string'
+          ? args.category.toLocaleLowerCase('it-IT').trim()
+          : ''
+      const ranked = rankPersonalBrainItems(personalItems, search, 60)
+        .filter((item) => {
+          if (!category) return true
+          return (
+            String(item.category || '').toLocaleLowerCase('it-IT') === category ||
+            item.intelligence.craft_tags.some((tag) =>
+              tag.includes(category.replaceAll(' ', '_'))
+            )
+          )
+        })
+        .slice(0, 20)
+
+      return {
+        items: ranked,
+        search_mode: 'personal_fused',
+        searched: {
+          inbox: inboxResult.data?.length || 0,
+          saved_archive: archiveResult.data?.length || 0,
+        },
+        warning:
+          ranked.some((item) => !item.intelligence.understood)
+            ? 'Alcuni social salvati non hanno ancora metadati sufficienti per essere compresi.'
+            : undefined,
+      }
     }
 
     case 'get_monthly_output_summary': {
@@ -583,58 +689,6 @@ type SearchResult = {
   title: string
   url: string
   snippet: string
-}
-
-const ARCHIVE_SYNONYMS: Record<string, string[]> = {
-  lusso: ['premium', 'luxury', 'elegante', 'editoriale'],
-  vino: ['wine', 'bottiglia', 'cantina', 'etichetta', 'vigneto'],
-  moda: ['fashion', 'editorial', 'lookbook', 'abbigliamento'],
-  grafica: ['graphic', 'branding', 'poster', 'tipografia', 'layout'],
-  social: ['instagram', 'reel', 'carosello', 'post', 'story'],
-  interni: ['interior', 'architettura', 'spazio', 'retail'],
-  mediterraneo: ['mediterranean', 'salento', 'puglia', 'naturale'],
-}
-
-function archiveWords(value: string) {
-  const words = value
-    .toLocaleLowerCase('it-IT')
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .split(/\s+/)
-    .filter((word) => word.length > 2)
-  const expanded = new Set(words)
-  for (const word of words) {
-    for (const synonym of ARCHIVE_SYNONYMS[word] || []) expanded.add(synonym)
-  }
-  return expanded
-}
-
-function rankArchiveItems(items: Record<string, unknown>[], search: string) {
-  const wanted = archiveWords(search)
-  if (!wanted.size) return items
-
-  return items
-    .map((item) => {
-      const title = String(item.title || '')
-      const metadata = [
-        item.summary,
-        item.category,
-        Array.isArray(item.tags) ? item.tags.join(' ') : item.tags,
-        item.artist_name,
-        item.platform,
-        item.dominant_color,
-      ].join(' ')
-      const titleWords = archiveWords(title)
-      const metadataWords = archiveWords(metadata)
-      let score = 0
-      for (const word of wanted) {
-        if (titleWords.has(word)) score += 5
-        if (metadataWords.has(word)) score += 2
-        if (title.toLocaleLowerCase('it-IT').includes(word)) score += 2
-      }
-      return { ...item, relevance_score: score }
-    })
-    .filter((item) => item.relevance_score > 0)
-    .sort((a, b) => b.relevance_score - a.relevance_score)
 }
 
 const RADAR_CONTEXT: Record<string, string> = {

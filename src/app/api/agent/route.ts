@@ -19,6 +19,36 @@ function normalizedWords(value: string) {
   )
 }
 
+function readableMemory(content: string) {
+  if (!content.startsWith('[GROW_BRAIN_FEEDBACK]')) return content
+
+  const signal = content.match(/\bsignal=([a-z_]+)/)?.[1]
+  const rawTitle = content.match(/\btitle=(.+)$/)?.[1]
+  let title = 'questo materiale'
+  if (rawTitle) {
+    try {
+      title = String(JSON.parse(rawTitle))
+    } catch {
+      title = rawTitle
+    }
+  }
+
+  const prefix =
+    signal === 'useful_now'
+      ? 'Davide considera utile adesso'
+      : signal === 'nourishment'
+        ? 'Davide considera nutrimento creativo, non un lavoro da assegnare'
+        : signal === 'personal'
+          ? 'Davide considera personale e non va trasformato in lavoro senza richiesta'
+          : signal === 'not_for_me'
+            ? 'Davide non vuole che venga riproposto'
+            : signal === 'used'
+              ? 'Davide ha già usato'
+              : 'Davide ha valutato'
+
+  return `${prefix}: ${title}`
+}
+
 async function getRelevantMemories(
   supabase: Awaited<ReturnType<typeof getAuthenticatedSupabase>>['supabase'],
   userId: string,
@@ -34,12 +64,13 @@ async function getRelevantMemories(
   const queryWords = normalizedWords(message)
   return ((data || []) as MemoryRow[])
     .map((memory, index) => {
-      const words = normalizedWords(memory.content)
+      const readableContent = readableMemory(memory.content)
+      const words = normalizedWords(readableContent)
       let score = Math.max(0, 3 - index * 0.08)
       for (const word of queryWords) {
         if (words.has(word)) score += 3
       }
-      return { ...memory, score }
+      return { ...memory, content: readableContent, score }
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 8)
@@ -75,7 +106,7 @@ HAI FUNZIONI VERE, USALE:
 - get_operational_context per leggere la situazione reale di GROW prima di decidere priorita', prossime mosse o diagnosi operative
 - create/list/update_calendar_item(s) per il calendario editoriale
 - create/list_inbox_items per idee, link, note
-- search_saved_content per cercare nell'archivio reference
+- search_saved_content per cercare nel cervello personale reale: note, salvati Instagram/TikTok e soli elementi davvero salvati in Archivio
 - project_radar per trovare segnali recenti e opportunita' pertinenti a un cliente
 - market_forecast per stimare successo/insuccesso di concept, campagne, contenuti social, lanci, posizionamenti e scelte creative usando segnali recenti
 - get_monthly_output_summary per capire l'andamento del mese
@@ -93,7 +124,9 @@ REGOLE DI INTELLIGENZA:
 - Nelle ricerche strategiche separa sempre: fonti autorevoli, community/sentiment, fonti creative/case study. Reddit e forum valgono come segnale grezzo, non come prova. Discord solo se pubblico e indicizzato: non promettere accesso a community chiuse.
 - Se Davide fornisce un URL, usa fetch_webpage e ragiona sul testo realmente letto.
 - Per domande sul lavoro di Davide usa prima i dati interni di GROW; usa il web solo se aggiunge contesto esterno utile.
-- Per trovare reference in Archivio, cerca per concetti visivi e intenzione, non solo per titolo letterale.
+- Per trovare reference usa search_saved_content: cerca per concetti visivi, tecnica e intenzione, non solo per titolo letterale.
+- Non collegare automaticamente un salvato social a un cliente. "Personale", "nutrimento creativo" e "utile al lavoro" sono tre cose diverse; usa un cliente solo se Davide lo cita o il collegamento e' esplicito.
+- Quando i dati di un salvato sono poveri (per esempio solo un URL o una preview generica), dichiaralo e non inventarne soggetto, stile o utilita'.
 - Se Davide chiede un radar per un cliente, usa project_radar e traduci i risultati in massimo tre spunti applicabili, non in una rassegna stampa.
 - Dopo una ricerca sintetizza: non copiare gli snippet. Indica 2-4 fonti con titolo e URL.
 - Distingui chiaramente fatti trovati, interpretazione creativa e raccomandazione.
