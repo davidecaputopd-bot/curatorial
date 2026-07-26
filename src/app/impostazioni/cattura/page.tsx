@@ -151,6 +151,14 @@ export default function CaptureSetupPage() {
             </p>
           </div>
         </section>
+
+        <Link
+          href="/impostazioni/importa"
+          className="mt-4 flex min-h-14 items-center justify-between rounded-[1.25rem] border border-black/10 bg-white px-4 py-3 text-sm font-black transition active:scale-[0.98]"
+        >
+          <span>Importa i vecchi salvati Instagram e TikTok</span>
+          <span>→</span>
+        </Link>
       </div>
 
       <BottomNav />
