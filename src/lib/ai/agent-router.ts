@@ -61,6 +61,12 @@ function hasKey(value: string | undefined) {
   return Boolean(value && value.trim().length > 0)
 }
 
+function normalizeToolArgs(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
 function extractFailedGeneration(error: unknown): AgentToolCall[] | null {
   const raw = JSON.stringify(error)
   const match = raw.match(/<function=([\w_]+)(\{[^<]*\})<\/function>/)
@@ -334,7 +340,7 @@ export async function runAgent(
     for (const call of result.tool_calls) {
       let args: Record<string, unknown> = {}
       try {
-        args = JSON.parse(call.function.arguments || '{}')
+        args = normalizeToolArgs(JSON.parse(call.function.arguments || '{}'))
       } catch {
         args = {}
       }
