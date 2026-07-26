@@ -40,11 +40,15 @@ function readableMemory(content: string) {
         ? 'Davide considera nutrimento creativo, non un lavoro da assegnare'
         : signal === 'personal'
           ? 'Davide considera personale e non va trasformato in lavoro senza richiesta'
-          : signal === 'not_for_me'
-            ? 'Davide non vuole che venga riproposto'
-            : signal === 'used'
-              ? 'Davide ha già usato'
-              : 'Davide ha valutato'
+          : signal === 'keep'
+            ? 'Davide vuole tenere questo materiale nella propria memoria creativa'
+            : signal === 'not_now'
+              ? 'Davide non vuole usare questo materiale adesso, ma può essere riproposto più avanti'
+              : signal === 'not_for_me'
+                ? 'Davide non vuole che venga riproposto'
+                : signal === 'used'
+                  ? 'Davide ha già usato'
+                  : 'Davide ha valutato'
 
   return `${prefix}: ${title}`
 }

@@ -9,6 +9,8 @@ export const BRAIN_FEEDBACK_SIGNALS = [
   'useful_now',
   'nourishment',
   'personal',
+  'keep',
+  'not_now',
   'not_for_me',
   'used',
 ] as const

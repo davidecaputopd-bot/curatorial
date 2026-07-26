@@ -1,6 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ArrowRight,
+  ArrowUp,
+  At,
+  ClockCounterClockwise,
+  Plus,
+} from '@phosphor-icons/react'
 import BottomNav from '@/components/BottomNav'
 
 type Action = {
@@ -99,21 +106,37 @@ const CLIENT_NOTES: Record<string, string> = {
   TRAMA: 'Vintage contemporaneo. Apertura store ottobre 2026.',
 }
 
-const QUICK_PROMPTS = [
-  'Leggi GROW e dimmi da dove riparto oggi.',
-  'Trova una cosa utile nella mia Inbox e trasformala in lavoro.',
-  'Controlla Piano e dimmi cosa sto ignorando.',
-  'Valuta se questa idea puo funzionare sul mercato.',
-]
+const AI_STARTERS = [
+  {
+    label: 'Fai il punto',
+    description: 'Legge Piano, Inbox e Archivio e sceglie una priorità.',
+    prompt: 'Leggi GROW e dimmi da dove riparto oggi.',
+    mode: 'send',
+  },
+  {
+    label: 'Trova materiale',
+    description: 'Cerca una reference già salvata per ciò che devi fare.',
+    prompt: 'Cerca nei miei materiali una reference utile per: ',
+    mode: 'compose',
+  },
+  {
+    label: 'Valuta un’idea',
+    description: 'Confronta intuizione, pubblico e segnali di mercato.',
+    prompt: 'Valuta questa idea con realismo e indicami rischi e potenziale: ',
+    mode: 'compose',
+  },
+] as const
 
 const COMMAND_KEYS = [
   { label: 'Oggi', prompt: 'Leggi GROW e dimmi la priorita di oggi.' },
-  { label: 'Inbox', prompt: 'Guarda la mia Inbox recente e trova uno spunto utile.' },
-  { label: 'Piano', prompt: 'Controlla il Piano e dimmi cosa rischio di lasciare indietro.' },
-  { label: 'Mercato', prompt: 'Valuta questa idea sul mercato: ' },
-  { label: 'Reddit', prompt: 'Cerca online in inglese, includendo Reddit e forum pubblici: ' },
-  { label: 'Archivio', prompt: 'Cerca nel mio Archivio una direzione visiva per: ' },
-]
+  { label: 'Nei salvati', prompt: 'Cerca nei miei materiali una direzione per: ' },
+  { label: 'Valuta', prompt: 'Valuta questa idea sul mercato: ' },
+  {
+    label: 'Online',
+    prompt:
+      'Cerca online in inglese, includendo fonti autorevoli, Reddit e forum pubblici: ',
+  },
+] as const
 
 function messageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -195,6 +218,7 @@ export default function AiPage() {
   const [citations, setCitations] = useState<Citation[]>([])
   const [composerFocused, setComposerFocused] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
 
   const referenceContext = useMemo(() => buildReferenceContext(reference), [reference])
   const projectContext = useMemo(() => buildProjectContext(project), [project])
@@ -296,6 +320,11 @@ export default function AiPage() {
   }
 
   const removeCitation = (id: string) => setCitations((prev) => prev.filter((c) => c.id !== id))
+
+  const prepareComposer = (prompt: string) => {
+    setInput(prompt)
+    window.requestAnimationFrame(() => composerRef.current?.focus())
+  }
 
   const updateAction = (
     messageId: string,
@@ -474,16 +503,18 @@ export default function AiPage() {
             <button
               type="button"
               onClick={openHistory}
-              className="rounded-full border border-grow-border bg-grow-card px-3 py-2 text-[10px] font-black uppercase tracking-tight text-grow-muted"
+              aria-label="Apri cronologia"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-grow-border bg-grow-card text-grow-muted"
             >
-              Cronologia
+              <ClockCounterClockwise size={18} weight="bold" />
             </button>
             <button
               type="button"
               onClick={startNewChat}
-              className="rounded-full bg-[#0F0F10] px-3 py-2 text-[10px] font-black uppercase tracking-tight text-white"
+              aria-label="Nuova conversazione"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0F0F10] text-white"
             >
-              Nuova chat
+              <Plus size={18} weight="bold" />
             </button>
           </div>
         </header>
@@ -541,26 +572,66 @@ export default function AiPage() {
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
           {messages.length === 0 && (
-            <div className="rounded-[1.6rem] border border-grow-border bg-grow-card px-5 py-6">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                Cabina GROW
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-grow-muted">
-                Posso leggere Piano, Inbox e Archivio prima di rispondere. Posso anche valutare idee, campagne e contenuti con segnali di mercato.
-              </p>
-              <div className="mt-4 grid gap-2">
-                {QUICK_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => void send(prompt)}
-                    className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-left text-xs font-bold leading-snug text-grow-text active:scale-[0.99]"
-                  >
-                    {prompt}
-                  </button>
-                ))}
+            <section className="flex min-h-full items-center py-8">
+              <div className="w-full">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+                  Tavolo di lavoro
+                </p>
+                <h2 className="mt-3 max-w-sm text-[30px] font-bold leading-[0.98] tracking-[-0.045em]">
+                  {project
+                    ? `Cosa sblocchiamo per ${project}?`
+                    : 'Cosa vuoi sbloccare?'}
+                </h2>
+                <p className="mt-4 max-w-md text-sm leading-relaxed text-grow-muted">
+                  GROW parte dai tuoi materiali e distingue ciò che sa, ciò che
+                  trova online e ciò che sta ipotizzando.
+                </p>
+
+                <div className="mt-7 border-y border-black/10">
+                  {AI_STARTERS.map((starter, index) => (
+                    <button
+                      key={starter.label}
+                      type="button"
+                      onClick={() => {
+                        if (starter.mode === 'send') {
+                          void send(starter.prompt)
+                          return
+                        }
+                        prepareComposer(starter.prompt)
+                      }}
+                      className="group flex min-h-[76px] w-full items-center gap-4 border-t border-black/10 py-4 text-left first:border-t-0 active:opacity-60"
+                    >
+                      <span
+                        className={[
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+                          index === 0
+                            ? 'bg-[#0F0F10] text-grow-yellow'
+                            : 'bg-white text-grow-text',
+                        ].join(' ')}
+                      >
+                        <ArrowRight
+                          size={17}
+                          weight="bold"
+                          className="transition-transform group-hover:translate-x-0.5"
+                        />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold">
+                          {starter.label}
+                        </span>
+                        <span className="mt-1 block text-[11px] leading-relaxed text-grow-muted">
+                          {starter.description}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-grow-muted">
+                  Contesto disponibile · Piano · Inbox · Archivio
+                </p>
               </div>
-            </div>
+            </section>
           )}
 
           {messages.map((message) => (
@@ -761,14 +832,13 @@ export default function AiPage() {
                   type="button"
                   onClick={() => {
                     if (key.prompt.endsWith(': ')) {
-                      setInput(key.prompt)
-                      setComposerFocused(true)
+                      prepareComposer(key.prompt)
                     } else {
                       void send(key.prompt)
                     }
                   }}
                   disabled={loading}
-                  className="shrink-0 rounded-full border border-black/10 bg-white px-3 py-2 text-[10px] font-black uppercase text-grow-muted disabled:opacity-40"
+                  className="min-h-11 shrink-0 rounded-full border border-black/10 bg-white px-3 text-[10px] font-black uppercase text-grow-muted disabled:opacity-40"
                 >
                   {key.label}
                 </button>
@@ -780,11 +850,12 @@ export default function AiPage() {
                 type="button"
                 onClick={() => setShowCitePicker((v) => !v)}
                 aria-label="Cita un elemento salvato"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-grow-muted hover:text-grow-text"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-grow-muted hover:text-grow-text"
               >
-                @
+                <At size={18} weight="bold" />
               </button>
               <textarea
+                ref={composerRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onFocus={() => setComposerFocused(true)}
@@ -795,7 +866,11 @@ export default function AiPage() {
                     void send(input)
                   }
                 }}
-                placeholder="Scrivi qualsiasi cosa..."
+                placeholder={
+                  project
+                    ? `Cosa vuoi ottenere per ${project}?`
+                    : 'Chiedi, cerca o sviluppa un’idea...'
+                }
                 aria-label="Messaggio per GROW AI"
                 rows={1}
                 className="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-snug outline-none placeholder:text-grow-muted"
@@ -805,11 +880,9 @@ export default function AiPage() {
                 onClick={() => void send(input)}
                 disabled={!input.trim() || loading}
                 aria-label="Invia"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-grow-yellow text-grow-text disabled:opacity-40"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-grow-yellow text-grow-text disabled:opacity-40"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <ArrowUp size={17} weight="bold" />
               </button>
             </div>
           </div>

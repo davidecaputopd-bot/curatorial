@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       ? 'less_like_this'
       : signal === 'useful_now'
         ? 'more_like_this'
-        : signal === 'nourishment'
+        : signal === 'nourishment' || signal === 'keep'
           ? 'like'
           : signal === 'used'
             ? 'open'

@@ -2,6 +2,11 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import {
+  CaretLeft,
+  CaretRight,
+  ChatCircleDots,
+} from '@phosphor-icons/react'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 import type {
@@ -33,14 +38,6 @@ const placeholders: Record<string, string> = {
   lifestyle: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=900&q=80',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  idea: 'Idea',
-  in_produzione: 'In produzione',
-  pronto: 'Pronto',
-  pubblicato: 'Pubblicato',
-  da_riciclare: 'Da riciclare',
-}
-
 type FeedItem = {
   id: string
   title?: string | null
@@ -53,44 +50,9 @@ type FeedItem = {
   width?: number | null
 }
 
-type CalendarItem = {
+type ChatItem = {
   id: string
-  client: string
-  title: string
-  content_type?: string | null
-  status: string
-  scheduled_date?: string | null
-}
-
-type InboxItem = {
-  id: string
-  content?: string | null
-  url?: string | null
   created_at: string
-}
-
-function localDateKey(date: Date) {
-  const parts = new Intl.DateTimeFormat('en', {
-    timeZone: 'Europe/Rome',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date)
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value || ''
-  const year = value('year')
-  const month = value('month')
-  const day = value('day')
-  return `${year}-${month}-${day}`
-}
-
-function shortDate(value: string) {
-  return new Date(`${value}T12:00:00`).toLocaleDateString('it-IT', {
-    timeZone: 'Europe/Rome',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
 }
 
 function romeHour(date: Date) {
@@ -101,15 +63,6 @@ function romeHour(date: Date) {
       hourCycle: 'h23',
     }).format(date)
   )
-}
-
-function timeAgo(value: string) {
-  const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60_000)
-  if (minutes < 1) return 'adesso'
-  if (minutes < 60) return `${minutes}m fa`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h fa`
-  return `${Math.floor(hours / 24)}g fa`
 }
 
 function SafeImage({
@@ -138,94 +91,138 @@ const FEEDBACK_LABELS: Array<{
   signal: BrainFeedbackSignal
   label: string
 }> = [
-  { signal: 'useful_now', label: 'Utile' },
-  { signal: 'nourishment', label: 'Nutrimento' },
-  { signal: 'personal', label: 'Personale' },
+  { signal: 'keep', label: 'Tieni' },
+  { signal: 'not_now', label: 'Non ora' },
   { signal: 'not_for_me', label: 'Non per me' },
-  { signal: 'used', label: 'Già usato' },
 ]
+
+const BRAIN_KIND_LABELS: Record<DailyBrainCard['kind'], string> = {
+  dont_miss: 'Ora',
+  resume: 'Riprendi',
+  possibility: 'Esplora',
+}
 
 function BrainBriefCard({
   card,
   feedback,
   onFeedback,
+  position,
+  total,
+  onPrevious,
+  onNext,
 }: {
   card: DailyBrainCard
   feedback?: BrainFeedbackSignal
   onFeedback: (card: DailyBrainCard, signal: BrainFeedbackSignal) => void
+  position: number
+  total: number
+  onPrevious: () => void
+  onNext: () => void
 }) {
   return (
-    <article className="rounded-[1.15rem] border border-white/10 bg-white/[0.055] p-4">
-      <div className="flex items-start gap-3">
-        <span
-          className={[
-            'mt-1 h-8 w-1 shrink-0 rounded-full',
-            card.kind === 'dont_miss' ? 'bg-grow-yellow' : 'bg-white/20',
-          ].join(' ')}
-        />
-        <div className="min-w-0 flex-1">
-          <p
-            className={[
-              'text-[9px] font-black uppercase tracking-[0.16em]',
-              card.kind === 'dont_miss'
-                ? 'text-grow-yellow'
-                : 'text-white/40',
-            ].join(' ')}
-          >
-            {card.eyebrow}
-          </p>
-          <h3 className="mt-1 text-sm font-black leading-tight text-white">
-            {card.title}
-          </h3>
-          <p className="mt-1.5 text-xs leading-relaxed text-white/55">
-            {card.summary}
-          </p>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Link
-              href={card.href}
-              className={[
-                'rounded-full px-3 py-2 text-[9px] font-black uppercase tracking-wide active:scale-[0.98]',
-                card.kind === 'dont_miss'
-                  ? 'bg-grow-yellow text-black'
-                  : 'bg-white text-black',
-              ].join(' ')}
-            >
-              {card.action_label} →
-            </Link>
-            <details className="group">
-              <summary className="cursor-pointer list-none rounded-full border border-white/10 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-white/45">
-                Perché
-              </summary>
-              <div className="mt-2 rounded-xl bg-black/25 p-3">
-                <p className="max-w-md text-[10px] leading-relaxed text-white/60">
-                  {card.reason}
-                </p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-white/30">
-                  {card.evidence.filter(Boolean).join(' · ')}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {FEEDBACK_LABELS.map((option) => (
-                    <button
-                      key={option.signal}
-                      type="button"
-                      disabled={Boolean(feedback)}
-                      onClick={() => onFeedback(card, option.signal)}
-                      className={[
-                        'rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide transition disabled:cursor-default',
-                        feedback === option.signal
-                          ? 'border-grow-yellow bg-grow-yellow text-black'
-                          : 'border-white/10 text-white/45 hover:border-white/25 hover:text-white/70 disabled:opacity-35',
-                      ].join(' ')}
-                    >
-                      {feedback === option.signal ? 'Registrato' : option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </details>
-          </div>
+    <article className="overflow-hidden rounded-[1.5rem] border border-black/10 bg-[#FFFDF8]">
+      {card.image_url && (
+        <div className="relative h-44 overflow-hidden bg-grow-soft sm:h-52">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={card.image_url}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+          {card.outside_bubble && (
+            <span className="absolute bottom-3 left-3 bg-grow-yellow px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-black">
+              Fuori bolla
+            </span>
+          )}
         </div>
+      )}
+
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-grow-muted">
+              {BRAIN_KIND_LABELS[card.kind]} · {card.eyebrow}
+            </p>
+            <h3 className="mt-3 text-[25px] font-bold leading-[1.02] tracking-[-0.035em] text-grow-text sm:text-[30px]">
+              {card.title}
+            </h3>
+          </div>
+          <span className="font-mono shrink-0 text-[10px] text-grow-muted">
+            {String(position + 1).padStart(2, '0')}/
+            {String(total).padStart(2, '0')}
+          </span>
+        </div>
+
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-grow-muted">
+          {card.summary}
+        </p>
+
+        <div className="mt-5 border-l-2 border-grow-yellow pl-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-grow-muted">
+            Perché ora
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-grow-text/75">
+            {card.reason}
+          </p>
+          <p className="mt-1.5 text-[10px] text-grow-muted">
+            {card.evidence.filter(Boolean).join(' · ')}
+          </p>
+        </div>
+
+        <div className="mt-6 flex items-center gap-2">
+          <Link
+            href={card.href}
+            className="inline-flex min-h-11 flex-1 items-center justify-between rounded-full bg-[#0F0F10] px-4 text-[11px] font-bold text-white transition active:scale-[0.98]"
+          >
+            <span>{card.action_label}</span>
+            <span className="text-grow-yellow">→</span>
+          </Link>
+          <button
+            type="button"
+            onClick={onPrevious}
+            disabled={total < 2}
+            aria-label="Scelta precedente"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-grow-muted disabled:opacity-30"
+          >
+            <CaretLeft size={16} weight="bold" />
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={total < 2}
+            aria-label="Scelta successiva"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-grow-text disabled:opacity-30"
+          >
+            <CaretRight size={16} weight="bold" />
+          </button>
+        </div>
+
+        {card.kind !== 'dont_miss' && (
+          <div className="mt-5 border-t border-black/[0.08] pt-4">
+            {feedback ? (
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-grow-muted">
+                Capito. GROW ne terrà conto.
+              </p>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="mr-auto text-[11px] text-grow-muted">
+                  Ti serve?
+                </span>
+                {FEEDBACK_LABELS.map((option) => (
+                  <button
+                    key={option.signal}
+                    type="button"
+                    onClick={() => onFeedback(card, option.signal)}
+                    className="min-h-11 rounded-full px-3 text-[10px] font-medium text-grow-muted transition hover:bg-grow-soft hover:text-grow-text active:scale-[0.98]"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </article>
   )
@@ -365,17 +362,14 @@ function ImageCard({
 
 export default function Home() {
   const [images, setImages] = useState<FeedItem[]>([])
-  const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([])
-  const [inboxItems, setInboxItems] = useState<InboxItem[]>([])
   const [loadingImages, setLoadingImages] = useState(true)
-  const [loadingWork, setLoadingWork] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
-  const [inboxTotal, setInboxTotal] = useState(0)
   const [dailyBrief, setDailyBrief] = useState<DailyBrainBrief | null>(null)
   const [loadingBrain, setLoadingBrain] = useState(true)
+  const [brainIndex, setBrainIndex] = useState(0)
   const [brainFeedback, setBrainFeedback] = useState<
     Record<string, BrainFeedbackSignal>
   >({})
@@ -392,17 +386,12 @@ export default function Home() {
     Promise.all([
       fetchFeedPage(0),
       fetch('/api/saved').then((response) => response.json()),
-      fetch('/api/calendar').then((response) => response.json()),
-      fetch('/api/inbox').then((response) => response.json()),
       fetch('/api/inbox?source=chat').then((response) => response.json()),
-      fetch('/api/inbox?lane=notes&limit=12').then((response) =>
-        response.json()
-      ),
     ])
-      .then(([feed, saved, calendar, inbox, chat, manualInbox]) => {
+      .then(([feed, saved, chat]) => {
         if (cancelled) return
         const feedItems = (feed.items || []) as FeedItem[]
-        const chatItems = (chat.items || []) as InboxItem[]
+        const chatItems = (chat.items || []) as ChatItem[]
         const latestChat = chatItems[0]
         const lastSeen = localStorage.getItem('grow_chat_last_seen')
 
@@ -413,9 +402,6 @@ export default function Home() {
             ((saved.items || []) as { id: string }[]).map((item) => item.id)
           )
         )
-        setCalendarItems((calendar.items || []) as CalendarItem[])
-        setInboxTotal(Number(inbox.total || inbox.items?.length || 0))
-        setInboxItems((manualInbox.items || []) as InboxItem[])
         setHasUnreadChat(
           Boolean(
             latestChat &&
@@ -431,7 +417,6 @@ export default function Home() {
       .finally(() => {
         if (!cancelled) {
           setLoadingImages(false)
-          setLoadingWork(false)
         }
       })
 
@@ -518,24 +503,6 @@ export default function Home() {
   }
 
   const now = new Date()
-  const today = localDateKey(now)
-  const upcomingItems = calendarItems
-    .filter(
-      (item) =>
-        item.scheduled_date &&
-        item.scheduled_date > today &&
-        item.status !== 'pubblicato'
-    )
-    .sort((a, b) =>
-      String(a.scheduled_date).localeCompare(String(b.scheduled_date))
-    )
-    .slice(0, 4)
-  const activeItems = calendarItems
-    .filter(
-      (item) =>
-        item.status === 'in_produzione' || item.status === 'pronto'
-    )
-    .slice(0, 4)
   const currentHour = romeHour(now)
   const greeting =
     currentHour < 12
@@ -543,6 +510,12 @@ export default function Home() {
       : currentHour < 18
         ? 'Buon pomeriggio'
         : 'Buonasera'
+  const brainCards = dailyBrief?.cards || []
+  const activeBrainIndex = Math.min(
+    brainIndex,
+    Math.max(0, brainCards.length - 1)
+  )
+  const activeBrainCard = brainCards[activeBrainIndex]
 
   const handleDwell = async (itemId: string, seconds: number) => {
     try {
@@ -561,14 +534,34 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-6xl lg:px-8">
-        <header className="mb-7 flex min-h-[7.25rem] items-end justify-between gap-4">
+        <header className="mb-8 flex min-h-[7.25rem] items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
               {greeting}
             </p>
-            <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+            <h1 className="mt-2 text-[42px] font-black uppercase leading-[0.88] tracking-tighter">
               Oggi<span className="text-grow-yellow">.</span>
             </h1>
+            <Link
+              href="/chat"
+              className="relative mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0F0F10] px-4 text-[11px] font-bold text-white transition active:scale-[0.98]"
+            >
+              <ChatCircleDots
+                size={17}
+                weight="bold"
+                className="text-grow-yellow"
+              />
+              Chat veloce
+              {hasUnreadChat && (
+                <>
+                  <span
+                    className="h-2 w-2 rounded-full bg-grow-yellow"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">Nuovi messaggi</span>
+                </>
+              )}
+            </Link>
           </div>
           <div className="flex min-w-[7.5rem] flex-col items-end">
             <div className="flex h-[5.75rem] w-[5.25rem] items-end justify-center">
@@ -579,7 +572,7 @@ export default function Home() {
                 className="w-[4.6rem] object-contain"
               />
             </div>
-            <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted">
+            <p className="mt-1 text-right font-mono text-[9px] uppercase tracking-[0.12em] text-grow-muted">
               {now.toLocaleDateString('it-IT', {
                 timeZone: 'Europe/Rome',
                 weekday: 'long',
@@ -590,249 +583,70 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="mb-5 grid grid-cols-3 gap-2 lg:hidden">
-          <Link
-            href="/chat"
-            className="relative min-h-[76px] rounded-[1.25rem] bg-[#0F0F10] p-3 text-white shadow-[0_14px_34px_rgba(15,15,16,0.16)] active:scale-[0.98]"
-          >
-            {hasUnreadChat && (
-              <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-grow-yellow" />
-            )}
-            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-yellow">
-              Chat
-            </span>
-            <span className="mt-2 block text-[12px] font-black uppercase leading-tight">
-              Veloce
-            </span>
-            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-white/40">
-              Telefono
-            </span>
-          </Link>
-
-          <Link
-            href="/inbox"
-            className="min-h-[76px] rounded-[1.25rem] border border-grow-border bg-white p-3 text-grow-text active:scale-[0.98]"
-          >
-            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-muted">
-              Nota
-            </span>
-            <span className="mt-2 block text-[12px] font-black uppercase leading-tight">
-              Inbox
-            </span>
-            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-grow-muted">
-              Taccuino
-            </span>
-          </Link>
-
-          <Link
-            href="/ai"
-            className="min-h-[76px] rounded-[1.25rem] bg-grow-yellow p-3 text-[#0F0F10] shadow-[0_14px_34px_rgba(255,229,0,0.22)] active:scale-[0.98]"
-          >
-            <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-black/55">
-              AI
-            </span>
-            <span className="mt-2 block text-[12px] font-black uppercase leading-tight">
-              Regia
-            </span>
-            <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-black/45">
-              Ragiona
-            </span>
-          </Link>
-        </section>
-
-        <section className="grid gap-3 lg:grid-cols-[1.45fr_0.8fr]">
-          <div className="rounded-[1.5rem] bg-[#0F0F10] p-5 text-white">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
-                  Cervello operativo
-                </p>
-                <h2 className="mt-1 text-xl font-black uppercase">
-                  Regia di oggi
-                </h2>
-              </div>
-              <Link
-                href="/ai?brief=Leggi%20GROW%20e%20dimmi%20la%20singola%20mossa%20pi%C3%B9%20utile%20ora."
-                className="rounded-full border border-white/15 px-3 py-2 text-[9px] font-black uppercase text-white/60"
-              >
-                Chiedi a GROW →
-              </Link>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {loadingBrain ? (
-                <>
-                  {[1, 2, 3].map((item) => (
-                    <div
-                      key={item}
-                      className="h-28 animate-pulse rounded-[1.15rem] bg-white/5"
-                    />
-                  ))}
-                </>
-              ) : dailyBrief?.cards.length ? (
-                dailyBrief.cards.map((card) => (
-                  <BrainBriefCard
-                    key={card.id}
-                    card={card}
-                    feedback={brainFeedback[card.id]}
-                    onFeedback={(selected, signal) =>
-                      void registerBrainFeedback(selected, signal)
-                    }
-                  />
-                ))
-              ) : (
-                <div className="rounded-[1.1rem] border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-bold">Nessun segnale forte.</p>
-                  <p className="mt-1 text-xs leading-relaxed text-white/45">
-                    GROW non inventa una priorità quando i dati non bastano.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <Link
-            href="/inbox"
-            className="flex min-h-44 flex-col justify-between rounded-[1.5rem] border border-grow-border bg-grow-card p-5"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                  Taccuino
-                </p>
-                <h2 className="mt-1 text-xl font-black uppercase">Inbox</h2>
-              </div>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-grow-yellow text-lg font-black">
-                +
-              </span>
-            </div>
+        <section aria-labelledby="daily-edit-title">
+          <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-4xl font-black">{inboxTotal}</p>
-              <p className="mt-1 text-xs leading-relaxed text-grow-muted">
-                Note, link e salvati social. Li interpreta GROW quando servono.
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+                Cervello GROW
               </p>
-            </div>
-          </Link>
-        </section>
-
-        <section className="mt-6 grid gap-5 lg:grid-cols-2">
-          <div>
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                  Prossime
-                </p>
-                <h2 className="mt-1 text-lg font-black uppercase">Scadenze</h2>
-              </div>
-              <Link
-                href="/calendario"
-                className="text-[10px] font-black uppercase text-grow-muted"
+              <h2
+                id="daily-edit-title"
+                className="mt-1 text-[29px] font-bold leading-none tracking-[-0.04em]"
               >
-                Vedi piano
+                Daily Edit
+              </h2>
+            </div>
+            <Link
+              href="/ai?brief=Leggi%20GROW%20e%20dimmi%20la%20singola%20mossa%20pi%C3%B9%20utile%20ora."
+              className="text-[11px] font-bold text-grow-muted transition hover:text-grow-text"
+            >
+              Chiedi a GROW →
+            </Link>
+          </div>
+
+          {loadingBrain ? (
+            <div className="h-[26rem] animate-pulse rounded-[1.5rem] border border-black/5 bg-white/70" />
+          ) : activeBrainCard ? (
+            <BrainBriefCard
+              key={activeBrainCard.id}
+              card={activeBrainCard}
+              feedback={brainFeedback[activeBrainCard.id]}
+              position={activeBrainIndex}
+              total={brainCards.length}
+              onPrevious={() =>
+                setBrainIndex((current) =>
+                  (current - 1 + brainCards.length) % brainCards.length
+                )
+              }
+              onNext={() =>
+                setBrainIndex((current) => (current + 1) % brainCards.length)
+              }
+              onFeedback={(selected, signal) =>
+                void registerBrainFeedback(selected, signal)
+              }
+            />
+          ) : (
+            <div className="rounded-[1.5rem] border border-black/10 bg-[#FFFDF8] px-5 py-12">
+              <p className="text-base font-bold">Nessun segnale forte oggi.</p>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-grow-muted">
+                GROW non inventa una priorità quando Piano, Inbox e Archivio
+                non offrono abbastanza contesto.
+              </p>
+              <Link
+                href="/inbox"
+                className="mt-6 inline-flex min-h-11 items-center rounded-full bg-[#0F0F10] px-4 text-[11px] font-bold text-white"
+              >
+                Aggiungi una nota
               </Link>
             </div>
-            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-grow-card">
-              {loadingWork ? (
-                <div className="h-36 animate-pulse bg-grow-soft" />
-              ) : upcomingItems.length ? (
-                upcomingItems.map((item) => (
-                  <Link
-                    key={item.id}
-                    href="/calendario"
-                    className="flex items-center gap-3 border-t border-grow-border px-4 py-3 first:border-t-0"
-                  >
-                    <span className="w-16 shrink-0 text-[9px] font-black uppercase text-grow-muted">
-                      {shortDate(item.scheduled_date!)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold">
-                        {item.title}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-grow-muted">
-                        {item.client}
-                      </span>
-                    </span>
-                  </Link>
-                ))
-              ) : (
-                <p className="px-5 py-10 text-center text-sm text-grow-muted">
-                  Nessuna scadenza futura.
-                </p>
-              )}
-            </div>
-          </div>
+          )}
 
-          <div>
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                  Continua
-                </p>
-                <h2 className="mt-1 text-lg font-black uppercase">
-                  Lavori aperti
-                </h2>
-              </div>
-              <Link
-                href="/ai"
-                className="rounded-full bg-[#0F0F10] px-3 py-2 text-[9px] font-black uppercase text-grow-yellow"
-              >
-                Lavora in AI →
-              </Link>
-            </div>
-            <div className="overflow-hidden rounded-[1.5rem] border border-grow-border bg-grow-card">
-              {loadingWork ? (
-                <div className="h-36 animate-pulse bg-grow-soft" />
-              ) : activeItems.length ? (
-                activeItems.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/ai?project=${encodeURIComponent(item.client)}&brief=${encodeURIComponent(item.title)}`}
-                    className="flex items-center gap-3 border-t border-grow-border px-4 py-3 first:border-t-0"
-                  >
-                    <span className="h-8 w-1 shrink-0 rounded-full bg-grow-yellow" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold">
-                        {item.title}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] font-bold uppercase text-grow-muted">
-                        {item.client} · {STATUS_LABELS[item.status]}
-                      </span>
-                    </span>
-                    <span className="text-grow-muted">→</span>
-                  </Link>
-                ))
-              ) : (
-                <p className="px-5 py-10 text-center text-sm text-grow-muted">
-                  Nessun lavoro in produzione.
-                </p>
-              )}
-            </div>
-          </div>
+          <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.12em] text-grow-muted">
+            Piano · Inbox · Archivio · si aggiorna con le tue scelte
+          </p>
         </section>
 
-        <section className="mt-6">
-          <div className="rounded-[1.4rem] border border-grow-border bg-grow-card px-5 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
-                  Ultime note
-                </p>
-                <p className="mt-1 line-clamp-2 text-sm font-bold">
-                  {inboxItems[0]?.content ||
-                    inboxItems[0]?.url ||
-                    'Il taccuino è vuoto.'}
-                </p>
-              </div>
-              {inboxItems[0] && (
-                <span className="ml-4 shrink-0 text-[9px] font-bold uppercase text-grow-muted">
-                  {timeAgo(inboxItems[0].created_at)}
-                </span>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section id="scopri" className="mt-10 scroll-mt-6">
+        <section id="scopri" className="mt-12 scroll-mt-6">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">

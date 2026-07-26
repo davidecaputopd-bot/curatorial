@@ -14,12 +14,25 @@ type InteractionRow = {
   created_at?: string | null
 }
 
-function feedbackKey(content: string) {
-  const sourceType = content.match(/\bsource_type=([^\s]+)/)?.[1]
-  const sourceId = content.match(/\bsource_id=([^\s]+)/)?.[1]
-  const signal = content.match(/\bsignal=([^\s]+)/)?.[1]
+type BrainFeedbackRow = {
+  content: string
+  created_at?: string | null
+}
+
+const NOT_NOW_COOLDOWN_MS = 7 * 86_400_000
+
+function feedbackKey(row: BrainFeedbackRow) {
+  const sourceType = row.content.match(/\bsource_type=([^\s]+)/)?.[1]
+  const sourceId = row.content.match(/\bsource_id=([^\s]+)/)?.[1]
+  const signal = row.content.match(/\bsignal=([^\s]+)/)?.[1]
   if (!sourceType || !sourceId || !signal) return null
-  if (!['personal', 'not_for_me', 'used'].includes(signal)) return null
+  const permanent = ['personal', 'not_for_me', 'used'].includes(signal)
+  const createdAt = Date.parse(row.created_at || '')
+  const coolingDown =
+    signal === 'not_now' &&
+    Number.isFinite(createdAt) &&
+    Date.now() - createdAt < NOT_NOW_COOLDOWN_MS
+  if (!permanent && !coolingDown) return null
   return `${sourceType}:${sourceId}`
 }
 
@@ -70,7 +83,7 @@ export async function GET() {
       .limit(180),
     supabase
       .from('memories')
-      .select('content')
+      .select('content, created_at')
       .eq('user_id', user.id)
       .like('content', '[GROW_BRAIN_FEEDBACK]%')
       .order('created_at', { ascending: false })
@@ -149,8 +162,8 @@ export async function GET() {
   )
 
   const suppressed = new Set(
-    (feedbackResult.data || [])
-      .map((row) => feedbackKey(row.content))
+    ((feedbackResult.data || []) as BrainFeedbackRow[])
+      .map(feedbackKey)
       .filter((key): key is string => Boolean(key))
   )
   const discovery: DiscoverySignal[] = (discoveryResult.data || []).map(
