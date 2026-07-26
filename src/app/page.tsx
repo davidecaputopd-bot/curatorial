@@ -70,18 +70,37 @@ type InboxItem = {
 }
 
 function localDateKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value || ''
+  const year = value('year')
+  const month = value('month')
+  const day = value('day')
   return `${year}-${month}-${day}`
 }
 
 function shortDate(value: string) {
   return new Date(`${value}T12:00:00`).toLocaleDateString('it-IT', {
+    timeZone: 'Europe/Rome',
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   })
+}
+
+function romeHour(date: Date) {
+  return Number(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Rome',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(date)
+  )
 }
 
 function timeAgo(value: string) {
@@ -517,10 +536,11 @@ export default function Home() {
         item.status === 'in_produzione' || item.status === 'pronto'
     )
     .slice(0, 4)
+  const currentHour = romeHour(now)
   const greeting =
-    now.getHours() < 12
+    currentHour < 12
       ? 'Buongiorno'
-      : now.getHours() < 18
+      : currentHour < 18
         ? 'Buon pomeriggio'
         : 'Buonasera'
 
@@ -561,6 +581,7 @@ export default function Home() {
             </div>
             <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-[0.15em] text-grow-muted">
               {now.toLocaleDateString('it-IT', {
+                timeZone: 'Europe/Rome',
                 weekday: 'long',
                 day: 'numeric',
                 month: 'long',
