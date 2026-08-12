@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AGENT_TOOLS, executeAgentTool } from './agent-tools'
+import { selectGrowSkills } from './grow-skills'
 import { routeAI } from './router'
 
 export type AgentMessage = {
@@ -29,6 +30,7 @@ type AgentToolChoice =
           | 'project_radar'
           | 'get_operational_context'
           | 'market_forecast'
+          | 'search_saved_content'
       }
     }
 
@@ -168,6 +170,21 @@ function firstToolFor(message: string): AgentToolChoice {
     return { type: 'function', function: { name: 'fetch_webpage' } }
   }
 
+  if (/\b(radar|segnali|opportunità|ispirazioni)\b.{0,50}\b(AN23|ANventitre|Exousia|Cantina Don Carlo|ACI Copertino|TRAMA)\b/i.test(message)) {
+    return { type: 'function', function: { name: 'project_radar' } }
+  }
+
+  if (/\b(ricorda|ricordati|memorizza|tieni a mente|da ora in poi)\b/i.test(message)) {
+    return { type: 'function', function: { name: 'create_memory' } }
+  }
+
+  const preferredTool = selectGrowSkills(message).find(
+    (skill) => skill.preferredTool
+  )?.preferredTool
+  if (preferredTool) {
+    return { type: 'function', function: { name: preferredTool } }
+  }
+
   const needsFreshResearch =
     /\b(cerca|ricerca|trova)\b.{0,40}\b(web|online|internet|trend|notizi[ae]|campagn[ae]|reference|fonti)\b/i.test(message) ||
     /\b(ultim[oaie]|recent[ei]|attuale|aggiornat[oaie]|oggi|adesso|novità|trend|notizi[ae])\b/i.test(message) ||
@@ -177,27 +194,12 @@ function firstToolFor(message: string): AgentToolChoice {
     return { type: 'function', function: { name: 'web_search' } }
   }
 
-  const needsMarketForecast =
-    /\b(funzioner[àa]|funziona|successo|insuccesso|flop|prevedi|previsione|forecast|mercato|marketing|strategia social|campagna|lancio|posizionamento|target|pubblico|engagement|conversione|rischio)\b/i.test(message)
-
-  if (needsMarketForecast) {
-    return { type: 'function', function: { name: 'market_forecast' } }
-  }
-
-  if (/\b(radar|segnali|opportunità|ispirazioni)\b.{0,50}\b(AN23|ANventitre|Exousia|Cantina Don Carlo|ACI Copertino|TRAMA)\b/i.test(message)) {
-    return { type: 'function', function: { name: 'project_radar' } }
-  }
-
   const needsGrowContext =
     /\b(cosa faccio|che faccio|oggi|domani|settimana|priorit[àa]|piano|calendario|in sospeso|arretrati|da chiudere|continua|continuiamo|migliora|miglioriamo|organizza|riordina|situazione|stato|dashboard)\b/i.test(message) ||
     /\b(inbox|archivio|reference|salvati|note|clienti|contenuti|lavori aperti)\b/i.test(message)
 
   if (needsGrowContext) {
     return { type: 'function', function: { name: 'get_operational_context' } }
-  }
-
-  if (/\b(ricorda|ricordati|memorizza|tieni a mente|da ora in poi)\b/i.test(message)) {
-    return { type: 'function', function: { name: 'create_memory' } }
   }
 
   return 'auto'

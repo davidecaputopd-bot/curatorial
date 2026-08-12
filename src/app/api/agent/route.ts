@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { runAgent } from '@/lib/ai/agent-router'
+import {
+  buildGrowSkillsPrompt,
+  selectGrowSkills,
+  type GrowSkill,
+} from '@/lib/ai/grow-skills'
 
 export const maxDuration = 60
 
@@ -80,7 +85,10 @@ async function getRelevantMemories(
     .slice(0, 8)
 }
 
-function buildAgentSystemPrompt(memories: MemoryRow[]) {
+function buildAgentSystemPrompt(
+  memories: MemoryRow[],
+  activeSkills: readonly GrowSkill[]
+) {
   const now = new Date()
   const dayNames = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato']
   const today = now.toISOString().split('T')[0]
@@ -165,7 +173,9 @@ TONO:
 - Italiano, salvo quando Davide scrive in inglese o quando generi un prompt tecnico per immagini.
 - Dopo aver eseguito funzioni, di' cosa hai fatto o trovato in una riga, non descrivere il processo.
 - Se una richiesta e' ambigua (es. titolo non trovato), chiedi chiarimento invece di inventare.
-- Su domande di design/AI/strategia: opinione netta, non panoramica bilanciata.`
+- Su domande di design/AI/strategia: opinione netta, non panoramica bilanciata.
+
+${buildGrowSkillsPrompt(activeSkills)}`
 }
 
 function sse(data: unknown): string {
@@ -186,6 +196,7 @@ export async function POST(request: Request) {
     if (!conversationId) return NextResponse.json({ error: 'conversationId richiesto' }, { status: 400 })
 
     const memories = await getRelevantMemories(supabase, user.id, message)
+    const activeSkills = selectGrowSkills(message)
 
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
     const writer = writable.getWriter()
@@ -197,7 +208,7 @@ export async function POST(request: Request) {
     const run = async () => {
       try {
         const result = await runAgent(
-          buildAgentSystemPrompt(memories),
+          buildAgentSystemPrompt(memories, activeSkills),
           message,
           history,
           supabase,
@@ -228,6 +239,10 @@ export async function POST(request: Request) {
           actions: result.actions,
           provider: result.provider,
           imageUrl: result.imageUrl || null,
+          skills: activeSkills.map((skill) => ({
+            id: skill.id,
+            label: skill.label,
+          })),
         })
       } catch (err) {
         await write({ type: 'error', error: err instanceof Error ? err.message : 'Errore agente' })
