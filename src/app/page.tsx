@@ -15,8 +15,8 @@ import type {
   DailyBrainCard,
 } from '@/lib/brain/daily-brief'
 
-const PAGE_SIZE = 18
-const FEED_CEILING = 18
+const PAGE_SIZE = 6
+const FEED_CEILING = 6
 const DAILY_FEED_SEED = Math.floor(Date.now() / 86_400_000)
 
 const PLATFORM_LABELS: Record<string, string> = {

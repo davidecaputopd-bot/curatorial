@@ -80,6 +80,7 @@ type BuildDailyBrainInput = {
   inboxTotal: number
   archiveTotal: number
   suppressed: Set<string>
+  feedbackWeights: Map<string, number>
   negativeContentIds: Set<string>
   now?: Date
 }
@@ -219,7 +220,8 @@ function calendarCard(
 function personalCard(
   personalItems: PersonalBrainItem[],
   activeProject: string | null,
-  suppressed: Set<string>
+  suppressed: Set<string>,
+  feedbackWeights: Map<string, number>
 ): DailyBrainCard | null {
   const ranked = personalItems
     .map((item) => {
@@ -245,7 +247,8 @@ function personalCard(
           roleScore +
           intelligence.confidence * 2 +
           intelligence.craft_tags.length * 0.35 +
-          recency,
+          recency +
+          (feedbackWeights.get(sourceKey) || 0),
       }
     })
     .filter(
@@ -404,6 +407,7 @@ export function buildDailyBrainBrief({
   inboxTotal,
   archiveTotal,
   suppressed,
+  feedbackWeights,
   negativeContentIds,
   now = new Date(),
 }: BuildDailyBrainInput): DailyBrainBrief {
@@ -426,7 +430,7 @@ export function buildDailyBrainBrief({
 
   const cards = [
     calendarCard(calendar, today),
-    personalCard(personalItems, activeProject, suppressed),
+    personalCard(personalItems, activeProject, suppressed, feedbackWeights),
     possibilityCard(
       discovery,
       personalItems,

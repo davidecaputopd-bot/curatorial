@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
@@ -10,6 +11,16 @@ import {
   removeLocalStudioAsset,
   type StudioAsset,
 } from '@/lib/studio/local-assets'
+
+const SocialArchive = dynamic(() => import('@/components/SocialArchive'), {
+  loading: () => (
+    <div className="grid grid-cols-3 gap-[2px] lg:grid-cols-5">
+      {Array.from({ length: 15 }, (_, index) => (
+        <div key={index} className="aspect-[3/4] animate-pulse bg-black/10" />
+      ))}
+    </div>
+  ),
+})
 
 type ArchiveItem = {
   id: string
@@ -60,6 +71,7 @@ const placeholders: Record<string, string> = {
 
 export default function ArchivioPage() {
   const router = useRouter()
+  const [view, setView] = useState<'reference' | 'social'>('reference')
   const [items, setItems] = useState<ArchiveItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selecting, setSelecting] = useState(false)
@@ -187,19 +199,19 @@ export default function ArchivioPage() {
 
   return (
     <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-10 text-grow-text">
-      <section className="mx-auto max-w-lg">
+      <section className="mx-auto max-w-lg lg:max-w-5xl">
         <header className="mb-7">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
                 GROW Archivio
               </p>
 
-              <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+              <h1 className="mt-1 text-[40px] font-black uppercase leading-[0.9] tracking-tighter">
                 Archivio<span className="text-grow-yellow">.</span>
               </h1>
             </div>
-            {items.length > 0 && (
+            {view === 'reference' && items.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
@@ -219,13 +231,41 @@ export default function ArchivioPage() {
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-grow-muted">
-            {selecting
+            {view === 'social'
+              ? 'Instagram e TikTok diventano una memoria visiva da scorrere, capire e ritrovare.'
+              : selecting
               ? 'Scegli fino a 12 reference da portare insieme nell’AI.'
               : 'Reference scelte e output prodotti in Studio, raccolti nella stessa memoria creativa.'}
           </p>
+
+          <div className="mt-5 grid grid-cols-2 rounded-full bg-[#EDE8DE] p-1">
+            {[
+              { key: 'reference' as const, label: 'Reference' },
+              { key: 'social' as const, label: 'Social' },
+            ].map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => {
+                  if (option.key === 'social' && selecting) cancelSelection()
+                  setView(option.key)
+                }}
+                className={[
+                  'min-h-11 rounded-full px-4 font-mono text-[9px] uppercase tracking-[0.12em] transition active:scale-[0.98]',
+                  view === option.key
+                    ? 'bg-[#0F0F10] text-grow-yellow'
+                    : 'text-grow-muted',
+                ].join(' ')}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </header>
 
-        {loading ? (
+        {view === 'social' ? (
+          <SocialArchive />
+        ) : loading ? (
           <div className="grid auto-rows-[124px] grid-cols-2 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
@@ -359,7 +399,7 @@ export default function ArchivioPage() {
         )}
       </section>
 
-      {selecting && (
+      {view === 'reference' && selecting && (
         <div className="fixed inset-x-0 bottom-[92px] z-40 px-4 lg:bottom-6 lg:left-[280px]">
           <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-[1.4rem] bg-[#0F0F10] p-3 pl-4 text-white shadow-[0_18px_50px_rgba(15,15,16,0.24)]">
             <div>

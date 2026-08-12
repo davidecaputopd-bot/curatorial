@@ -494,8 +494,8 @@ export default function AiPage() {
       <div className="mx-auto flex h-full w-full max-w-xl flex-col px-4 pt-8">
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-grow-muted">GROW</p>
-            <h1 className="mt-2 text-[34px] font-black uppercase leading-[0.9] tracking-tighter">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">GROW AI</p>
+            <h1 className="mt-1 text-[40px] font-black uppercase leading-[0.9] tracking-tighter">
               AI<span className="text-grow-yellow">.</span>
             </h1>
           </div>

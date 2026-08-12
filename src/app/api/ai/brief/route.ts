@@ -21,6 +21,12 @@ type BrainFeedbackRow = {
 
 const NOT_NOW_COOLDOWN_MS = 7 * 86_400_000
 
+function feedbackIdentity(row: BrainFeedbackRow) {
+  const sourceType = row.content.match(/\bsource_type=([^\s]+)/)?.[1]
+  const sourceId = row.content.match(/\bsource_id=([^\s]+)/)?.[1]
+  return sourceType && sourceId ? `${sourceType}:${sourceId}` : null
+}
+
 function feedbackKey(row: BrainFeedbackRow) {
   const sourceType = row.content.match(/\bsource_type=([^\s]+)/)?.[1]
   const sourceId = row.content.match(/\bsource_id=([^\s]+)/)?.[1]
@@ -34,6 +40,22 @@ function feedbackKey(row: BrainFeedbackRow) {
     Date.now() - createdAt < NOT_NOW_COOLDOWN_MS
   if (!permanent && !coolingDown) return null
   return `${sourceType}:${sourceId}`
+}
+
+function positiveFeedback(row: BrainFeedbackRow) {
+  const sourceType = row.content.match(/\bsource_type=([^\s]+)/)?.[1]
+  const sourceId = row.content.match(/\bsource_id=([^\s]+)/)?.[1]
+  const signal = row.content.match(/\bsignal=([^\s]+)/)?.[1]
+  if (!sourceType || !sourceId || !signal) return null
+  const weight =
+    signal === 'useful_now'
+      ? 5
+      : signal === 'nourishment'
+        ? 2.5
+        : signal === 'keep'
+          ? 1.5
+          : 0
+  return weight ? { key: `${sourceType}:${sourceId}`, weight } : null
 }
 
 export async function GET() {
@@ -161,11 +183,25 @@ export async function GET() {
     })
   )
 
+  const latestFeedback: BrainFeedbackRow[] = []
+  const seenFeedback = new Set<string>()
+  for (const row of (feedbackResult.data || []) as BrainFeedbackRow[]) {
+    const key = feedbackIdentity(row)
+    if (!key || seenFeedback.has(key)) continue
+    seenFeedback.add(key)
+    latestFeedback.push(row)
+  }
   const suppressed = new Set(
-    ((feedbackResult.data || []) as BrainFeedbackRow[])
+    latestFeedback
       .map(feedbackKey)
       .filter((key): key is string => Boolean(key))
   )
+  const feedbackWeights = new Map<string, number>()
+  for (const row of latestFeedback) {
+    const feedback = positiveFeedback(row)
+    if (!feedback || feedbackWeights.has(feedback.key)) continue
+    feedbackWeights.set(feedback.key, feedback.weight)
+  }
   const discovery: DiscoverySignal[] = (discoveryResult.data || []).map(
     (item) => ({
       ...item,
@@ -179,6 +215,7 @@ export async function GET() {
     inboxTotal: inboxResult.count || inboxItems.length,
     archiveTotal: savedIds.length,
     suppressed,
+    feedbackWeights,
     negativeContentIds,
   })
 

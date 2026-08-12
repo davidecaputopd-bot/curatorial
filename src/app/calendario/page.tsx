@@ -247,7 +247,7 @@ export default function CalendarioPage() {
         <header className="mb-5">
           <div className="flex min-h-[7.25rem] items-start justify-between gap-4 overflow-hidden">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
                 GROW Piano
               </p>
               <h1 className="mt-1 text-[40px] font-black uppercase leading-[0.9] tracking-tighter">
