@@ -1,7 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import {
+  ArrowSquareOut,
+  CaretLeft,
+  CaretRight,
+  Copy,
+  GridFour,
+  Play,
+  Sparkle,
+  Trash,
+  X,
+} from '@phosphor-icons/react'
 import BottomNav from '@/components/BottomNav'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
@@ -51,6 +62,344 @@ type Item = {
   source?: string
   created_at: string
   intelligence?: ContentIntelligence
+}
+
+type SocialPreview = {
+  title: string | null
+  description: string | null
+  image: string | null
+}
+
+function sourceLabel(source?: string) {
+  if (source?.toLocaleLowerCase('it-IT').includes('tiktok')) return 'TikTok'
+  if (source?.toLocaleLowerCase('it-IT').includes('instagram')) return 'Instagram'
+  return 'Social'
+}
+
+function instagramEmbedUrl(value?: string | null) {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    const hostname = url.hostname.toLocaleLowerCase('en-US')
+    if (
+      hostname !== 'instagram.com' &&
+      !hostname.endsWith('.instagram.com')
+    ) {
+      return null
+    }
+    const match = url.pathname.match(/^\/(p|reel|tv)\/([^/]+)/i)
+    if (!match) return null
+    return `https://www.instagram.com/${match[1]}/${match[2]}/embed/captioned`
+  } catch {
+    return null
+  }
+}
+
+function SocialGridTile({
+  item,
+  onOpen,
+  onPreview,
+}: {
+  item: Item
+  onOpen: () => void
+  onPreview: (id: string, preview: SocialPreview) => void
+}) {
+  const tileRef = useRef<HTMLButtonElement>(null)
+  const requested = useRef(false)
+  const [preview, setPreview] = useState<SocialPreview>({
+    title: item.og_title || null,
+    description: item.og_description || null,
+    image: item.og_image || item.image_url || null,
+  })
+
+  useEffect(() => {
+    const element = tileRef.current
+    if (
+      !element ||
+      !item.url ||
+      requested.current ||
+      preview.title ||
+      preview.image
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        requested.current = true
+        observer.disconnect()
+        fetch('/api/inbox/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id }),
+        })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((payload) => {
+            if (!payload?.preview) return
+            const nextPreview = {
+              title: payload.preview.title || null,
+              description: payload.preview.description || null,
+              image: payload.preview.image || null,
+            }
+            setPreview(nextPreview)
+            onPreview(item.id, nextPreview)
+          })
+          .catch(() => {})
+      },
+      { rootMargin: '240px' }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [item.id, item.url, onPreview, preview.image, preview.title])
+
+  const title = preview.title || item.content || 'Salvato social'
+  const platform = sourceLabel(item.source)
+
+  return (
+    <button
+      ref={tileRef}
+      type="button"
+      onClick={onOpen}
+      className="group relative aspect-[3/4] min-w-0 overflow-hidden bg-[#171717] text-left outline-none focus-visible:ring-2 focus-visible:ring-grow-yellow focus-visible:ring-offset-2"
+      aria-label={`Apri ${title}`}
+    >
+      {preview.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={preview.image}
+          alt=""
+          className="h-full w-full object-cover transition duration-300 group-active:scale-[0.98]"
+          onError={(event) => {
+            ;(event.currentTarget as HTMLImageElement).style.display = 'none'
+          }}
+        />
+      ) : (
+        <div className="absolute inset-0 flex flex-col justify-between bg-[linear-gradient(155deg,#2A2926_0%,#111_62%,#000_100%)] p-3 text-white">
+          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-grow-yellow">
+            {platform}
+          </span>
+          <p className="line-clamp-4 text-[12px] font-bold leading-snug">
+            {title}
+          </p>
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/75" />
+      <div className="pointer-events-none absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[8px] font-black uppercase tracking-wide text-white backdrop-blur-sm">
+        {isTikTokUrl(item.url) && <Play size={9} weight="fill" />}
+        {platform}
+      </div>
+      {item.intelligence?.understood && (
+        <span
+          className="pointer-events-none absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-black/30 bg-grow-yellow shadow-sm"
+          aria-label="Letto da GROW"
+        />
+      )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-2.5 text-white">
+        <p className="line-clamp-2 text-[10px] font-bold leading-snug drop-shadow-sm">
+          {title}
+        </p>
+      </div>
+    </button>
+  )
+}
+
+function SocialViewer({
+  item,
+  position,
+  totalItems,
+  copied,
+  onClose,
+  onPrevious,
+  onNext,
+  onCopy,
+  onRemove,
+}: {
+  item: Item
+  position: number
+  totalItems: number
+  copied: boolean
+  onClose: () => void
+  onPrevious: () => void
+  onNext: () => void
+  onCopy: () => void
+  onRemove: () => void
+}) {
+  const videoId = tiktokVideoId(item.url)
+  const instagramEmbed = instagramEmbedUrl(item.url)
+  const previewImage = item.og_image || item.image_url
+  const title = item.og_title || item.content || 'Salvato social'
+  const intelligence = item.intelligence
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex flex-col bg-[#080808] text-white"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div className="relative z-20 flex min-h-16 items-center justify-between px-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 backdrop-blur-md"
+          aria-label="Chiudi"
+        >
+          <X size={20} weight="bold" />
+        </button>
+        <div className="text-center">
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-grow-yellow">
+            {sourceLabel(item.source)}
+          </p>
+          <p className="mt-0.5 text-[10px] text-white/50">
+            {position + 1} di {totalItems}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/70 backdrop-blur-md"
+          aria-label="Elimina salvato"
+        >
+          <Trash size={18} />
+        </button>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        {videoId ? (
+          <iframe
+            src={`https://www.tiktok.com/player/v1/${videoId}?autoplay=0&controls=1&description=0`}
+            title={title}
+            allow="fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="h-full w-full border-0 bg-black"
+          />
+        ) : instagramEmbed ? (
+          <iframe
+            src={instagramEmbed}
+            title={title}
+            loading="eager"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="h-full w-full border-0 bg-white"
+          />
+        ) : previewImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewImage} alt="" className="h-full w-full object-contain" />
+        ) : (
+          <div className="flex h-full items-center justify-center px-10 text-center">
+            <div>
+              <GridFour size={32} className="mx-auto text-grow-yellow" />
+              <p className="mt-4 text-sm font-bold">Anteprima non disponibile</p>
+              <p className="mt-1 text-xs leading-relaxed text-white/50">
+                Il salvato resta ricercabile tramite titolo e link.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {position > 0 && (
+          <button
+            type="button"
+            onClick={onPrevious}
+            className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 backdrop-blur-md"
+            aria-label="Precedente"
+          >
+            <CaretLeft size={20} weight="bold" />
+          </button>
+        )}
+        {position < totalItems - 1 && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 backdrop-blur-md"
+            aria-label="Successivo"
+          >
+            <CaretRight size={20} weight="bold" />
+          </button>
+        )}
+      </div>
+
+      <div className="relative z-20 max-h-[42vh] overflow-y-auto rounded-t-[1.5rem] bg-[#121212] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.35)]">
+        <div className="mx-auto h-1 w-9 rounded-full bg-white/20" />
+        <div className="mx-auto mt-4 max-w-xl">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-3 text-sm font-bold leading-snug">{title}</p>
+              <p className="mt-1 text-[10px] text-white/45">{timeAgo(item.created_at)}</p>
+            </div>
+            {intelligence && (
+              <span
+                className={[
+                  'shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide',
+                  intelligence.role === 'work_direct'
+                    ? 'bg-grow-yellow text-black'
+                    : 'bg-white/10 text-white/70',
+                ].join(' ')}
+              >
+                {intelligence.role_label}
+              </span>
+            )}
+          </div>
+
+          {intelligence && (
+            <div className="mt-3 rounded-[1rem] bg-white/[0.06] p-3">
+              <p className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-grow-yellow">
+                <Sparkle size={12} weight="fill" />
+                Lettura GROW · {Math.round(intelligence.confidence * 100)}%
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-white/70">
+                {intelligence.rationale}
+              </p>
+              {intelligence.craft_labels.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {intelligence.craft_labels.slice(0, 5).map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-bold text-white/55"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
+            <Link
+              href={`/ai?brief=${encodeURIComponent(item.content || item.og_title || item.url || '')}`}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-grow-yellow px-4 text-[10px] font-black uppercase tracking-wide text-black"
+            >
+              <Sparkle size={15} weight="fill" /> Usa con GROW
+            </Link>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white"
+              aria-label="Copia link"
+            >
+              {copied ? <span className="text-[9px] font-black">OK</span> : <Copy size={17} />}
+            </button>
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white"
+                aria-label="Apri originale"
+              >
+                <ArrowSquareOut size={18} />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
@@ -190,6 +539,7 @@ export default function InboxPage() {
   const [filter, setFilter] = useState<'all' | InboxNoteType>('all')
   const [roleFilter, setRoleFilter] = useState<'all' | ContentRole>('all')
   const [copied, setCopied] = useState<string | null>(null)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const selectLane = (nextLane: 'notes' | 'social') => {
@@ -204,6 +554,7 @@ export default function InboxPage() {
     setError('')
     setFilter('all')
     setRoleFilter('all')
+    setViewerIndex(null)
     setLane(nextLane)
   }
 
@@ -216,6 +567,7 @@ export default function InboxPage() {
     setQuery('')
     setExpanded(null)
     setError('')
+    setViewerIndex(null)
     setRoleFilter(nextRole)
   }
 
@@ -347,6 +699,21 @@ export default function InboxPage() {
     } catch {}
   }
 
+  const updatePreview = useCallback((id: string, preview: SocialPreview) => {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              og_title: preview.title,
+              og_description: preview.description,
+              og_image: preview.image,
+            }
+          : item
+      )
+    )
+  }, [])
+
   const typedItems = useMemo(
     () =>
       items.map((item) => ({
@@ -383,6 +750,53 @@ export default function InboxPage() {
     })
   }, [filter, lane, query, roleFilter, typedItems])
 
+  const socialSummary = useMemo(() => {
+    const understood = typedItems.filter(
+      (item) => item.intelligence?.understood
+    ).length
+    const craftCounts = new Map<string, number>()
+    typedItems.forEach((item) => {
+      item.intelligence?.craft_labels.forEach((label) => {
+        craftCounts.set(label, (craftCounts.get(label) || 0) + 1)
+      })
+    })
+    const topCraft = [...craftCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+    return {
+      understoodPercentage: typedItems.length
+        ? Math.round((understood / typedItems.length) * 100)
+        : 0,
+      topCraft: topCraft || 'In scoperta',
+    }
+  }, [typedItems])
+
+  useEffect(() => {
+    if (viewerIndex === null) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setViewerIndex(null)
+      if (event.key === 'ArrowLeft') {
+        setViewerIndex((current) =>
+          current === null ? null : Math.max(0, current - 1)
+        )
+      }
+      if (event.key === 'ArrowRight') {
+        setViewerIndex((current) =>
+          current === null
+            ? null
+            : Math.min(filteredItems.length - 1, current + 1)
+        )
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [filteredItems.length, viewerIndex])
+
   const isDetectedUrl = /^https?:\/\//.test(text.trim())
 
   return (
@@ -398,7 +812,7 @@ export default function InboxPage() {
             <p className="mt-1 text-sm text-grow-muted">
               {lane === 'notes'
                 ? 'Il tuo taccuino. Nessun progetto obbligatorio.'
-                : 'Instagram e TikTok, separati dalle tue note.'}
+                : 'Il tuo gusto, visibile. Scorri e ritrova.'}
             </p>
           </div>
           <Link href="/chat" className="mt-1 shrink-0 rounded-full bg-grow-yellow px-3 py-1.5 text-[10px] font-bold uppercase text-grow-black">
@@ -489,17 +903,53 @@ export default function InboxPage() {
 
         {lane === 'social' && (
           <>
+            <section className="mb-3 rounded-[1.5rem] border border-black/10 bg-white p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#0F0F10] text-2xl font-black text-grow-yellow">
+                  G<span className="text-white">.</span>
+                </div>
+                <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-lg font-black leading-none">{total}</p>
+                    <p className="mt-1 text-[8px] font-black uppercase tracking-wide text-grow-muted">
+                      Salvati
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-black leading-none">
+                      {socialSummary.understoodPercentage}%
+                    </p>
+                    <p className="mt-1 text-[8px] font-black uppercase tracking-wide text-grow-muted">
+                      Letti
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-black leading-none">
+                      {socialSummary.topCraft}
+                    </p>
+                    <p className="mt-1.5 text-[8px] font-black uppercase tracking-wide text-grow-muted">
+                      Tratto
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 border-t border-black/10 pt-3">
+                <p className="text-xs font-black">Il tuo profilo visivo.</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-grow-muted">
+                  GROW legge titoli, descrizioni e fonti. Se un segnale non è chiaro,
+                  lo lascia da capire invece di inventare.
+                </p>
+              </div>
+            </section>
             <Link
               href="/impostazioni/cattura"
-              className="mb-6 flex min-h-14 items-center justify-between gap-4 rounded-[1.25rem] bg-[#0F0F10] px-4 py-3 text-white transition active:scale-[0.98]"
+              className="mb-5 flex min-h-12 items-center justify-between gap-4 rounded-full bg-[#0F0F10] px-4 py-2.5 text-white transition active:scale-[0.98]"
             >
               <span>
-                <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-grow-yellow">
-                  {total} materiali
+                <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-grow-yellow">
+                  + Importa salvati
                 </span>
-                <span className="mt-1 block text-sm font-bold">
-                  Aggiungi da Instagram o TikTok
-                </span>
+                <span className="mt-0.5 block text-[10px] text-white/55">Instagram o TikTok</span>
               </span>
               <span className="text-grow-yellow">→</span>
             </Link>
@@ -596,13 +1046,26 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* Lista */}
         {loading ? (
-          <div className="space-y-2">
-            {[1,2,3].map(i => (
-              <div key={i} className="h-20 animate-pulse rounded-[1.2rem] bg-white" />
-            ))}
-          </div>
+          lane === 'social' ? (
+            <div className="grid grid-cols-3 gap-1 lg:grid-cols-5">
+              {Array.from({ length: 12 }, (_, index) => (
+                <div
+                  key={index}
+                  className="aspect-[3/4] animate-pulse rounded-[0.7rem] bg-black/10"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {[1, 2, 3].map((index) => (
+                <div
+                  key={index}
+                  className="h-20 animate-pulse rounded-[1.2rem] bg-white"
+                />
+              ))}
+            </div>
+          )
         ) : filteredItems.length === 0 ? (
           <div className="rounded-[1.5rem] border border-black/10 bg-white px-6 py-16 text-center">
             <p className="text-sm font-semibold text-grow-text">
@@ -622,6 +1085,38 @@ export default function InboxPage() {
                   : 'Importa i tuoi preferiti da Instagram o TikTok.'}
             </p>
           </div>
+        ) : lane === 'social' ? (
+          <>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-grow-muted">
+                <GridFour size={13} weight="fill" /> Griglia personale
+              </p>
+              <p className="text-[9px] font-bold text-grow-muted">
+                {filteredItems.length} visibili
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-1 lg:grid-cols-5">
+              {filteredItems.map((item, index) => (
+                <div key={item.id} className="overflow-hidden rounded-[0.7rem]">
+                  <SocialGridTile
+                    item={item}
+                    onOpen={() => setViewerIndex(index)}
+                    onPreview={updatePreview}
+                  />
+                </div>
+              ))}
+            </div>
+            {hasMore && (
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={() => void loadMore()}
+                className="mt-4 min-h-12 w-full rounded-full border border-black/12 bg-white text-xs font-black uppercase tracking-wide disabled:opacity-50"
+              >
+                {loadingMore ? 'Carico…' : 'Mostra altri salvati'}
+              </button>
+            )}
+          </>
         ) : (
           <>
             <div className="divide-y divide-black/10 rounded-[1.5rem] border border-black/10 bg-white">
@@ -662,29 +1157,10 @@ export default function InboxPage() {
                     {/* OG preview card (da DB) — sempre visibile se disponibile */}
                     <OGCard item={item} expanded={expanded === item.id} />
 
-                    {/* Meta row */}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {lane === 'notes' ? (
-                        <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-[10px] font-bold text-grow-muted">
-                          {INBOX_NOTE_LABELS[item.note_type]}
-                        </span>
-                      ) : (
-                        <>
-                          <span
-                            className={[
-                              'rounded-full px-2 py-0.5 text-[10px] font-black',
-                              item.intelligence?.role === 'work_direct'
-                                ? 'bg-grow-yellow text-grow-text'
-                                : 'bg-[#F1EDE5] text-grow-muted',
-                            ].join(' ')}
-                          >
-                            {item.intelligence?.role_label || 'Da capire'}
-                          </span>
-                          <span className="text-[10px] font-bold uppercase text-grow-muted">
-                            {item.source || 'social'}
-                          </span>
-                        </>
-                      )}
+                      <span className="rounded-full bg-[#F1EDE5] px-2 py-0.5 text-[10px] font-bold text-grow-muted">
+                        {INBOX_NOTE_LABELS[item.note_type]}
+                      </span>
                       {item.url && !item.og_title && (
                         <a href={item.url} target="_blank" rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
@@ -697,37 +1173,6 @@ export default function InboxPage() {
                       </span>
                     </div>
 
-                    {lane === 'social' &&
-                      expanded === item.id &&
-                      item.intelligence && (
-                        <div className="mt-3 rounded-[1rem] bg-[#F4F0E8] p-3">
-                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-grow-muted">
-                            Lettura GROW · {Math.round(item.intelligence.confidence * 100)}%
-                          </p>
-                          <p className="mt-1 text-xs leading-relaxed text-grow-text">
-                            {item.intelligence.rationale}
-                          </p>
-                          {item.intelligence.craft_labels.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {item.intelligence.craft_labels.slice(0, 4).map((label) => (
-                                <span
-                                  key={label}
-                                  className="rounded-full border border-black/10 bg-white px-2 py-1 text-[9px] font-bold text-grow-muted"
-                                >
-                                  {label}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {item.intelligence.needs_review && (
-                            <p className="mt-2 text-[10px] leading-relaxed text-grow-muted">
-                              Dati insufficienti: GROW non forza una classificazione.
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                    {/* AI handoff */}
                     {expanded === item.id && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Link
@@ -764,12 +1209,40 @@ export default function InboxPage() {
                 onClick={() => void loadMore()}
                 className="mt-4 min-h-12 w-full rounded-full border border-black/12 bg-white text-xs font-black uppercase tracking-wide disabled:opacity-50"
               >
-                {loadingMore ? 'Carico…' : 'Carica altri 100'}
+                {loadingMore ? 'Carico…' : 'Carica altre note'}
               </button>
             )}
           </>
         )}
       </div>
+      {viewerIndex !== null && filteredItems[viewerIndex] && (
+        <SocialViewer
+          item={filteredItems[viewerIndex]}
+          position={viewerIndex}
+          totalItems={filteredItems.length}
+          copied={copied === filteredItems[viewerIndex].id}
+          onClose={() => setViewerIndex(null)}
+          onPrevious={() =>
+            setViewerIndex((current) =>
+              current === null ? null : Math.max(0, current - 1)
+            )
+          }
+          onNext={() =>
+            setViewerIndex((current) =>
+              current === null
+                ? null
+                : Math.min(filteredItems.length - 1, current + 1)
+            )
+          }
+          onCopy={() => void copy(filteredItems[viewerIndex])}
+          onRemove={() => {
+            if (!window.confirm('Eliminare questo salvato?')) return
+            const item = filteredItems[viewerIndex]
+            setViewerIndex(null)
+            void remove(item.id)
+          }}
+        />
+      )}
       <BottomNav />
     </main>
   )
