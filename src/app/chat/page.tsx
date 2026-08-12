@@ -349,8 +349,8 @@ export default function ChatPage() {
   ]
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#0F0F10] text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 pb-32 pt-8">
+    <main className="flex min-h-[100dvh] flex-col bg-[#0F0F10] text-white">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-lg flex-col px-4 pb-32 pt-8">
 
         {/* Header */}
         <header className="mb-4 flex items-center justify-between">
@@ -358,7 +358,7 @@ export default function ChatPage() {
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45" style={{ fontFamily: 'DM Mono, monospace' }}>
               Telefono ↔ Computer
             </p>
-            <h1 className="text-[26px] font-black uppercase tracking-tight">
+            <h1 className="font-display text-[2.35rem] uppercase leading-none">
               Chat veloce<span className="text-grow-yellow">.</span>
             </h1>
           </div>

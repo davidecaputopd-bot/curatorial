@@ -40,7 +40,7 @@ export default function BottomNav() {
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={[
-                'flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[1.2rem] font-mono text-[8px] uppercase tracking-[0.06em] transition-all duration-200 active:scale-[0.97]',
+                'flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-[1.2rem] text-[9px] font-bold uppercase tracking-[-0.01em] transition-all duration-200 active:scale-[0.97]',
                 active
                   ? 'bg-[#0F0F10] text-[#FFE500]'
                   : 'text-[#5F5A52] hover:bg-black/5 hover:text-[#0F0F10]',

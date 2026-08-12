@@ -16,7 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <DesktopNav />
-      <div className="min-h-screen lg:pl-[280px]">
+      <div className="min-h-[100dvh] lg:pl-[280px]">
         {children}
       </div>
       <QuickChatButton />

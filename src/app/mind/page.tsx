@@ -195,10 +195,10 @@ function FocusTimer() {
 
 export default function MindPage() {
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text">
       <div className="mx-auto max-w-lg px-4 pt-12 space-y-4">
         <header className="mb-6">
-          <h1 className="text-[26px] font-black uppercase tracking-tight">
+          <h1 className="font-display text-[2.35rem] uppercase leading-none">
             Mind<span className="text-grow-yellow">.</span>
           </h1>
           <p className="mt-1 text-sm text-grow-muted">Concentrazione e controllo emotivo.</p>

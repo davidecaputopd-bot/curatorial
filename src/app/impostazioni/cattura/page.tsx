@@ -68,7 +68,7 @@ export default function CaptureSetupPage() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:px-8">
         <header className="mb-8">
           <Link
@@ -79,10 +79,10 @@ export default function CaptureSetupPage() {
           </Link>
           <div className="mt-5 flex items-end justify-between gap-5">
             <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-grow-muted">
+              <p className="grow-page-kicker">
                 Ingresso universale
               </p>
-              <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+              <h1 className="grow-page-title mt-2">
                 Salva in GROW<span className="text-grow-yellow">.</span>
               </h1>
             </div>
@@ -100,7 +100,7 @@ export default function CaptureSetupPage() {
           <p className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">
             Comando rapido iPhone
           </p>
-          <h2 className="mt-2 text-2xl font-black leading-none">
+          <h2 className="grow-section-title mt-2">
             Configuralo una volta.
           </h2>
 

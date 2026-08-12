@@ -252,14 +252,14 @@ export default function ScopriPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-6xl lg:px-8">
         <header className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-grow-muted">
+            <p className="grow-page-kicker">
               Selezione quotidiana
             </p>
-            <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+            <h1 className="grow-page-title mt-2">
               Scopri<span className="text-grow-yellow">.</span>
             </h1>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-grow-muted">
@@ -452,7 +452,7 @@ export default function ScopriPage() {
                   </span>
                 )}
               </div>
-              <h2 className="mt-2 text-2xl font-black leading-[1.02] tracking-tight">
+              <h2 className="grow-section-title mt-2">
                 {selected.title || 'Reference senza titolo'}
               </h2>
               {selected.artist_name && (

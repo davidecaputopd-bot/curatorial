@@ -57,10 +57,10 @@ function LoginInner() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7F4EE] px-6 text-[#0F0F10]">
-      <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center">
+    <main className="min-h-[100dvh] bg-[#F7F4EE] px-6 text-[#0F0F10]">
+      <div className="mx-auto flex min-h-[100dvh] max-w-sm flex-col justify-center">
         <div className="mb-12 flex items-end justify-between">
-          <p className="text-4xl font-black tracking-tight">
+          <p className="font-display text-5xl uppercase leading-none">
             GROW<span className="text-[#FFE500]">.</span>
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -72,7 +72,7 @@ function LoginInner() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <h1 className="text-2xl font-black">Inserisci PIN</h1>
+          <h1 className="font-display text-[2.25rem] uppercase leading-none">Inserisci PIN</h1>
           <p className="mt-2 text-sm leading-relaxed text-black/55">
             Accesso rapido alla tua app personale. Niente più codici via mail.
           </p>
@@ -126,7 +126,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#F7F4EE]">
+        <main className="flex min-h-[100dvh] items-center justify-center bg-[#F7F4EE]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0F0F10]/20 border-t-[#0F0F10]" />
         </main>
       }

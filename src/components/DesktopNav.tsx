@@ -25,7 +25,7 @@ export default function DesktopNav() {
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-[280px] border-r border-black/10 bg-[#F7F4EE]/96 px-5 py-6 text-[#0F0F10] backdrop-blur-xl lg:flex lg:flex-col">
       <Link href="/" className="mb-9 block px-2">
-        <p className="text-4xl font-black tracking-tight">
+        <p className="font-display text-5xl uppercase leading-none tracking-normal">
           GROW<span className="text-[#FFE500]">.</span>
         </p>
         <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.17em] text-black/40">
@@ -55,7 +55,7 @@ export default function DesktopNav() {
             >
               <Icon size={21} weight={active ? 'fill' : 'regular'} />
               <span className="min-w-0">
-                <span className="block text-[12px] font-black uppercase tracking-tight">
+                <span className="block text-[12px] font-bold uppercase tracking-[0.02em]">
                   {item.label}
                 </span>
                 <span className={active ? 'mt-0.5 block text-[10px] text-white/50' : 'mt-0.5 block text-[10px] text-black/35'}>
@@ -84,7 +84,7 @@ export default function DesktopNav() {
             <ChatCircleDots size={20} weight="fill" />
           </span>
           <span>
-            <span className="block text-xs font-black uppercase">Chat veloce</span>
+            <span className="block text-xs font-bold uppercase">Chat veloce</span>
             <span className="mt-0.5 block text-[10px] text-black/45">Da telefono al computer</span>
           </span>
         </Link>

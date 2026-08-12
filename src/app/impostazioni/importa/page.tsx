@@ -193,7 +193,7 @@ export default function ImportSavedPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:px-8">
         <header className="mb-8">
           <Link
@@ -202,10 +202,10 @@ export default function ImportSavedPage() {
           >
             ← Salva in GROW
           </Link>
-          <p className="mt-5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-grow-muted">
+          <p className="grow-page-kicker mt-5">
             Recupera il passato
           </p>
-          <h1 className="mt-2 text-[38px] font-black uppercase leading-[0.88] tracking-tighter">
+          <h1 className="grow-page-title mt-2">
             Importa i salvati<span className="text-grow-yellow">.</span>
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-grow-muted">

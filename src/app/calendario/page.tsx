@@ -242,15 +242,15 @@ export default function CalendarioPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-9 lg:max-w-5xl">
         <header className="mb-5">
           <div className="flex min-h-[7.25rem] items-start justify-between gap-4 overflow-hidden">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+              <p className="grow-page-kicker">
                 GROW Piano
               </p>
-              <h1 className="mt-1 text-[40px] font-black uppercase leading-[0.9] tracking-tighter">
+              <h1 className="grow-page-title mt-1">
                 Piano<span className="text-grow-yellow">.</span>
               </h1>
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-grow-muted">
@@ -414,7 +414,7 @@ export default function CalendarioPage() {
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-grow-yellow">
                 Stato produzione
               </p>
-              <h2 className="mt-2 text-2xl font-black leading-none tracking-tight">
+              <h2 className="grow-section-title mt-2">
                 {inMotion.length} cose aperte.
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-white/60">
@@ -464,7 +464,7 @@ export default function CalendarioPage() {
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-grow-muted">
                   Nuovo blocco
                 </p>
-                <h2 className="text-xl font-black uppercase">Cosa va prodotto?</h2>
+                <h2 className="font-display text-[1.75rem] uppercase leading-none">Cosa va prodotto?</h2>
               </div>
               <button
                 type="button"
@@ -648,7 +648,7 @@ function FocusPanel({
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-grow-yellow">
             Focus operativo
           </p>
-          <h2 className="mt-2 text-2xl font-black leading-none tracking-tight">
+          <h2 className="grow-section-title mt-2">
             Prima chiudi questo.
           </h2>
         </div>

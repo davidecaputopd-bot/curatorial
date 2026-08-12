@@ -532,14 +532,14 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-6xl lg:px-8">
         <header className="mb-8 flex min-h-[7.25rem] items-end justify-between gap-4">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+            <p className="grow-page-kicker">
               {greeting}
             </p>
-            <h1 className="mt-2 text-[42px] font-black uppercase leading-[0.88] tracking-tighter">
+            <h1 className="grow-page-title mt-2">
               Oggi<span className="text-grow-yellow">.</span>
             </h1>
             <Link
@@ -586,12 +586,12 @@ export default function Home() {
         <section aria-labelledby="daily-edit-title">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+              <p className="grow-page-kicker">
                 Cervello GROW
               </p>
               <h2
                 id="daily-edit-title"
-                className="mt-1 text-[29px] font-bold leading-none tracking-[-0.04em]"
+                className="grow-section-title mt-1"
               >
                 Daily Edit
               </h2>
@@ -649,10 +649,10 @@ export default function Home() {
         <section id="scopri" className="mt-12 scroll-mt-6">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-grow-muted">
+              <p className="grow-page-kicker">
                 Selezione visiva
               </p>
-              <h2 className="mt-1 text-[28px] font-black uppercase leading-none">
+              <h2 className="grow-section-title mt-1">
                 Scopri<span className="text-grow-yellow">.</span>
               </h2>
             </div>

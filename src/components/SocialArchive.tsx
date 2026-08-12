@@ -8,7 +8,10 @@ import {
   Brain,
   Copy,
   GridFour,
+  MagnifyingGlass,
   Play,
+  SpeakerHigh,
+  SpeakerSlash,
   Sparkle,
   X,
 } from '@phosphor-icons/react'
@@ -219,13 +222,18 @@ function FeedMedia({
   item,
   active,
   playing,
-  onPlay,
+  muted,
+  onTogglePlayback,
+  onMutedChange,
 }: {
   item: SocialItem
   active: boolean
   playing: boolean
-  onPlay: () => void
+  muted: boolean
+  onTogglePlayback: () => void
+  onMutedChange: (muted: boolean) => void
 }) {
+  const tiktokFrameRef = useRef<HTMLIFrameElement>(null)
   const [imageFailed, setImageFailed] = useState(false)
   const videoId = tiktokVideoId(item.url)
   const instagramEmbed = instagramEmbedUrl(item.url)
@@ -233,20 +241,73 @@ function FeedMedia({
   const playable = Boolean(videoId || instagramEmbed)
   const title = itemTitle(item)
 
-  if (active && playing && videoId) {
+  const controlTikTok = useCallback(
+    (type: 'play' | 'pause' | 'mute' | 'unMute') => {
+      tiktokFrameRef.current?.contentWindow?.postMessage(
+        { type, 'x-tiktok-player': true },
+        '*'
+      )
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (!videoId || !active) return
+    const timer = window.setTimeout(() => {
+      controlTikTok(playing ? 'play' : 'pause')
+      controlTikTok(muted ? 'mute' : 'unMute')
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [active, controlTikTok, muted, playing, videoId])
+
+  if (active && videoId) {
     return (
-      <iframe
-        src={`https://www.tiktok.com/player/v1/${videoId}?autoplay=1&muted=1&controls=1&description=0`}
-        title={title}
-        allow="autoplay; fullscreen"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        className="relative z-10 h-full w-full border-0 bg-black"
-      />
+      <div className="absolute inset-0 bg-black">
+        <iframe
+          ref={tiktokFrameRef}
+          src={`https://www.tiktok.com/player/v1/${videoId}?autoplay=1&muted=1&loop=1&controls=0&description=0&music_info=0&rel=0&native_context_menu=0`}
+          title={title}
+          allow="autoplay; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+          onLoad={() => {
+            controlTikTok(playing ? 'play' : 'pause')
+            controlTikTok(muted ? 'mute' : 'unMute')
+          }}
+          className="pointer-events-none relative z-10 h-full w-full border-0 bg-black"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            controlTikTok(playing ? 'pause' : 'play')
+            onTogglePlayback()
+          }}
+          className="absolute inset-0 z-20 flex items-center justify-center outline-none"
+          aria-label={playing ? `Metti in pausa ${title}` : `Riproduci ${title}`}
+        >
+          {!playing && (
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-grow-yellow text-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+              <Play size={25} weight="fill" className="ml-1" />
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const nextMuted = !muted
+            controlTikTok(nextMuted ? 'mute' : 'unMute')
+            onMutedChange(nextMuted)
+          }}
+          className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"
+          aria-label={muted ? 'Attiva audio' : 'Disattiva audio'}
+        >
+          {muted ? <SpeakerSlash size={19} /> : <SpeakerHigh size={19} />}
+        </button>
+      </div>
     )
   }
 
-  if (active && playing && instagramEmbed) {
+  if (active && instagramEmbed) {
     return (
       <iframe
         src={instagramEmbed}
@@ -297,7 +358,7 @@ function FeedMedia({
       {playable && (
         <button
           type="button"
-          onClick={onPlay}
+          onClick={onTogglePlayback}
           className="absolute left-1/2 top-1/2 z-20 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-grow-yellow text-black shadow-[0_18px_50px_rgba(0,0,0,0.35)] transition active:scale-95"
           aria-label={`Riproduci ${title}`}
         >
@@ -331,8 +392,11 @@ function SocialFeed({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<Array<HTMLElement | null>>([])
+  const activeIndexRef = useRef(startIndex)
   const [activeIndex, setActiveIndex] = useState(startIndex)
-  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [pausedId, setPausedId] = useState<string | null>(null)
+  const [muted, setMuted] = useState(true)
+  const activeItemId = items[activeIndex]?.id
 
   const goTo = useCallback((index: number) => {
     const next = Math.max(0, Math.min(items.length - 1, index))
@@ -361,8 +425,11 @@ function SocialFeed({
         if (!visible) return
         const index = Number((visible.target as HTMLElement).dataset.index)
         if (!Number.isFinite(index)) return
+        if (activeIndexRef.current === index) return
+        activeIndexRef.current = index
         setActiveIndex(index)
-        setPlayingId(null)
+        setPausedId(null)
+        setMuted(true)
         onActiveIndex(index)
       },
       { root, threshold: [0.55, 0.72, 0.9] }
@@ -372,6 +439,15 @@ function SocialFeed({
     })
     return () => observer.disconnect()
   }, [items.length, onActiveIndex])
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (!activeItemId) return
+      setPausedId(document.hidden ? activeItemId : null)
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [activeItemId])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -402,6 +478,8 @@ function SocialFeed({
         const active = index === activeIndex
         const title = itemTitle(item)
         const itemFeedback = feedback[item.id]
+        const isTikTokVideo = Boolean(tiktokVideoId(item.url))
+        const playing = pausedId !== item.id
         return (
           <article
             key={item.id}
@@ -415,8 +493,12 @@ function SocialFeed({
             <FeedMedia
               item={item}
               active={active}
-              playing={playingId === item.id}
-              onPlay={() => setPlayingId(item.id)}
+              playing={playing}
+              muted={muted}
+              onMutedChange={setMuted}
+              onTogglePlayback={() =>
+                setPausedId((current) => (current === item.id ? null : item.id))
+              }
             />
 
             <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -486,7 +568,17 @@ function SocialFeed({
               </div>
             </div>
 
-            <div className="absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-3 z-40 flex flex-col gap-3">
+            <div className="absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-3 z-40 flex flex-col gap-2.5">
+              {isTikTokVideo && !playing && (
+                <button
+                  type="button"
+                  onClick={() => setPausedId(null)}
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-grow-yellow text-black shadow-lg"
+                  aria-label="Riproduci"
+                >
+                  <Play size={18} weight="fill" />
+                </button>
+              )}
               <Link
                 href={`/ai?brief=${encodeURIComponent(item.content || item.og_title || item.url || '')}`}
                 className="flex h-12 w-12 items-center justify-center rounded-full bg-grow-yellow text-black shadow-lg"
@@ -517,7 +609,7 @@ function SocialFeed({
                   <ArrowSquareOut size={19} />
                 </a>
               )}
-              <div className="flex flex-col overflow-hidden rounded-full bg-black/55 backdrop-blur-md">
+              <div className="hidden flex-col overflow-hidden rounded-full bg-black/55 backdrop-blur-md md:flex">
                 <button
                   type="button"
                   onClick={() => goTo(index - 1)}
@@ -541,7 +633,7 @@ function SocialFeed({
 
             {index === startIndex && (
               <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-2 font-mono text-[8px] uppercase tracking-[0.12em] text-white/65 backdrop-blur-md">
-                Scorri per continuare
+                Scorri · tocca per pausa
               </div>
             )}
           </article>
@@ -714,12 +806,23 @@ export default function SocialArchive() {
 
   return (
     <>
-      <section className="rounded-[1.5rem] border border-black/10 bg-white p-4">
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#0F0F10] text-grow-yellow">
-            <Brain size={28} weight="fill" />
+      <section className="rounded-[1.5rem] border border-black/10 bg-[#FFFDF8] p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="grow-page-kicker">Profilo GROW</p>
+            <h2 className="font-display mt-1 text-[2rem] uppercase leading-none">
+              Il tuo gusto<span className="text-grow-yellow">.</span>
+            </h2>
+            <p className="mt-2 max-w-sm text-[11px] leading-relaxed text-grow-muted">
+              Rivedi ciò che hai scelto. Le tue reazioni aiutano GROW a capire cosa vale la pena riportarti.
+            </p>
           </div>
-          <div className="grid min-w-0 flex-1 grid-cols-3 gap-2 text-center">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0F0F10] text-grow-yellow">
+            <Brain size={22} weight="fill" />
+          </div>
+        </div>
+        <div className="mt-4 border-t border-black/10 pt-4">
+          <div className="grid min-w-0 grid-cols-3 gap-2 text-center">
             <div>
               <p className="text-lg font-black leading-none">{total}</p>
               <p className="mt-1 font-mono text-[8px] uppercase tracking-wide text-grow-muted">Salvati</p>
@@ -733,12 +836,6 @@ export default function SocialArchive() {
               <p className="mt-1.5 font-mono text-[8px] uppercase tracking-wide text-grow-muted">Tratto</p>
             </div>
           </div>
-        </div>
-        <div className="mt-4 border-t border-black/10 pt-3">
-          <p className="text-sm font-bold">Il tuo gusto, non un altro feed.</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-grow-muted">
-            Scorri per ritrovare. Indica cosa ti serve: GROW userà le tue scelte per selezionare meglio, senza assegnare clienti da solo.
-          </p>
         </div>
       </section>
 
@@ -757,7 +854,7 @@ export default function SocialArchive() {
         </button>
         <Link
           href="/impostazioni/cattura"
-          className="flex min-h-12 items-center rounded-full bg-grow-yellow px-4 text-[10px] font-black uppercase text-black"
+          className="flex min-h-12 items-center rounded-full border border-black/10 bg-[#FFFDF8] px-4 text-[10px] font-bold uppercase text-black"
         >
           Importa
         </Link>
@@ -765,11 +862,20 @@ export default function SocialArchive() {
 
       <div className="mt-5">
         <div className="relative">
+          <label htmlFor="social-archive-search" className="sr-only">
+            Cerca nei salvati social
+          </label>
+          <MagnifyingGlass
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-grow-muted"
+          />
           <input
+            id="social-archive-search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Cerca nei salvati social..."
-            className="min-h-12 w-full rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none focus:border-grow-yellow"
+            type="search"
+            className="min-h-12 w-full rounded-2xl border border-black/10 bg-[#FFFDF8] py-3 pl-11 pr-4 text-sm outline-none focus:border-black/30"
           />
         </div>
         <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -784,7 +890,7 @@ export default function SocialArchive() {
                 setRoleFilter(option.key)
               }}
               className={[
-                'min-h-11 shrink-0 rounded-full px-3 text-[9px] font-black uppercase tracking-wide',
+                'min-h-11 shrink-0 rounded-full px-3 text-[9px] font-bold uppercase tracking-wide',
                 roleFilter === option.key
                   ? 'bg-[#0F0F10] text-grow-yellow'
                   : 'border border-black/10 bg-white text-grow-muted',
@@ -809,7 +915,7 @@ export default function SocialArchive() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-3 gap-[2px] lg:grid-cols-5">
+        <div className="grid grid-cols-3 gap-[2px] overflow-hidden rounded-[1.15rem]">
           {Array.from({ length: 15 }, (_, index) => (
             <div key={index} className="aspect-[3/4] animate-pulse bg-black/10" />
           ))}
@@ -830,7 +936,7 @@ export default function SocialArchive() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-[2px] lg:grid-cols-5">
+          <div className="grid grid-cols-3 gap-[2px] overflow-hidden rounded-[1.15rem] bg-black/5">
             {visibleItems.map((item, index) => (
               <SocialTile
                 key={item.id}

@@ -14,7 +14,7 @@ import {
 
 const SocialArchive = dynamic(() => import('@/components/SocialArchive'), {
   loading: () => (
-    <div className="grid grid-cols-3 gap-[2px] lg:grid-cols-5">
+    <div className="grid grid-cols-3 gap-[2px] overflow-hidden rounded-[1.15rem]">
       {Array.from({ length: 15 }, (_, index) => (
         <div key={index} className="aspect-[3/4] animate-pulse bg-black/10" />
       ))}
@@ -198,16 +198,16 @@ export default function ArchivioPage() {
   }
 
   return (
-    <main className="min-h-screen bg-grow-bg px-4 pb-32 pt-10 text-grow-text">
+    <main className="min-h-[100dvh] bg-grow-bg px-4 pb-32 pt-10 text-grow-text lg:pb-12">
       <section className="mx-auto max-w-lg lg:max-w-5xl">
         <header className="mb-7">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+              <p className="grow-page-kicker">
                 GROW Archivio
               </p>
 
-              <h1 className="mt-1 text-[40px] font-black uppercase leading-[0.9] tracking-tighter">
+              <h1 className="grow-page-title mt-1">
                 Archivio<span className="text-grow-yellow">.</span>
               </h1>
             </div>
@@ -283,7 +283,7 @@ export default function ArchivioPage() {
               <SaveFlowerIcon size={24} />
             </div>
 
-            <h2 className="mt-5 text-xl font-black uppercase tracking-tight">
+            <h2 className="grow-section-title mt-5">
               Nulla salvato
             </h2>
 

@@ -357,14 +357,14 @@ export default function InboxPage() {
   const detectedUrl = /^https?:\/\//.test(text.trim())
 
   return (
-    <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
+    <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-4xl lg:px-8">
         <header className="mb-7 flex items-start justify-between gap-4">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
+            <p className="grow-page-kicker">
               GROW Inbox
             </p>
-            <h1 className="mt-1 text-[40px] font-black uppercase leading-[0.9] tracking-tighter">
+            <h1 className="grow-page-title mt-1">
               Inbox<span className="text-grow-yellow">.</span>
             </h1>
             <p className="mt-3 text-sm text-grow-muted">
