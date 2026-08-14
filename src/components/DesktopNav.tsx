@@ -16,7 +16,7 @@ const items = [
   { href: '/inbox', label: 'Inbox', desc: 'Cattura senza ordinare', icon: NotePencil },
   { href: '/archivio', label: 'Archivio', desc: 'Reference e salvati social', icon: Archive },
   { href: '/calendario', label: 'Piano', desc: 'Cosa produrre e quando', icon: CalendarBlank },
-  { href: '/ai', label: 'AI', desc: 'Cerca, ragiona, agisci', icon: Brain },
+  { href: '/ai', label: 'GROW', desc: 'Il tuo archivio che ragiona', icon: Brain },
 ]
 
 export default function DesktopNav() {
@@ -91,7 +91,6 @@ export default function DesktopNav() {
 
         <div className="mt-3 flex gap-3 px-2 font-mono text-[8px] uppercase tracking-[0.1em] text-black/35">
           <Link href="/scopri" className="hover:text-black">Scopri</Link>
-          <Link href="/studio" className="hover:text-black">Studio</Link>
         </div>
       </div>
     </aside>

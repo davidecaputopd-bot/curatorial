@@ -15,7 +15,7 @@ const items = [
   { href: '/inbox', label: 'Inbox', icon: NotePencil },
   { href: '/archivio', label: 'Archivio', icon: Archive },
   { href: '/calendario', label: 'Piano', icon: CalendarBlank },
-  { href: '/ai', label: 'AI', icon: Brain },
+  { href: '/ai', label: 'GROW', icon: Brain },
 ]
 
 export default function BottomNav() {

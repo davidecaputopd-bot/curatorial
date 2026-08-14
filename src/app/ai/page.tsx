@@ -46,6 +46,20 @@ type Citation = {
 
 type Conversation = { conversation_id: string; title: string; updated_at: string }
 
+type BrainCounts = {
+  inbox_total: number
+  archive_total: number
+  active_calendar: number
+}
+
+type EvidenceItem = {
+  id: string
+  title: string
+  meta: string
+  imageUrl?: string
+  url?: string
+}
+
 const TOOL_LABELS: Record<string, string> = {
   get_operational_context: 'Letto contesto GROW',
   list_calendar_items: 'Letto calendario',
@@ -95,6 +109,128 @@ function actionSummary(action: Action) {
     return String(args.content || 'Nuovo ricordo')
   }
   return TOOL_LABELS[action.tool] || action.tool
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function safeExternalUrl(value: unknown) {
+  if (typeof value !== 'string' || !value) return ''
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.toString()
+      : ''
+  } catch {
+    return ''
+  }
+}
+
+function hostname(value: unknown) {
+  const url = safeExternalUrl(value)
+  return url ? new URL(url).hostname.replace(/^www\./, '') : ''
+}
+
+function actionEvidence(action: Action): EvidenceItem[] {
+  const result = record(action.result)
+  const source =
+    action.tool === 'market_forecast'
+      ? result.signals
+      : result.items || result.results
+  if (!Array.isArray(source)) return []
+
+  return source
+    .map((raw, index) => {
+      const item = record(raw)
+      const title = String(
+        item.title || item.content || item.description || 'Materiale senza titolo'
+      ).trim()
+      const url = safeExternalUrl(item.url) || undefined
+      const intelligence = record(item.intelligence)
+      const internalMeta = [
+        item.origin === 'archive' ? 'Archivio' : item.origin === 'inbox' ? 'Inbox' : '',
+        typeof intelligence.role_label === 'string' ? intelligence.role_label : '',
+      ].filter(Boolean).join(' · ')
+      const webMeta = [
+        hostname(url),
+        typeof item.lane === 'string' ? item.lane : '',
+      ].filter(Boolean).join(' · ')
+
+      return {
+        id: String(item.id || url || `${action.tool}-${index}`),
+        title,
+        meta: internalMeta || webMeta || 'Fonte consultata',
+        imageUrl:
+          typeof item.image_url === 'string' ? item.image_url : undefined,
+        url,
+      }
+    })
+    .filter((item) => item.title)
+    .slice(0, 4)
+}
+
+function EvidenceCards({ action }: { action: Action }) {
+  const evidence = actionEvidence(action)
+  if (!evidence.length) return null
+
+  const label = action.tool === 'search_saved_content'
+    ? 'Dal tuo GROW'
+    : 'Fonti consultate'
+
+  return (
+    <div className="mt-2 rounded-[1.15rem] border border-black/[0.08] bg-[#F7F4EE] p-2.5">
+      <p className="px-1 font-mono text-[8px] uppercase tracking-[0.14em] text-grow-muted">
+        {label}
+      </p>
+      <div className="mt-2 grid gap-1.5">
+        {evidence.map((item) => {
+          const content = (
+            <>
+              {item.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  className="h-12 w-12 shrink-0 rounded-[0.8rem] object-cover"
+                />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 block text-[11px] font-bold leading-snug text-grow-text">
+                  {item.title}
+                </span>
+                <span className="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-grow-muted">
+                  {item.meta}
+                </span>
+              </span>
+              {item.url && <span className="shrink-0 text-grow-muted">↗</span>}
+            </>
+          )
+
+          return item.url ? (
+            <a
+              key={item.id}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-14 items-center gap-2 rounded-[0.95rem] bg-white p-2 active:opacity-60"
+            >
+              {content}
+            </a>
+          ) : (
+            <div
+              key={item.id}
+              className="flex min-h-14 items-center gap-2 rounded-[0.95rem] bg-white p-2"
+            >
+              {content}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 const CLIENT_NOTES: Record<string, string> = {
@@ -217,6 +353,7 @@ export default function AiPage() {
   const [citeResults, setCiteResults] = useState<Citation[]>([])
   const [citations, setCitations] = useState<Citation[]>([])
   const [composerFocused, setComposerFocused] = useState(false)
+  const [brainCounts, setBrainCounts] = useState<BrainCounts | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
 
@@ -260,6 +397,20 @@ export default function AiPage() {
       setConversationId(newConversationId())
     })
     return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/ai/brief')
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled || !data?.brief?.counts) return
+        setBrainCounts(data.brief.counts as BrainCounts)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -494,9 +645,9 @@ export default function AiPage() {
       <div className="mx-auto flex h-full w-full max-w-xl flex-col px-4 pt-8">
         <header className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="grow-page-kicker">GROW AI</p>
+            <p className="grow-page-kicker">Secondo cervello</p>
             <h1 className="grow-page-title mt-1">
-              AI<span className="text-grow-yellow">.</span>
+              GROW<span className="text-grow-yellow">.</span>
             </h1>
           </div>
           <div className="flex gap-2">
@@ -575,7 +726,7 @@ export default function AiPage() {
             <section className="flex min-h-full items-center py-8">
               <div className="w-full">
                 <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-grow-muted">
-                  Tavolo di lavoro
+                  Il tuo archivio che ragiona
                 </p>
                 <h2 className="mt-3 max-w-sm text-[30px] font-bold leading-[0.98] tracking-[-0.045em]">
                   {project
@@ -583,8 +734,8 @@ export default function AiPage() {
                     : 'Cosa vuoi sbloccare?'}
                 </h2>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-grow-muted">
-                  GROW parte dai tuoi materiali e distingue ciò che sa, ciò che
-                  trova online e ciò che sta ipotizzando.
+                  Cerca nei tuoi materiali, mostra le prove e propone il passo
+                  successivo. Le modifiche partono solo dopo la tua conferma.
                 </p>
 
                 <div className="mt-7 border-y border-black/10">
@@ -628,7 +779,9 @@ export default function AiPage() {
                 </div>
 
                 <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-grow-muted">
-                  Contesto disponibile · Piano · Inbox · Archivio
+                  {brainCounts
+                    ? `${brainCounts.active_calendar} nel Piano · ${brainCounts.inbox_total} in Inbox · ${brainCounts.archive_total} salvati`
+                    : 'Contesto disponibile · Piano · Inbox · Archivio'}
                 </p>
               </div>
             </section>
@@ -653,12 +806,14 @@ export default function AiPage() {
                       const needsConfirmation = CONFIRMATION_TOOLS.has(action.tool)
                       if (!needsConfirmation) {
                         return (
-                          <span
+                          <div
                             key={`${action.tool}-${index}`}
-                            className="inline-flex rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-bold uppercase text-grow-text"
                           >
-                            {TOOL_LABELS[action.tool] || action.tool}
-                          </span>
+                            <span className="inline-flex rounded-full bg-grow-yellow px-2 py-0.5 text-[9px] font-bold uppercase text-grow-text">
+                              {TOOL_LABELS[action.tool] || action.tool}
+                            </span>
+                            <EvidenceCards action={action} />
+                          </div>
                         )
                       }
 
@@ -781,7 +936,14 @@ export default function AiPage() {
           <div ref={bottomRef} />
         </div>
 
-        <div className="shrink-0 pb-3">
+        <div
+          className={[
+            'shrink-0 transition-[padding] duration-200',
+            composerFocused || showCitePicker
+              ? 'pb-[max(0.75rem,env(safe-area-inset-bottom))]'
+              : 'pb-[calc(6.75rem+env(safe-area-inset-bottom))] lg:pb-3',
+          ].join(' ')}
+        >
           <div className="mx-auto max-w-xl">
             {citations.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">

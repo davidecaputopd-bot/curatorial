@@ -9,11 +9,32 @@ export async function GET(request: Request) {
   const q = (searchParams.get('q') || '').trim()
   if (!q) return NextResponse.json({ items: [] })
 
-  const [saved, inbox, calendar] = await Promise.all([
-    supabase.from('content_items').select('id, title, category, image_url, url').ilike('title', `%${q}%`).limit(8),
+  const [savedInteractions, inbox, calendar] = await Promise.all([
+    supabase
+      .from('interactions')
+      .select('content_id')
+      .eq('user_id', user.id)
+      .eq('action', 'save')
+      .limit(1000),
     supabase.from('inbox_items').select('id, content, url, client').eq('user_id', user.id).ilike('content', `%${q}%`).limit(8),
     supabase.from('calendar_items').select('id, title, client, status').eq('user_id', user.id).ilike('title', `%${q}%`).limit(8),
   ])
+
+  const savedIds = [
+    ...new Set(
+      (savedInteractions.data || [])
+        .map((interaction) => interaction.content_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ]
+  const saved = savedIds.length
+    ? await supabase
+        .from('content_items')
+        .select('id, title, category, image_url, url')
+        .in('id', savedIds)
+        .ilike('title', `%${q}%`)
+        .limit(8)
+    : { data: [] }
 
   const items = [
     ...(saved.data || []).map((i) => ({ type: 'archivio' as const, id: i.id, title: i.title, meta: i.category, image_url: i.image_url, url: i.url })),
