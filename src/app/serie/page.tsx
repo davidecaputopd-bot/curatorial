@@ -111,13 +111,16 @@ export default function SeriePage() {
   const markWatched = async (show: TvShow) => {
     if (!show.next_season || !show.next_number) return
     setBusy(show.id)
-    await fetch('/api/tv/watch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ show_id: show.id, season: show.next_season, episode: show.next_number }),
-    })
-    await load()
-    setBusy(null)
+    try {
+      await fetch('/api/tv/watch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_id: show.id, season: show.next_season, episode: show.next_number }),
+      })
+      await load()
+    } finally {
+      setBusy(null)
+    }
   }
 
   const togglePush = async () => {
@@ -201,11 +204,13 @@ export default function SeriePage() {
         </header>
         {pushError && <p className="mx-4 mt-3 rounded-xl bg-grow-butter px-3 py-2 text-xs font-bold lg:mx-8">{pushError}</p>}
 
-        <nav className="sticky top-0 z-30 mt-6 grid grid-cols-3 border-b border-grow-border bg-grow-bg/95 backdrop-blur-xl">
+        <nav role="tablist" className="sticky top-0 z-30 mt-6 grid grid-cols-3 border-b border-grow-border bg-grow-bg/95 backdrop-blur-xl">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
+              role="tab"
+              aria-selected={tab === item.id}
               onClick={() => setTab(item.id)}
               className={[
                 'relative py-4 text-[12px] font-extrabold uppercase tracking-wide transition-colors',
@@ -360,6 +365,7 @@ export default function SeriePage() {
                   <button
                     key={item.id}
                     type="button"
+                    aria-pressed={filter === item.id}
                     onClick={() => setFilter(item.id)}
                     className={[
                       'shrink-0 rounded-full px-3.5 py-2 text-[11px] font-extrabold uppercase',
@@ -373,7 +379,12 @@ export default function SeriePage() {
               <p className="mb-3 text-[11px] font-bold uppercase text-grow-muted">{grid.length} serie</p>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
                 {grid.map((show) => (
-                  <Link key={show.id} href={`/serie/${show.id}`} className="group block overflow-hidden rounded-lg bg-grow-black">
+                  <Link
+                    key={show.id}
+                    href={`/serie/${show.id}`}
+                    aria-label={`${show.title} · ${progressState(show).label}`}
+                    className="group block overflow-hidden rounded-lg bg-grow-black"
+                  >
                     <Poster
                       src={show.poster}
                       title={show.title}
@@ -399,16 +410,31 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
   const [results, setResults] = useState<SearchResult[]>([])
   const [adding, setAdding] = useState<number | null>(null)
   const [added, setAdded] = useState<Set<number>>(new Set())
+  const [searched, setSearched] = useState('')
 
   useEffect(() => {
-    if (query.trim().length < 2) return
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) return
     const timer = setTimeout(() => {
-      void fetch(`/api/tv/search?q=${encodeURIComponent(query)}`)
+      void fetch(`/api/tv/search?q=${encodeURIComponent(q)}`)
         .then((response) => response.json())
-        .then((data) => setResults(data.items || []))
+        .then((data) => {
+          setResults(data.items || [])
+          setSearched(q)
+        })
+        .catch(() => setSearched(q))
     }, 300)
     return () => clearTimeout(timer)
   }, [query])
+
+  // Sotto i 2 caratteri non mostra i risultati della ricerca precedente.
+  const visible = query.trim().length < 2 ? [] : results
 
   const add = async (item: SearchResult) => {
     setAdding(item.tvmaze_id)
@@ -427,7 +453,10 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
   return (
     <div className="fixed inset-0 z-[60] flex items-end bg-black/40 lg:items-center lg:justify-center" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full overflow-y-auto rounded-t-[1.8rem] bg-grow-bg p-4 pb-8 lg:max-w-lg lg:rounded-[1.8rem]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Aggiungi una serie"
+        className="max-h-[85dvh] w-full overflow-y-auto overscroll-contain rounded-t-[1.8rem] bg-grow-bg p-4 pb-[max(2rem,env(safe-area-inset-bottom))] lg:max-w-lg lg:rounded-[1.8rem]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2">
@@ -435,15 +464,21 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            type="search"
+            enterKeyHint="search"
+            aria-label="Cerca una serie"
             placeholder="Cerca una serie…"
-            className="h-12 flex-1 rounded-full border border-grow-border bg-grow-card px-5 text-sm font-bold outline-none focus:border-grow-black"
+            className="h-12 flex-1 rounded-full border border-grow-border bg-grow-card px-5 text-base font-bold outline-none focus:border-grow-black"
           />
           <button type="button" onClick={onClose} className="h-12 px-3 text-[11px] font-extrabold uppercase text-grow-muted">
             Chiudi
           </button>
         </div>
+        {visible.length === 0 && searched === query.trim() && searched.length >= 2 && (
+          <p className="py-8 text-center text-sm text-grow-muted">Nessuna serie trovata per “{searched}”.</p>
+        )}
         <ul className="mt-3 divide-y divide-grow-border">
-          {results.map((item) => (
+          {visible.map((item) => (
             <li key={item.tvmaze_id} className="flex items-center gap-3 py-3">
               <Poster src={item.poster} title={item.title} className="h-[66px] w-[44px] shrink-0 rounded-md" />
               <span className="min-w-0 flex-1">

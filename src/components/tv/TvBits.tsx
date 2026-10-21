@@ -94,10 +94,10 @@ export function CheckButton({
       aria-label={label}
       aria-pressed={checked}
       className={[
-        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 active:scale-90',
+        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 active:scale-90 motion-reduce:active:scale-100',
         checked
           ? 'border-grow-yellow bg-grow-yellow text-grow-black'
-          : 'border-grow-black/25 text-grow-black/30 hover:border-grow-black hover:text-grow-black',
+          : 'border-grow-black/40 text-grow-black/55 hover:border-grow-black hover:text-grow-black',
         busy ? 'opacity-50' : '',
       ].join(' ')}
     >

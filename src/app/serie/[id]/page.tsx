@@ -72,40 +72,46 @@ function SerieDetail() {
   const toggle = async (episode: Episode) => {
     if (!show) return
     setBusy(episode.id)
-    if (isWatched(episode)) {
-      await fetch('/api/tv/watch', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ show_id: show.id, season: episode.season, episode: episode.number }),
-      })
-    } else {
-      const beforeIt = aired.filter(
-        (other) =>
-          (other.season < episode.season || (other.season === episode.season && other.number < episode.number)) &&
-          !isWatched(other)
-      )
-      const upTo = beforeIt.length > 0 && window.confirm(`Segnare come visti anche i ${beforeIt.length} episodi precedenti?`)
-      await fetch('/api/tv/watch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ show_id: show.id, season: episode.season, episode: episode.number, upTo }),
-      })
+    try {
+      if (isWatched(episode)) {
+        await fetch('/api/tv/watch', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ show_id: show.id, season: episode.season, episode: episode.number }),
+        })
+      } else {
+        const beforeIt = aired.filter(
+          (other) =>
+            (other.season < episode.season || (other.season === episode.season && other.number < episode.number)) &&
+            !isWatched(other)
+        )
+        const upTo = beforeIt.length > 0 && window.confirm(`Segnare come visti anche i ${beforeIt.length} episodi precedenti?`)
+        await fetch('/api/tv/watch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ show_id: show.id, season: episode.season, episode: episode.number, upTo }),
+        })
+      }
+      await load()
+    } finally {
+      setBusy(null)
     }
-    await load()
-    setBusy(null)
   }
 
   const markSeason = async (season: number) => {
     const last = aired.filter((episode) => episode.season === season).at(-1)
     if (!last || !show) return
     setBusy(-season)
-    await fetch('/api/tv/watch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ show_id: show.id, season, episode: last.number, upTo: true }),
-    })
-    await load()
-    setBusy(null)
+    try {
+      await fetch('/api/tv/watch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_id: show.id, season, episode: last.number, upTo: true }),
+      })
+      await load()
+    } finally {
+      setBusy(null)
+    }
   }
 
   if (!show) {
@@ -155,6 +161,7 @@ function SerieDetail() {
             <div className="mt-5 flex flex-wrap gap-2">
               <button
                 type="button"
+                aria-pressed={show.notify}
                 onClick={() => void patch({ notify: !show.notify })}
                 className={`h-10 rounded-full px-4 text-[10px] font-extrabold uppercase ${show.notify ? 'bg-grow-yellow text-grow-black' : 'bg-white/10 text-white'}`}
               >
@@ -162,6 +169,7 @@ function SerieDetail() {
               </button>
               <button
                 type="button"
+                aria-pressed={show.favorite}
                 onClick={() => void patch({ favorite: !show.favorite })}
                 className={`h-10 rounded-full px-4 text-[10px] font-extrabold uppercase ${show.favorite ? 'bg-white text-grow-black' : 'bg-white/10 text-white'}`}
               >
@@ -261,6 +269,7 @@ function SerieDetail() {
                 <div className="flex items-center gap-3 py-4">
                   <button
                     type="button"
+                    aria-expanded={open === season}
                     onClick={() => setOpen(open === season ? null : season)}
                     className="flex min-w-0 flex-1 items-center justify-between text-left"
                   >
@@ -274,7 +283,7 @@ function SerieDetail() {
                       type="button"
                       disabled={busy === -season}
                       onClick={() => void markSeason(season)}
-                      className="h-9 shrink-0 rounded-full bg-grow-black px-3 text-[9px] font-extrabold uppercase text-grow-yellow disabled:opacity-50"
+                      className="h-11 shrink-0 rounded-full bg-grow-black px-4 text-[10px] font-extrabold uppercase text-grow-yellow disabled:opacity-50"
                     >
                       Segna stagione
                     </button>
@@ -312,7 +321,7 @@ function SerieDetail() {
                               label={`${watched ? 'Togli' : 'Segna'} ${episodeCode(episode.season, episode.number)} ${watched ? 'dai visti' : 'come visto'}`}
                             />
                           ) : (
-                            <span className="w-11 shrink-0 text-center text-[9px] font-extrabold uppercase text-grow-muted">Presto</span>
+                            <span className="w-11 shrink-0 text-center text-[10px] font-extrabold uppercase text-grow-muted">Presto</span>
                           )}
                         </li>
                       )
