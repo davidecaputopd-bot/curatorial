@@ -47,10 +47,13 @@ export async function syncShow(supabase: SupabaseClient, show: ShowRow) {
   return episodes.length
 }
 
-// Sincronizza in sequenza, rispettando il limite di TVmaze.
-export async function syncShows(supabase: SupabaseClient, shows: ShowRow[]) {
+// Sincronizza in sequenza, rispettando il limite di TVmaze. Si ferma a `budgetMs`
+// per restare sotto il limite di durata delle funzioni Vercel: il resto al giro dopo.
+export async function syncShows(supabase: SupabaseClient, shows: ShowRow[], budgetMs = 45_000) {
+  const startedAt = Date.now()
   const results: { id: number; episodes?: number; error?: string }[] = []
   for (const show of shows) {
+    if (Date.now() - startedAt > budgetMs) break
     try {
       results.push({ id: show.id, episodes: await syncShow(supabase, show) })
     } catch (error) {

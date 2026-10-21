@@ -25,7 +25,7 @@ export async function POST() {
     .order('synced_at', { ascending: true, nullsFirst: true })
     .limit(12)
 
-  const results = await syncShows(supabase, shows || [])
+  const results = await syncShows(supabase, shows || [], 40_000)
   return NextResponse.json({ synced: results.length, remaining: Math.max((count || 0) - results.length, 0) })
 }
 
@@ -48,7 +48,8 @@ export async function GET(request: Request) {
     .limit(500)
   // Le serie mai scaricate vanno sincronizzate almeno una volta, anche se concluse.
   const shows = (candidates || []).filter((show) => !show.synced_at || show.show_status !== 'Ended').slice(0, 60)
-  const results = await syncShows(supabase, shows)
+  // Lascia ~15 s per le notifiche dopo la sincronizzazione.
+  const results = await syncShows(supabase, shows, 40_000)
 
   const now = new Date()
   const since = new Date(now.getTime() - 36 * 3600_000).toISOString()
