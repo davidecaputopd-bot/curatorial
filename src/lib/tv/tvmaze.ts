@@ -15,6 +15,7 @@ export type TvmazeShow = {
   id: number
   name: string
   status: string | null
+  premiered?: string | null
   image: { medium?: string; original?: string } | null
   network: { name: string } | null
   webChannel: { name: string } | null

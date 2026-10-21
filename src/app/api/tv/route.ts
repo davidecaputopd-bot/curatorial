@@ -43,24 +43,33 @@ export async function POST(request: Request) {
   const info = await getShow(Number(tvmaze_id))
   if (!info) return NextResponse.json({ error: 'Serie non trovata' }, { status: 404 })
 
-  const { data, error } = await supabase
-    .from('tv_shows')
-    .upsert(
-      {
-        user_id: user.id,
-        title: info.name,
-        tvmaze_id: info.id,
-        tvdb_id: info.externals?.thetvdb || null,
-        followed: true,
-        followed_at: new Date().toISOString().slice(0, 10),
-        progress_season: 0,
-        progress_episode: 0,
-        imported_from: 'grow',
-      },
-      { onConflict: 'user_id,title' }
-    )
-    .select('id, user_id, tvmaze_id')
-    .single()
+  // Se la serie è già in archivio (anche non seguita) torna a seguirla senza toccare la posizione.
+  const findBy = (column: 'tvmaze_id' | 'title', value: number | string) =>
+    supabase.from('tv_shows').select('id').eq('user_id', user.id).eq(column, value).limit(1).maybeSingle()
+  const existing = (await findBy('tvmaze_id', info.id)).data || (await findBy('title', info.name)).data
+
+  const { data, error } = existing
+    ? await supabase
+        .from('tv_shows')
+        .update({ followed: true, tvmaze_id: info.id })
+        .eq('id', existing.id)
+        .select('id, user_id, tvmaze_id')
+        .single()
+    : await supabase
+        .from('tv_shows')
+        .insert({
+          user_id: user.id,
+          title: info.name,
+          tvmaze_id: info.id,
+          tvdb_id: info.externals?.thetvdb || null,
+          followed: true,
+          followed_at: new Date().toISOString().slice(0, 10),
+          progress_season: 0,
+          progress_episode: 0,
+          imported_from: 'grow',
+        })
+        .select('id, user_id, tvmaze_id')
+        .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await syncShow(supabase, data)
@@ -74,7 +83,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json()
   const fields: Record<string, unknown> = {}
-  for (const key of ['progress_season', 'progress_episode', 'notify', 'followed', 'favorite']) {
+  for (const key of ['progress_season', 'progress_episode', 'notify', 'followed', 'favorite', 'for_later']) {
     if (key in body) fields[key] = body[key]
   }
 

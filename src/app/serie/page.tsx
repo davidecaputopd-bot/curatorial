@@ -25,7 +25,15 @@ type Upcoming = {
   tv_shows: { title: string; poster: string | null; network: string | null }
 }
 
-type SearchResult = { tvmaze_id: number; title: string; poster: string | null; network: string | null; status: string | null }
+type SearchResult = {
+  tvmaze_id: number
+  title: string
+  poster: string | null
+  network: string | null
+  status: string | null
+  year: string | null
+  show_id: number | null
+}
 
 const TABS = [
   { id: 'vedere', label: 'Da vedere' },
@@ -45,6 +53,13 @@ const FILTERS = [
   { id: 'archivio', label: 'Non seguite' },
 ]
 
+// Ordinamenti di TV Time: watch_date, follow_date, alphabetical.
+const SORTS = [
+  { id: 'visione', label: 'Ultima visione' },
+  { id: 'follow', label: 'Seguita da' },
+  { id: 'az', label: 'A-Z' },
+] as const
+
 export default function SeriePage() {
   const [tab, setTab] = useState<Tab>('vedere')
   const [shows, setShows] = useState<TvShow[]>([])
@@ -54,6 +69,8 @@ export default function SeriePage() {
   const [busy, setBusy] = useState<number | null>(null)
   const [filter, setFilter] = useState('tutte')
   const [showNotStarted, setShowNotStarted] = useState(false)
+  const [showLater, setShowLater] = useState(false)
+  const [sort, setSort] = useState<(typeof SORTS)[number]['id']>('visione')
   const [push, setPush] = useState<'on' | 'off' | 'unsupported'>('off')
   const [pushError, setPushError] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -100,11 +117,14 @@ export default function SeriePage() {
 
   const [now] = useState(() => Date.now())
   const followed = useMemo(() => shows.filter((show) => show.followed), [shows])
-  const toWatch = followed
+  // "Guarda più tardi": resta seguita ma esce dalla lista attiva, come is_for_later di TV Time.
+  const active = followed.filter((show) => !show.for_later)
+  const later = followed.filter((show) => show.for_later)
+  const toWatch = active
     .filter((show) => show.next_episode_id && show.progress_season !== null && !(show.progress_season === 0 && show.progress_episode === 0))
     .sort((a, b) => String(b.last_watched_at || b.followed_at).localeCompare(String(a.last_watched_at || a.followed_at)))
-  const unknown = followed.filter((show) => show.progress_season === null && show.aired_count > 0)
-  const notStarted = followed.filter(
+  const unknown = active.filter((show) => show.progress_season === null && show.aired_count > 0)
+  const notStarted = active.filter(
     (show) => show.progress_season === 0 && show.progress_episode === 0 && show.aired_count > 0
   )
 
@@ -116,6 +136,20 @@ export default function SeriePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ show_id: show.id, season: show.next_season, episode: show.next_number }),
+      })
+      await load()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const setForLater = async (show: TvShow, value: boolean) => {
+    setBusy(show.id)
+    try {
+      await fetch('/api/tv', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: show.id, for_later: value }),
       })
       await load()
     } finally {
@@ -146,12 +180,27 @@ export default function SeriePage() {
         if (filter === 'fav') return show.favorite
         return progressState(show).tone === filter
       })
-      .sort((a, b) =>
-        filter === 'fav'
-          ? (a.favorite_position ?? 99) - (b.favorite_position ?? 99)
-          : String(b.last_watched_at || '').localeCompare(String(a.last_watched_at || '')) || a.title.localeCompare(b.title)
-      )
-  }, [followed, shows, filter])
+      .sort((a, b) => {
+        if (filter === 'fav') return (a.favorite_position ?? 99) - (b.favorite_position ?? 99)
+        if (sort === 'az') return a.title.localeCompare(b.title)
+        const key = sort === 'follow' ? 'followed_at' : 'last_watched_at'
+        return String(b[key] || '').localeCompare(String(a[key] || '')) || a.title.localeCompare(b.title)
+      })
+  }, [followed, shows, filter, sort])
+
+  // Statistiche del profilo TV Time: episodi visti, tempo passato, serie finite.
+  const stats = useMemo(() => {
+    const minutes = followed.reduce((sum, show) => sum + (show.watched_minutes || 0), 0)
+    return {
+      episodes: followed.reduce(
+        (sum, show) => sum + (show.progress_season === null ? 0 : Math.max(show.aired_count - show.unwatched_count, 0)),
+        0
+      ),
+      days: Math.floor(minutes / 1440),
+      hours: Math.floor((minutes % 1440) / 60),
+      completed: followed.filter((show) => progressState(show).tone === 'done').length,
+    }
+  }, [followed])
 
   const upcomingByDay = useMemo(() => {
     const groups: { day: string; items: Upcoming[] }[] = []
@@ -195,10 +244,10 @@ export default function SeriePage() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              aria-label="Aggiungi una serie"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-grow-black text-xl font-extrabold text-grow-yellow"
+              className="flex h-11 items-center gap-1.5 rounded-full bg-grow-black pl-3.5 pr-4 text-[11px] font-extrabold uppercase text-grow-yellow"
             >
-              +
+              <span aria-hidden className="text-lg leading-none">+</span>
+              Aggiungi
             </button>
           </div>
         </header>
@@ -242,7 +291,7 @@ export default function SeriePage() {
           ) : followed.length === 0 ? (
             <div className="rounded-[2rem] border border-grow-border bg-grow-card px-6 py-14 text-center">
               <h2 className="text-2xl font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">Nessuna serie</h2>
-              <p className="mt-2 text-sm text-grow-muted">Importa l’archivio TV Time o aggiungi una serie con +.</p>
+              <p className="mt-2 text-sm text-grow-muted">Importa l’archivio TV Time o aggiungi una serie con Aggiungi.</p>
             </div>
           ) : tab === 'vedere' ? (
             <>
@@ -320,6 +369,45 @@ export default function SeriePage() {
                   )}
                 </section>
               )}
+
+              {later.length > 0 && (
+                <section className="mt-8">
+                  <button
+                    type="button"
+                    aria-expanded={showLater}
+                    onClick={() => setShowLater((value) => !value)}
+                    className="flex w-full items-center justify-between text-left"
+                  >
+                    <h2 className="text-xl font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">Guarda più tardi ({later.length})</h2>
+                    <span className="text-xl font-extrabold">{showLater ? '−' : '+'}</span>
+                  </button>
+                  {showLater && (
+                    <ul className="mt-2 divide-y divide-grow-border">
+                      {later.map((show) => (
+                        <li key={show.id} className="flex items-center gap-3 py-3">
+                          <Link href={`/serie/${show.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                            <Poster src={show.poster} title={show.title} className="h-[66px] w-[44px] shrink-0 rounded-md" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[15px] font-extrabold">{show.title}</span>
+                              <span className="block text-[12px] font-bold text-grow-muted">
+                                {show.next_season && show.next_number ? `Riprendi da ${episodeCode(show.next_season, show.next_number)}` : progressState(show).label}
+                              </span>
+                            </span>
+                          </Link>
+                          <button
+                            type="button"
+                            disabled={busy === show.id}
+                            onClick={() => void setForLater(show, false)}
+                            className="h-10 shrink-0 rounded-full border border-grow-border px-4 text-[10px] font-extrabold uppercase disabled:opacity-50"
+                          >
+                            Riprendi
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
             </>
           ) : tab === 'arrivo' ? (
             upcomingByDay.length === 0 ? (
@@ -344,6 +432,11 @@ export default function SeriePage() {
                               {episodeCode(item.season, item.number)}
                               {item.name ? ` · ${item.name}` : ''}
                             </span>
+                            {item.number === 1 && (
+                              <span className="mt-1 inline-block rounded-full bg-grow-yellow px-2 py-0.5 text-[10px] font-extrabold uppercase text-grow-black">
+                                {item.season === 1 ? 'Nuova serie' : 'Nuova stagione'}
+                              </span>
+                            )}
                           </span>
                           <span className="shrink-0 text-right">
                             <span className="block text-sm font-extrabold">{airTime(item.airstamp)}</span>
@@ -360,6 +453,22 @@ export default function SeriePage() {
             )
           ) : (
             <>
+              <dl className="mb-4 grid grid-cols-3 divide-x divide-grow-border border-y border-grow-border py-3 text-center">
+                <div>
+                  <dt className="text-[10px] font-bold uppercase text-grow-muted">Episodi visti</dt>
+                  <dd className="text-2xl font-[family-name:var(--font-tv-display)] tabular-nums">{stats.episodes.toLocaleString('it-IT')}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-bold uppercase text-grow-muted">Tempo</dt>
+                  <dd className="text-2xl font-[family-name:var(--font-tv-display)] tabular-nums">
+                    {stats.days}g {stats.hours}h
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-bold uppercase text-grow-muted">Completate</dt>
+                  <dd className="text-2xl font-[family-name:var(--font-tv-display)] tabular-nums">{stats.completed}</dd>
+                </div>
+              </dl>
               <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 pb-3">
                 {FILTERS.map((item) => (
                   <button
@@ -376,8 +485,34 @@ export default function SeriePage() {
                   </button>
                 ))}
               </div>
-              <p className="mb-3 text-[11px] font-bold uppercase text-grow-muted">{grid.length} serie</p>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-[11px] font-bold uppercase text-grow-muted">{grid.length} serie</p>
+                {filter !== 'fav' && (
+                  <select
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value as typeof sort)}
+                    aria-label="Ordina le serie"
+                    className="h-9 rounded-full border border-grow-border bg-grow-card px-3 text-[11px] font-extrabold uppercase"
+                  >
+                    {SORTS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+                {filter === 'tutte' && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchOpen(true)}
+                    className="flex aspect-[2/3] flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-grow-black/30 text-grow-black"
+                  >
+                    <span aria-hidden className="text-3xl font-extrabold leading-none">+</span>
+                    <span className="text-[11px] font-extrabold uppercase">Aggiungi serie</span>
+                  </button>
+                )}
                 {grid.map((show) => (
                   <Link
                     key={show.id}
@@ -409,7 +544,8 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [adding, setAdding] = useState<number | null>(null)
-  const [added, setAdded] = useState<Set<number>>(new Set())
+  const [added, setAdded] = useState<Map<number, number>>(new Map())
+  const [error, setError] = useState('')
   const [searched, setSearched] = useState('')
 
   useEffect(() => {
@@ -433,19 +569,25 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
     return () => clearTimeout(timer)
   }, [query])
 
+  const showId = (item: SearchResult) => added.get(item.tvmaze_id) ?? item.show_id
+
   // Sotto i 2 caratteri non mostra i risultati della ricerca precedente.
   const visible = query.trim().length < 2 ? [] : results
 
   const add = async (item: SearchResult) => {
     setAdding(item.tvmaze_id)
+    setError('')
     const response = await fetch('/api/tv', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tvmaze_id: item.tvmaze_id }),
     })
     if (response.ok) {
-      setAdded((current) => new Set(current).add(item.tvmaze_id))
+      const data = await response.json()
+      setAdded((current) => new Map(current).set(item.tvmaze_id, data.show.id))
       onAdded()
+    } else {
+      setError(`Non sono riuscito ad aggiungere ${item.title}. Riprova.`)
     }
     setAdding(null)
   }
@@ -474,6 +616,10 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
             Chiudi
           </button>
         </div>
+        {error && <p className="mt-3 rounded-xl bg-grow-butter px-3 py-2 text-xs font-bold">{error}</p>}
+        {query.trim().length < 2 && (
+          <p className="py-8 text-center text-sm text-grow-muted">Scrivi il titolo: le puntate arrivano da TVmaze.</p>
+        )}
         {visible.length === 0 && searched === query.trim() && searched.length >= 2 && (
           <p className="py-8 text-center text-sm text-grow-muted">Nessuna serie trovata per “{searched}”.</p>
         )}
@@ -484,19 +630,31 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-extrabold">{item.title}</span>
                 <span className="block text-[11px] text-grow-muted">
-                  {[item.network, item.status === 'Ended' ? 'Conclusa' : item.status === 'Running' ? 'In onda' : item.status]
+                  {[item.year, item.network, item.status === 'Ended' ? 'Conclusa' : item.status === 'Running' ? 'In onda' : item.status]
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
               </span>
-              <button
-                type="button"
-                disabled={adding === item.tvmaze_id || added.has(item.tvmaze_id)}
-                onClick={() => void add(item)}
-                className="h-10 shrink-0 rounded-full bg-grow-black px-4 text-[10px] font-extrabold uppercase text-grow-yellow disabled:bg-grow-yellow disabled:text-grow-black"
-              >
-                {added.has(item.tvmaze_id) ? 'Seguita' : adding === item.tvmaze_id ? '…' : 'Segui'}
-              </button>
+              {showId(item) ? (
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <Link
+                    href={`/serie/${showId(item)}${added.has(item.tvmaze_id) ? '?imposta=1' : ''}`}
+                    className="flex h-10 items-center rounded-full bg-grow-yellow px-4 text-[10px] font-extrabold uppercase text-grow-black"
+                  >
+                    {added.has(item.tvmaze_id) ? 'A che punto sei' : 'Apri'}
+                  </Link>
+                  <span className="text-[10px] font-bold uppercase text-grow-muted">Seguita</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={adding === item.tvmaze_id}
+                  onClick={() => void add(item)}
+                  className="h-10 shrink-0 rounded-full bg-grow-black px-4 text-[10px] font-extrabold uppercase text-grow-yellow disabled:opacity-60"
+                >
+                  {adding === item.tvmaze_id ? 'Aggiungo…' : 'Segui'}
+                </button>
+              )}
             </li>
           ))}
         </ul>

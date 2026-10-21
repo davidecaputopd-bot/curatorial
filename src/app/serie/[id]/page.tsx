@@ -175,6 +175,16 @@ function SerieDetail() {
               >
                 {show.favorite ? '★ Preferita' : '☆ Preferita'}
               </button>
+              {show.followed && (
+                <button
+                  type="button"
+                  aria-pressed={show.for_later}
+                  onClick={() => void patch({ for_later: !show.for_later })}
+                  className={`h-10 rounded-full px-4 text-[10px] font-extrabold uppercase ${show.for_later ? 'bg-white text-grow-black' : 'bg-white/10 text-white'}`}
+                >
+                  {show.for_later ? 'Riprendi a guardare' : 'Guarda più tardi'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSetting((value) => !value)}

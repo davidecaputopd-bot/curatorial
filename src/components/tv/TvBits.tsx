@@ -16,6 +16,7 @@ export type TvShow = {
   last_watched_at: string | null
   followed_at: string | null
   favorite: boolean
+  for_later: boolean
   favorite_position: number | null
   notify: boolean
   synced_at: string | null
@@ -27,6 +28,7 @@ export type TvShow = {
   next_airstamp: string | null
   aired_count: number
   unwatched_count: number
+  watched_minutes: number
   upcoming_airstamp: string | null
 }
 
