@@ -40,13 +40,14 @@ export async function GET(request: Request) {
   const staleBefore = new Date(Date.now() - STALE_HOURS * 3600_000).toISOString()
   const { data: candidates } = await supabase
     .from('tv_shows')
-    .select('id, user_id, tvmaze_id, show_status')
+    .select('id, user_id, tvmaze_id, show_status, synced_at')
     .eq('followed', true)
     .not('tvmaze_id', 'is', null)
     .or(`synced_at.is.null,synced_at.lt.${staleBefore}`)
     .order('synced_at', { ascending: true, nullsFirst: true })
     .limit(500)
-  const shows = (candidates || []).filter((show) => show.show_status !== 'Ended').slice(0, 60)
+  // Le serie mai scaricate vanno sincronizzate almeno una volta, anche se concluse.
+  const shows = (candidates || []).filter((show) => !show.synced_at || show.show_status !== 'Ended').slice(0, 60)
   const results = await syncShows(supabase, shows)
 
   const now = new Date()
