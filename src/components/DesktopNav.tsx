@@ -4,19 +4,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Archive,
-  Brain,
   CalendarBlank,
-  ChatCircleDots,
-  House,
+  Compass,
   NotePencil,
+  Television,
 } from '@phosphor-icons/react'
 
 const items = [
-  { href: '/', label: 'Oggi', desc: 'La mossa utile', icon: House },
+  { href: '/serie', label: 'Serie', desc: 'Da vedere e nuove puntate', icon: Television },
+  { href: '/scopri', label: 'Scopri', desc: 'Reference da esplorare', icon: Compass },
   { href: '/inbox', label: 'Inbox', desc: 'Cattura senza ordinare', icon: NotePencil },
   { href: '/archivio', label: 'Archivio', desc: 'Reference e salvati social', icon: Archive },
   { href: '/calendario', label: 'Piano', desc: 'Cosa produrre e quando', icon: CalendarBlank },
-  { href: '/ai', label: 'GROW', desc: 'Il tuo archivio che ragiona', icon: Brain },
 ]
 
 export default function DesktopNav() {
@@ -67,32 +66,6 @@ export default function DesktopNav() {
         })}
       </nav>
 
-      <div className="mt-auto pt-6">
-        <p className="px-2 font-mono text-[8px] uppercase tracking-[0.16em] text-black/35">
-          Passaggio rapido
-        </p>
-        <Link
-          href="/chat"
-          className={[
-            'mt-2 flex min-h-[62px] items-center gap-3 rounded-[1.25rem] px-4 transition active:scale-[0.99]',
-            pathname === '/chat'
-              ? 'bg-[#FFE500] text-black'
-              : 'bg-white/70 text-[#0F0F10] hover:bg-white',
-          ].join(' ')}
-        >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0F0F10] text-[#FFE500]">
-            <ChatCircleDots size={20} weight="fill" />
-          </span>
-          <span>
-            <span className="block text-xs font-bold uppercase">Chat veloce</span>
-            <span className="mt-0.5 block text-[10px] text-black/45">Da telefono al computer</span>
-          </span>
-        </Link>
-
-        <div className="mt-3 flex gap-3 px-2 font-mono text-[8px] uppercase tracking-[0.1em] text-black/35">
-          <Link href="/scopri" className="hover:text-black">Scopri</Link>
-        </div>
-      </div>
     </aside>
   )
 }

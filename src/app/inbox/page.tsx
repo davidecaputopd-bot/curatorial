@@ -1,10 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown,
-  ChatCircleDots,
   Copy,
   Image as ImageIcon,
   NotePencil,
@@ -371,12 +369,6 @@ export default function InboxPage() {
               Cattura adesso. GROW classifica, senza inventare progetti.
             </p>
           </div>
-          <Link
-            href="/chat"
-            className="mt-1 flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-grow-yellow px-4 text-[9px] font-black uppercase tracking-wide text-grow-black"
-          >
-            <ChatCircleDots size={15} weight="fill" /> Chat
-          </Link>
         </header>
 
         <section
@@ -572,12 +564,6 @@ export default function InboxPage() {
 
                       {expanded === item.id && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <Link
-                            href={`/ai?brief=${encodeURIComponent(item.content || item.url || '')}`}
-                            className="inline-flex min-h-11 items-center rounded-full bg-grow-black px-3 text-[9px] font-black uppercase text-grow-yellow"
-                          >
-                            Usa con AI
-                          </Link>
                           <button
                             type="button"
                             onClick={() => void copy(item)}

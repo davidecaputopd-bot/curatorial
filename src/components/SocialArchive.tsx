@@ -12,7 +12,6 @@ import {
   Play,
   SpeakerHigh,
   SpeakerSlash,
-  Sparkle,
   X,
 } from '@phosphor-icons/react'
 import {
@@ -579,13 +578,6 @@ function SocialFeed({
                   <Play size={18} weight="fill" />
                 </button>
               )}
-              <Link
-                href={`/ai?brief=${encodeURIComponent(item.content || item.og_title || item.url || '')}`}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-grow-yellow text-black shadow-lg"
-                aria-label="Usa questo salvato con GROW AI"
-              >
-                <Sparkle size={19} weight="fill" />
-              </Link>
               <button
                 type="button"
                 onClick={() => onCopy(item)}

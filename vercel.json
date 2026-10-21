@@ -11,6 +11,10 @@
     {
       "path": "/api/fetch-arena",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/tv/sync",
+      "schedule": "0 7 * * *"
     }
   ]
 }

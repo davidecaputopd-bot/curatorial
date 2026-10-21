@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 
 const CLIENTS = ['Tutti', 'ANventitre', 'Exousia', 'Cantina Don Carlo', 'ACI Copertino', 'TRAMA']
@@ -851,12 +850,6 @@ function PlanCard({
                 Avanza a {STATUS_LABELS[nextStatus]}
               </button>
             )}
-            <Link
-              href={`/ai?project=${encodeURIComponent(item.client)}&brief=${encodeURIComponent(item.title)}`}
-              className="rounded-full bg-grow-text px-3 py-2 text-[9px] font-black uppercase text-grow-yellow"
-            >
-              Lavora in AI
-            </Link>
             <button
               type="button"
               onClick={() => onRemove(item.id)}

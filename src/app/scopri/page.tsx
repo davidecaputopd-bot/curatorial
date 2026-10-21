@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import SaveHeart from '@/components/SaveHeart'
 
@@ -466,13 +465,7 @@ export default function ScopriPage() {
                 </p>
               )}
 
-              <div className="mt-6 grid grid-cols-2 gap-2">
-                <Link
-                  href={`/ai?ref=${encodeURIComponent(selected.id)}&title=${encodeURIComponent(selected.title || '')}&image=${encodeURIComponent(selected.image_url || '')}&url=${encodeURIComponent(selected.url || '')}&category=${encodeURIComponent(selected.category || '')}`}
-                  className="flex min-h-12 items-center justify-center rounded-full bg-grow-yellow px-4 text-center text-[10px] font-black uppercase text-black active:scale-[0.98]"
-                >
-                  Usa con AI
-                </Link>
+              <div className="mt-6 grid grid-cols-1 gap-2">
                 <button
                   type="button"
                   onClick={() => {

@@ -4,18 +4,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Archive,
-  Brain,
   CalendarBlank,
-  House,
+  Compass,
   NotePencil,
+  Television,
 } from '@phosphor-icons/react'
 
 const items = [
-  { href: '/', label: 'Oggi', icon: House },
+  { href: '/serie', label: 'Serie', icon: Television },
+  { href: '/scopri', label: 'Scopri', icon: Compass },
   { href: '/inbox', label: 'Inbox', icon: NotePencil },
   { href: '/archivio', label: 'Archivio', icon: Archive },
   { href: '/calendario', label: 'Piano', icon: CalendarBlank },
-  { href: '/ai', label: 'GROW', icon: Brain },
 ]
 
 export default function BottomNav() {

@@ -1,9 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import { SaveFlowerIcon } from '@/components/SaveHeart'
 import {
@@ -44,18 +42,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   pexels: 'Pexels',
 }
 
-function buildAiHref(item: ArchiveItem) {
-  const params = new URLSearchParams()
-
-  if (item.id) params.set('ref', item.id)
-  if (item.title) params.set('title', item.title)
-  if (item.category) params.set('category', item.category)
-  if (item.image_url) params.set('image', item.image_url)
-  if (item.url) params.set('url', item.url)
-
-  return `/ai?${params.toString()}`
-}
-
 const placeholders: Record<string, string> = {
   branding: 'https://images.unsplash.com/photo-1634942537034-2531766767d1?w=900&q=80',
   typography: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=900&q=80',
@@ -70,12 +56,9 @@ const placeholders: Record<string, string> = {
 }
 
 export default function ArchivioPage() {
-  const router = useRouter()
   const [view, setView] = useState<'reference' | 'social'>('reference')
   const [items, setItems] = useState<ArchiveItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [selecting, setSelecting] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const load = async () => {
     setLoading(true)
@@ -158,45 +141,6 @@ export default function ArchivioPage() {
     } catch {}
   }
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) {
-        next.delete(id)
-      } else if (next.size < 12) {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
-  const cancelSelection = () => {
-    setSelecting(false)
-    setSelectedIds(new Set())
-  }
-
-  const useSelectionWithAI = () => {
-    const bundle = items
-      .filter((item) => selectedIds.has(item.id))
-      .map((item, index) => ({
-        type: 'archivio' as const,
-        id: item.id,
-        title: item.title || `Reference ${index + 1}`,
-        meta: [item.category, item.project, item.platform]
-          .filter(Boolean)
-          .join(' · '),
-        image_url: item.image_url || undefined,
-        url: item.url || undefined,
-      }))
-
-    if (!bundle.length) return
-    window.sessionStorage.setItem(
-      'grow-ai-reference-bundle',
-      JSON.stringify(bundle)
-    )
-    router.push('/ai?bundle=archive')
-  }
-
   return (
     <main className="min-h-[100dvh] bg-grow-bg px-4 pb-32 pt-10 text-grow-text lg:pb-12">
       <section className="mx-auto max-w-lg lg:max-w-5xl">
@@ -211,30 +155,11 @@ export default function ArchivioPage() {
                 Archivio<span className="text-grow-yellow">.</span>
               </h1>
             </div>
-            {view === 'reference' && items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (selecting) cancelSelection()
-                  else setSelecting(true)
-                }}
-                className={[
-                  'rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wide',
-                  selecting
-                    ? 'bg-[#0F0F10] text-grow-yellow'
-                    : 'border border-grow-border bg-grow-card text-grow-muted',
-                ].join(' ')}
-              >
-                {selecting ? 'Annulla' : 'Seleziona'}
-              </button>
-            )}
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-grow-muted">
             {view === 'social'
               ? 'Instagram e TikTok diventano una memoria visiva da scorrere, capire e ritrovare.'
-              : selecting
-              ? 'Scegli fino a 12 reference da portare insieme nell’AI.'
               : 'Reference scelte e output prodotti in Studio, raccolti nella stessa memoria creativa.'}
           </p>
 
@@ -246,10 +171,7 @@ export default function ArchivioPage() {
               <button
                 key={option.key}
                 type="button"
-                onClick={() => {
-                  if (option.key === 'social' && selecting) cancelSelection()
-                  setView(option.key)
-                }}
+                onClick={() => setView(option.key)}
                 className={[
                   'min-h-11 rounded-full px-4 font-mono text-[9px] uppercase tracking-[0.12em] transition active:scale-[0.98]',
                   view === option.key
@@ -308,9 +230,6 @@ export default function ArchivioPage() {
                     'group relative overflow-hidden rounded-[1.6rem] transition',
                     isTextOutput ? 'bg-[#0F0F10]' : 'bg-grow-soft',
                     tall ? 'row-span-2' : 'row-span-1',
-                    selectedIds.has(item.id)
-                      ? 'ring-4 ring-grow-yellow ring-offset-2 ring-offset-grow-bg'
-                      : '',
                   ].join(' ')}
                 >
                   {isTextOutput ? (
@@ -335,39 +254,7 @@ export default function ArchivioPage() {
                     </span>
                   )}
 
-                  {selecting && (
-                    <button
-                      type="button"
-                      onClick={() => toggleSelection(item.id)}
-                      className="absolute inset-0 z-30 flex items-start justify-end p-2"
-                      aria-label={
-                        selectedIds.has(item.id)
-                          ? 'Rimuovi dalla selezione'
-                          : 'Aggiungi alla selezione'
-                      }
-                    >
-                      <span
-                        className={[
-                          'flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-black shadow-lg',
-                          selectedIds.has(item.id)
-                            ? 'border-grow-yellow bg-grow-yellow text-black'
-                            : 'border-white bg-black/45 text-white backdrop-blur',
-                        ].join(' ')}
-                      >
-                        {selectedIds.has(item.id) ? '✓' : '+'}
-                      </span>
-                    </button>
-                  )}
-
-                  {!selecting && (
                   <div className="absolute right-2 top-2 z-20 flex gap-2">
-                    <Link
-                      href={buildAiHref(item)}
-                      className="flex h-11 items-center justify-center rounded-full bg-white/90 px-3.5 text-[10px] font-black uppercase tracking-tight text-[#0F0F10] shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-transform hover:scale-105"
-                    >
-                      Usa
-                    </Link>
-
                     <button
                       type="button"
                       onClick={() => remove(item.id)}
@@ -377,7 +264,6 @@ export default function ArchivioPage() {
                       <SaveFlowerIcon />
                     </button>
                   </div>
-                  )}
 
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                     <p className="text-[10px] font-black uppercase tracking-wider text-[#FFE500]">
@@ -398,29 +284,6 @@ export default function ArchivioPage() {
           </div>
         )}
       </section>
-
-      {view === 'reference' && selecting && (
-        <div className="fixed inset-x-0 bottom-[92px] z-40 px-4 lg:bottom-6 lg:left-[280px]">
-          <div className="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-[1.4rem] bg-[#0F0F10] p-3 pl-4 text-white shadow-[0_18px_50px_rgba(15,15,16,0.24)]">
-            <div>
-              <p className="text-sm font-black">
-                {selectedIds.size} reference
-              </p>
-              <p className="text-[9px] font-bold uppercase tracking-wide text-white/40">
-                massimo 12
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={useSelectionWithAI}
-              disabled={selectedIds.size === 0}
-              className="rounded-full bg-grow-yellow px-5 py-3 text-[10px] font-black uppercase text-black disabled:opacity-35"
-            >
-              Usa con AI →
-            </button>
-          </div>
-        </div>
-      )}
 
       <BottomNav />
     </main>
