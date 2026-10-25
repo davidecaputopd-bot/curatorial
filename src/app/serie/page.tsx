@@ -332,10 +332,16 @@ export default function SeriePage() {
 
               {unknown.length > 0 && (
                 <section className="mt-8">
-                  <h2 className="text-xl font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">A che punto sei?</h2>
+                  <h2 className="text-xl font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">A che punto sei? ({unknown.length})</h2>
                   <p className="mt-1 text-xs text-grow-muted">
-                    Serie che stavi guardando su TV Time: la posizione esatta non è nei dati recuperati. Tocca per impostarla.
+                    Serie che stavi guardando su TV Time: la posizione esatta non è nei dati recuperati.
                   </p>
+                  <Link
+                    href="/serie/imposta"
+                    className="mt-3 flex h-12 items-center justify-center rounded-full bg-grow-black text-[11px] font-extrabold uppercase text-grow-yellow"
+                  >
+                    Imposta una dopo l’altra →
+                  </Link>
                   <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {unknown.map((show) => (
                       <Link key={show.id} href={`/serie/${show.id}?imposta=1`} className="block">
