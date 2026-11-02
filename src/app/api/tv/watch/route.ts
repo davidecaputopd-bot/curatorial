@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getTvSupabase } from '@/lib/supabase/server'
 
 const after = (a: [number, number], b: [number, number]) =>
   a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])
@@ -7,7 +7,7 @@ const after = (a: [number, number], b: [number, number]) =>
 // Segna un episodio come visto. Con upTo: true segna anche tutti i precedenti
 // (come "segna gli episodi precedenti" di TV Time) spostando la posizione.
 export async function POST(request: Request) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { show_id, season, episode, upTo } = await request.json()
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
 // Annulla la visione di un episodio; se era l'ultimo visto, la posizione torna indietro di uno.
 export async function DELETE(request: Request) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { show_id, season, episode } = await request.json()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getTvSupabase } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { syncShows } from '@/lib/tv/sync'
 import { sendPush } from '@/lib/tv/push'
@@ -12,7 +12,7 @@ const STALE_HOURS = 20
 // Sincronizzazione manuale dalla pagina Serie: poche serie per chiamata,
 // prima quelle mai sincronizzate. Il client richiama finché remaining > 0.
 export async function POST() {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const staleBefore = new Date(Date.now() - STALE_HOURS * 3600_000).toISOString()

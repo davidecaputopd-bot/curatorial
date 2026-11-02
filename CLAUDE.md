@@ -22,6 +22,13 @@ src/app/api/
   fetch-rss/       — fetch articoli RSS
   interact/        — salvataggio interazioni
 
+## Account (Serie è multiutente)
+- GROW resta personale (solo `GROW_OWNER_EMAIL`); **Serie** è un'app a parte per gli amici, stesso repo e stesso Supabase
+- Ruoli in `src/lib/auth/viewer.ts`: `owner` = tutta GROW, `member` = solo `/serie/*`. Il routing è in `src/proxy.ts`
+- Un membro esiste se ha una riga in `tv_profiles`. Si crea solo da un codice di invito (`/api/account/join`, service role) — la registrazione pubblica di Supabase va tenuta disattivata
+- Login amici: `/entra`. Login proprietario: `/login` (PIN). Codici di invito: `/impostazioni/inviti`
+- Le API `/api/tv/*` usano `getTvSupabase()` (qualsiasi membro); tutte le altre restano su `getAuthenticatedSupabase()` (solo proprietario)
+
 ## Cosa funziona
 - Feed RSS: 190+ articoli, algoritmo pesi (80% preferiti + 20% serendipity)
 - /ai: Gemini 2.5 Flash + Groq fallback, cronologia su Supabase

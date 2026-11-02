@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getTvSupabase } from '@/lib/supabase/server'
 
 // Dettaglio serie: stato, episodi per stagione e visioni datate.
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params

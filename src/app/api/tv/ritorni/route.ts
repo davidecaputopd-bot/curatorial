@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getTvSupabase } from '@/lib/supabase/server'
 import { getSeasons } from '@/lib/tv/tvmaze'
 
 export const maxDuration = 60
@@ -7,7 +7,7 @@ export const maxDuration = 60
 // Le serie seguite non concluse: prossima data nota, stagione annunciata senza data,
 // ultima puntata andata in onda. Serve a "In arrivo" per le serie ferme da tempo.
 export async function GET() {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const now = new Date().toISOString()

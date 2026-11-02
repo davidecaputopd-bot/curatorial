@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getTvSupabase } from '@/lib/supabase/server'
 import { sendPush } from '@/lib/tv/push'
 
 // Registra questo dispositivo per le notifiche delle nuove puntate.
 export async function POST(request: Request) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { subscription, test } = await request.json()
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { endpoint } = await request.json()

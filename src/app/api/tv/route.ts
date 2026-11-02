@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getTvSupabase } from '@/lib/supabase/server'
 import { getShow } from '@/lib/tv/tvmaze'
 import { syncShow } from '@/lib/tv/sync'
 
 // Serie con prossimo episodio + uscite dei prossimi 30 giorni.
 export async function GET() {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const now = new Date()
@@ -36,7 +36,7 @@ export async function GET() {
 
 // Segui una nuova serie da TVmaze.
 export async function POST(request: Request) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { tvmaze_id } = await request.json()
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
 // Aggiorna posizione, notifiche o follow di una serie.
 export async function PATCH(request: Request) {
-  const { supabase, user } = await getAuthenticatedSupabase()
+  const { supabase, user } = await getTvSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
