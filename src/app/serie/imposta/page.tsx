@@ -10,7 +10,6 @@ import { episodeCode, Poster, type TvShow } from '@/components/tv/TvBits'
 type Episode = { id: number; season: number; number: number; name: string | null; airstamp: string | null }
 type Loaded = { show: TvShow; episodes: Episode[] }
 
-const display = 'font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]'
 
 export default function ImpostaPosizioniPage() {
   const [queue, setQueue] = useState<TvShow[] | null>(null)
@@ -87,7 +86,7 @@ export default function ImpostaPosizioniPage() {
   if (queue === null) {
     return (
       <Shell>
-        <div className="mt-8 h-72 animate-pulse rounded-[2rem] bg-grow-soft" />
+        <div className="mt-8 h-72 animate-pulse rounded-[1.75rem] bg-grow-card" />
       </Shell>
     )
   }
@@ -96,17 +95,17 @@ export default function ImpostaPosizioniPage() {
     return (
       <Shell>
         <div className="mt-10 text-center">
-          <h1 className={`text-[40px] leading-[0.9] ${display}`}>
+          <h1 className="grow-page-title">
             Fatto<span className="text-grow-yellow">.</span>
           </h1>
-          <p className="mt-3 text-sm text-grow-muted">
+          <p className="mt-4 text-[15px] text-grow-muted">
             {queue.length === 0
               ? 'Tutte le serie hanno già una posizione.'
               : `${done} ${done === 1 ? 'serie impostata' : 'serie impostate'}${queue.length - done > 0 ? `, ${queue.length - done} saltate` : ''}.`}
           </p>
           <Link
             href="/serie"
-            className="mt-6 inline-flex h-12 items-center rounded-full bg-grow-black px-6 text-[11px] font-extrabold uppercase text-grow-yellow"
+            className="grow-press grow-object mt-6 inline-flex min-h-12 items-center rounded-full bg-grow-yellow px-6 text-[15px] font-bold text-grow-black"
           >
             Torna alle serie
           </Link>
@@ -121,27 +120,27 @@ export default function ImpostaPosizioniPage() {
 
   return (
     <Shell>
-      <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-grow-muted">
+      <div className="flex items-center justify-between text-[13px] font-semibold text-grow-muted">
         <span className="tabular-nums">
           {index + 1} / {queue.length}
         </span>
         {index > 0 && (
-          <button type="button" onClick={() => setIndex((value) => value - 1)} className="h-11 px-1">
+          <button type="button" onClick={() => setIndex((value) => value - 1)} className="min-h-11 px-1">
             ← Indietro
           </button>
         )}
       </div>
-      <div className="mt-1 h-1 w-full bg-black/10">
-        <div className="h-full bg-grow-black transition-[width] duration-300" style={{ width: `${(index / queue.length) * 100}%` }} />
+      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-grow-soft">
+        <div className="h-full origin-left rounded-full bg-grow-text transition-transform duration-300" style={{ transform: `scaleX(${index / queue.length})` }} />
       </div>
 
       <div className="mt-6 flex items-end gap-4">
-        <Poster src={show.poster} title={show.title} className="h-[120px] w-[80px] shrink-0 rounded-xl" />
+        <Poster src={show.poster} title={show.title} className="h-[132px] w-[88px] shrink-0 rounded-xl shadow-[0_16px_24px_-10px_rgba(0,0,0,.7)]" />
         <div className="min-w-0">
-          <h1 className={`text-[30px] leading-[0.95] ${display}`} style={{ textWrap: 'balance' }}>
+          <h1 className="font-display text-[30px] leading-[0.95]" style={{ textWrap: 'balance' }}>
             {show.title}
           </h1>
-          <p className="mt-2 text-[11px] font-bold uppercase text-grow-muted">
+          <p className="mt-2 text-[13px] text-grow-muted">
             {[show.network, show.last_watched_at ? `ultima visione ${new Date(show.last_watched_at).toLocaleDateString('it-IT', { month: 'short', year: 'numeric' })}` : null]
               .filter(Boolean)
               .join(' · ')}
@@ -149,15 +148,15 @@ export default function ImpostaPosizioniPage() {
         </div>
       </div>
 
-      <h2 className={`mt-7 text-xl ${display}`}>Ultimo episodio visto</h2>
+      <h2 className="grow-section-title mt-8">Ultimo episodio visto</h2>
 
       {!current ? (
-        <div className="mt-3 h-40 animate-pulse rounded-2xl bg-grow-soft" />
+        <div className="mt-3 h-40 animate-pulse rounded-[1.4rem] bg-grow-card" />
       ) : current.episodes.length === 0 ? (
-        <p className="mt-3 text-sm text-grow-muted">Episodi non ancora scaricati da TVmaze: salta e ritorna più tardi.</p>
+        <p className="mt-4 text-[15px] text-grow-muted">Episodi non ancora scaricati da TVmaze: salta e ritorna più tardi.</p>
       ) : (
         <>
-          <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Stagione">
+          <div className="scrollbar-hide -mx-5 mt-3 flex gap-2 overflow-x-auto px-5" role="tablist" aria-label="Stagione">
             {seasons.map((value) => (
               <button
                 key={value}
@@ -166,15 +165,15 @@ export default function ImpostaPosizioniPage() {
                 aria-selected={season === value}
                 onClick={() => setSeason(value)}
                 className={[
-                  'h-10 shrink-0 rounded-full px-4 text-[11px] font-extrabold uppercase',
-                  season === value ? 'bg-grow-black text-grow-yellow' : 'border border-grow-border bg-grow-card text-grow-muted',
+                  'grow-press min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold',
+                  season === value ? 'grow-object bg-grow-text text-grow-black' : 'grow-surface text-grow-muted',
                 ].join(' ')}
               >
                 Stagione {value}
               </button>
             ))}
           </div>
-          <div className="mt-3 grid grid-cols-6 gap-2">
+          <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-6">
             {inSeason.map((episode) => (
               <button
                 key={episode.id}
@@ -182,24 +181,24 @@ export default function ImpostaPosizioniPage() {
                 disabled={saving}
                 onClick={() => void save({ progress_season: episode.season, progress_episode: episode.number })}
                 aria-label={`Visto fino a ${episodeCode(episode.season, episode.number)}${episode.name ? `, ${episode.name}` : ''}`}
-                className="flex aspect-square items-center justify-center rounded-xl border border-grow-border bg-grow-card text-sm font-extrabold tabular-nums transition-colors active:bg-grow-yellow disabled:opacity-50"
+                className="grow-press grow-surface flex aspect-square min-h-11 items-center justify-center rounded-[14px] text-[17px] font-extrabold tabular-nums active:bg-grow-yellow active:text-grow-black disabled:opacity-50"
               >
                 {episode.number}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-grow-muted">Tocca l’ultimo episodio che hai visto: si passa subito alla serie dopo.</p>
+          <p className="mt-2 text-[13px] text-grow-muted">Tocca l’ultimo episodio che hai visto: si passa subito alla serie dopo.</p>
         </>
       )}
 
-      {error && <p className="mt-4 rounded-xl bg-grow-butter px-3 py-2 text-xs font-bold">{error}</p>}
+      {error && <p className="mt-4 rounded-2xl bg-grow-butter px-4 py-3 text-sm">{error}</p>}
 
-      <div className="mt-6 grid grid-cols-3 gap-2">
+      <div className="mt-6 grid grid-cols-2 gap-2">
         <button
           type="button"
           disabled={saving || !last}
           onClick={() => last && void save({ progress_season: last.season, progress_episode: last.number })}
-          className="h-12 rounded-full bg-grow-black text-[11px] font-extrabold uppercase text-grow-yellow disabled:opacity-40"
+          className="grow-press grow-surface min-h-12 rounded-full text-[15px] font-semibold text-grow-text disabled:opacity-40"
         >
           Vista tutta
         </button>
@@ -207,7 +206,7 @@ export default function ImpostaPosizioniPage() {
           type="button"
           disabled={saving}
           onClick={() => void save({ progress_season: 0, progress_episode: 0 })}
-          className="h-12 rounded-full border border-grow-border bg-grow-card text-[11px] font-extrabold uppercase disabled:opacity-40"
+          className="grow-press grow-surface min-h-12 rounded-full text-[15px] font-semibold text-grow-text disabled:opacity-40"
         >
           Non iniziata
         </button>
@@ -215,7 +214,7 @@ export default function ImpostaPosizioniPage() {
           type="button"
           disabled={saving}
           onClick={() => void save(null)}
-          className="h-12 rounded-full text-[11px] font-extrabold uppercase text-grow-muted disabled:opacity-40"
+          className="col-span-2 min-h-12 rounded-full text-[15px] font-semibold text-grow-muted disabled:opacity-40"
         >
           Salta
         </button>
@@ -226,9 +225,9 @@ export default function ImpostaPosizioniPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-[100dvh] bg-grow-bg px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6 text-grow-text">
+    <main className="min-h-[100dvh] bg-grow-bg px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6 text-grow-text">
       <div className="mx-auto max-w-lg">
-        <Link href="/serie" className="inline-flex h-11 items-center text-[11px] font-extrabold uppercase tracking-wide text-grow-muted">
+        <Link href="/serie" className="-ml-1 inline-flex min-h-11 items-center text-[15px] font-semibold text-grow-muted">
           ✕ Chiudi
         </Link>
         {children}

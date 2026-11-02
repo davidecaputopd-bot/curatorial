@@ -116,8 +116,8 @@ function SerieDetail() {
 
   if (!show) {
     return (
-      <main className="min-h-screen bg-grow-bg px-4 pt-10">
-        <div className="mx-auto h-64 max-w-lg animate-pulse rounded-[2rem] bg-grow-soft" />
+      <main className="min-h-screen bg-grow-bg px-5 pt-10">
+        <div className="mx-auto h-64 max-w-lg animate-pulse rounded-[1.75rem] bg-grow-card" />
         <BottomNav />
       </main>
     )
@@ -130,30 +130,31 @@ function SerieDetail() {
   return (
     <main className="min-h-screen bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg lg:max-w-3xl">
-        <section className="relative overflow-hidden bg-grow-black px-4 pb-6 pt-8 text-white lg:px-8">
+        <section className="relative overflow-hidden px-5 pb-6 pt-8 lg:px-8">
           {show.poster && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={show.poster} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl" />
+            <img src={show.poster} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-3xl [mask-image:linear-gradient(to_bottom,black,transparent)]" />
           )}
           <div className="relative">
-            <Link href="/serie" className="text-[11px] font-extrabold uppercase tracking-wide text-white/60">
-              ← Serie
+            <Link href="/serie" className="-ml-1 inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-grow-muted">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+              Serie
             </Link>
-            <div className="mt-4 flex items-end gap-4">
-              <Poster src={show.poster} title={show.title} className="h-[150px] w-[100px] shrink-0 rounded-xl shadow-2xl" />
+            <div className="mt-3 flex items-end gap-4">
+              <Poster src={show.poster} title={show.title} className="h-[168px] w-28 shrink-0 rounded-xl shadow-[0_20px_30px_-12px_rgba(0,0,0,.7)]" />
               <div className="min-w-0">
-                <h1 className="text-[34px] leading-[0.95] font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">{show.title}</h1>
-                <p className="mt-2 text-[11px] font-bold uppercase text-white/55">
+                <h1 className="font-display text-[32px] leading-[0.95] [text-wrap:balance]">{show.title}</h1>
+                <p className="mt-2 text-[13px] text-grow-muted">
                   {[show.network, show.show_status === 'Ended' ? 'Conclusa' : show.show_status === 'Running' ? 'In onda' : null]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>
-                <p className="mt-2 text-sm font-extrabold text-grow-yellow">{state.label}</p>
+                <p className="mt-2 text-[15px] font-bold text-grow-yellow">{state.label}</p>
               </div>
             </div>
             <div className="mt-5">
-              <ProgressBar show={show} className="rounded-full bg-white/15" />
-              <p className="mt-2 text-[11px] font-bold uppercase text-white/55">
+              <ProgressBar show={show} className="h-2 overflow-hidden rounded-full" />
+              <p className="mt-2 text-[13px] tabular-nums text-grow-muted">
                 {show.progress_season === null ? 'Posizione da impostare' : `${watchedCount} / ${show.aired_count} episodi visti`}
                 {show.followed_at ? ` · seguita dal ${new Date(show.followed_at).toLocaleDateString('it-IT')}` : ''}
               </p>
@@ -163,7 +164,7 @@ function SerieDetail() {
                 type="button"
                 aria-pressed={show.notify}
                 onClick={() => void patch({ notify: !show.notify })}
-                className={`h-10 rounded-full px-4 text-[10px] font-extrabold uppercase ${show.notify ? 'bg-grow-yellow text-grow-black' : 'bg-white/10 text-white'}`}
+                className={`grow-press min-h-11 rounded-full px-4 text-sm font-semibold ${show.notify ? 'grow-object bg-grow-yellow text-grow-black' : 'grow-surface text-grow-text'}`}
               >
                 {show.notify ? 'Notifiche attive' : 'Notifiche spente'}
               </button>
@@ -171,7 +172,7 @@ function SerieDetail() {
                 type="button"
                 aria-pressed={show.favorite}
                 onClick={() => void patch({ favorite: !show.favorite })}
-                className={`h-10 rounded-full px-4 text-[10px] font-extrabold uppercase ${show.favorite ? 'bg-white text-grow-black' : 'bg-white/10 text-white'}`}
+                className={`grow-press min-h-11 rounded-full px-4 text-sm font-semibold ${show.favorite ? 'grow-object bg-grow-text text-grow-black' : 'grow-surface text-grow-text'}`}
               >
                 {show.favorite ? '★ Preferita' : '☆ Preferita'}
               </button>
@@ -180,7 +181,7 @@ function SerieDetail() {
                   type="button"
                   aria-pressed={show.for_later}
                   onClick={() => void patch({ for_later: !show.for_later })}
-                  className={`h-10 rounded-full px-4 text-[10px] font-extrabold uppercase ${show.for_later ? 'bg-white text-grow-black' : 'bg-white/10 text-white'}`}
+                  className={`grow-press min-h-11 rounded-full px-4 text-sm font-semibold ${show.for_later ? 'grow-object bg-grow-text text-grow-black' : 'grow-surface text-grow-text'}`}
                 >
                   {show.for_later ? 'Riprendi a guardare' : 'Guarda più tardi'}
                 </button>
@@ -188,7 +189,7 @@ function SerieDetail() {
               <button
                 type="button"
                 onClick={() => setSetting((value) => !value)}
-                className="h-10 rounded-full bg-white/10 px-4 text-[10px] font-extrabold uppercase text-white"
+                className="grow-press grow-surface min-h-11 rounded-full px-4 text-sm font-semibold text-grow-text"
               >
                 A che punto sei
               </button>
@@ -198,7 +199,7 @@ function SerieDetail() {
                   if (window.confirm(show.followed ? `Smettere di seguire ${show.title}?` : `Seguire di nuovo ${show.title}?`))
                     void patch({ followed: !show.followed })
                 }}
-                className="h-10 rounded-full bg-white/10 px-4 text-[10px] font-extrabold uppercase text-white/70"
+                className="grow-press min-h-11 rounded-full px-3 text-sm font-semibold text-grow-fix"
               >
                 {show.followed ? 'Non seguire' : 'Segui'}
               </button>
@@ -207,17 +208,17 @@ function SerieDetail() {
         </section>
 
         {setting && (
-          <section className="mx-4 mt-4 rounded-[1.5rem] border border-grow-border bg-grow-card p-4 lg:mx-8">
-            <h2 className="text-lg font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">A che punto sei?</h2>
-            <p className="mt-1 text-xs text-grow-muted">Scegli l’ultimo episodio che hai visto.</p>
+          <section className="grow-surface mx-5 mt-4 rounded-[1.4rem] p-5 lg:mx-8">
+            <h2 className="grow-section-title">A che punto sei?</h2>
+            <p className="mt-1 text-[13px] text-grow-muted">Scegli l’ultimo episodio che hai visto.</p>
             {episodes.length === 0 ? (
-              <p className="mt-3 text-xs font-bold text-grow-muted">Episodi non ancora scaricati: riapri tra poco.</p>
+              <p className="mt-3 text-[13px] text-grow-muted">Episodi non ancora scaricati: riapri tra poco.</p>
             ) : (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <select
                   value={pick.season}
                   onChange={(event) => setPick({ season: Number(event.target.value), episode: 1 })}
-                  className="h-11 rounded-full border border-grow-border bg-grow-bg px-4 text-sm font-bold"
+                  className="h-11 rounded-full bg-grow-soft px-4 text-sm font-semibold text-grow-text"
                   aria-label="Stagione"
                 >
                   {seasons.map((season) => (
@@ -229,7 +230,7 @@ function SerieDetail() {
                 <select
                   value={pick.episode}
                   onChange={(event) => setPick({ ...pick, episode: Number(event.target.value) })}
-                  className="h-11 rounded-full border border-grow-border bg-grow-bg px-4 text-sm font-bold"
+                  className="h-11 rounded-full bg-grow-soft px-4 text-sm font-semibold text-grow-text"
                   aria-label="Episodio"
                 >
                   {pickEpisodes.map((episode) => (
@@ -241,14 +242,14 @@ function SerieDetail() {
                 <button
                   type="button"
                   onClick={() => void patch({ progress_season: pick.season, progress_episode: pick.episode }).then(() => setSetting(false))}
-                  className="h-11 rounded-full bg-grow-black px-5 text-[11px] font-extrabold uppercase text-grow-yellow"
+                  className="grow-press grow-object min-h-11 rounded-full bg-grow-yellow px-5 text-sm font-bold text-grow-black"
                 >
                   Salva
                 </button>
                 <button
                   type="button"
                   onClick={() => void patch({ progress_season: 0, progress_episode: 0 }).then(() => setSetting(false))}
-                  className="h-11 rounded-full border border-grow-border px-4 text-[11px] font-extrabold uppercase text-grow-muted"
+                  className="grow-press min-h-11 rounded-full bg-grow-soft px-4 text-sm font-semibold text-grow-text"
                 >
                   Non iniziata
                 </button>
@@ -259,7 +260,7 @@ function SerieDetail() {
                       const last = aired[aired.length - 1]
                       void patch({ progress_season: last.season, progress_episode: last.number }).then(() => setSetting(false))
                     }}
-                    className="h-11 rounded-full border border-grow-border px-4 text-[11px] font-extrabold uppercase text-grow-muted"
+                    className="grow-press min-h-11 rounded-full bg-grow-soft px-4 text-sm font-semibold text-grow-text"
                   >
                     Vista tutta
                   </button>
@@ -269,22 +270,22 @@ function SerieDetail() {
           </section>
         )}
 
-        <div className="px-4 pt-4 lg:px-8">
+        <div className="px-5 pt-6 lg:px-8">
           {seasons.map((season) => {
             const list = episodes.filter((episode) => episode.season === season)
             const seen = list.filter(isWatched).length
             const airedInSeason = list.filter((episode) => aired.includes(episode))
             return (
-              <section key={season} className="border-b border-grow-border">
-                <div className="flex items-center gap-3 py-4">
+              <section key={season} className="grow-surface mb-3 overflow-hidden rounded-[1.4rem]">
+                <div className="flex items-center gap-3 px-4 py-3">
                   <button
                     type="button"
                     aria-expanded={open === season}
                     onClick={() => setOpen(open === season ? null : season)}
                     className="flex min-w-0 flex-1 items-center justify-between text-left"
                   >
-                    <span className="text-xl font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">Stagione {season}</span>
-                    <span className="text-[11px] font-bold uppercase text-grow-muted">
+                    <span className="text-[17px] font-bold">Stagione {season}</span>
+                    <span className="text-[13px] tabular-nums text-grow-muted">
                       {seen}/{list.length} {open === season ? '−' : '+'}
                     </span>
                   </button>
@@ -293,28 +294,28 @@ function SerieDetail() {
                       type="button"
                       disabled={busy === -season}
                       onClick={() => void markSeason(season)}
-                      className="h-11 shrink-0 rounded-full bg-grow-black px-4 text-[10px] font-extrabold uppercase text-grow-yellow disabled:opacity-50"
+                      className="grow-press min-h-11 shrink-0 rounded-full bg-grow-soft px-4 text-sm font-semibold text-grow-text disabled:opacity-50"
                     >
                       Segna stagione
                     </button>
                   )}
                 </div>
                 {open === season && (
-                  <ul className="pb-3">
+                  <ul className="divide-y divide-grow-border border-t border-grow-border">
                     {list.map((episode) => {
                       const watched = isWatched(episode)
                       const isAired = aired.includes(episode)
                       const watch = watchMap.get(`${episode.season}-${episode.number}`)
                       return (
-                        <li key={episode.id} className="flex items-center gap-3 py-2.5">
+                        <li key={episode.id} className="flex items-center gap-3 px-4 py-2.5">
                           <span className="min-w-0 flex-1">
-                            <span className="block text-[12px] font-bold text-grow-muted">
+                            <span className="block text-[13px] tabular-nums text-grow-muted">
                               {episodeCode(episode.season, episode.number)}
                             </span>
-                            <span className={`block truncate text-sm font-bold ${watched ? 'text-grow-muted' : ''}`}>
+                            <span className={`block truncate text-[15px] font-semibold ${watched ? 'text-grow-muted' : ''}`}>
                               {episode.name || 'Titolo non disponibile'}
                             </span>
-                            <span className="block text-[11px] text-grow-muted">
+                            <span className="block text-xs text-grow-muted">
                               {episode.airstamp
                                 ? `${isAired ? 'Uscito' : 'Esce'} il ${new Date(episode.airstamp).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}`
                                 : 'Data non annunciata'}
@@ -331,7 +332,7 @@ function SerieDetail() {
                               label={`${watched ? 'Togli' : 'Segna'} ${episodeCode(episode.season, episode.number)} ${watched ? 'dai visti' : 'come visto'}`}
                             />
                           ) : (
-                            <span className="w-11 shrink-0 text-center text-[10px] font-extrabold uppercase text-grow-muted">Presto</span>
+                            <span className="w-12 shrink-0 text-center text-xs font-semibold text-grow-muted">Presto</span>
                           )}
                         </li>
                       )
@@ -342,7 +343,7 @@ function SerieDetail() {
             )
           })}
           {episodes.length === 0 && (
-            <p className="py-10 text-center text-sm text-grow-muted">
+            <p className="py-10 text-center text-[15px] text-grow-muted">
               {show.tvmaze_id ? 'Sto scaricando gli episodi…' : 'Serie non collegata al catalogo TVmaze.'}
             </p>
           )}

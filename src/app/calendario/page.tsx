@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
+import { useTilt } from '@/components/useTilt'
 
 const CLIENTS = ['Tutti', 'ANventitre', 'Exousia', 'Cantina Don Carlo', 'ACI Copertino', 'TRAMA']
 const STATUSES = ['idea', 'in_produzione', 'pronto', 'pubblicato', 'da_riciclare']
@@ -19,19 +20,13 @@ const NEXT_ACTIONS: Record<string, string> = {
   pubblicato: 'Misura e archivia',
   da_riciclare: 'Trasforma in nuovo formato',
 }
-const CLIENT_COLORS: Record<string, string> = {
-  ANventitre: 'bg-amber-400',
-  Exousia: 'bg-emerald-500',
-  'Cantina Don Carlo': 'bg-purple-400',
-  'ACI Copertino': 'bg-sky-400',
-  TRAMA: 'bg-rose-400',
-}
-const CLIENT_TEXT: Record<string, string> = {
-  ANventitre: 'text-amber-600',
-  Exousia: 'text-emerald-600',
-  'Cantina Don Carlo': 'text-purple-600',
-  'ACI Copertino': 'text-sky-600',
-  TRAMA: 'text-rose-600',
+// Ogni cliente ha il suo logo, sul fondo per cui è disegnato. Il colore resta allo stato del lavoro.
+const CLIENT_LOGOS: Record<string, { src: string; bg: string }> = {
+  ANventitre: { src: '/clients/anventitre.png', bg: '#0F0F10' },
+  Exousia: { src: '/clients/exousia.png', bg: '#F3F0E8' },
+  'ACI Copertino': { src: '/clients/aci-copertino.png', bg: '#FFFFFF' },
+  TRAMA: { src: '/clients/trama.png', bg: '#F3F0E8' },
+  Umami: { src: '/clients/umami.png', bg: '#0F0F10' },
 }
 const CONTENT_TYPES = ['reel', 'carosello', 'post', 'storia', 'altro']
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
@@ -47,7 +42,6 @@ type CalItem = {
 }
 
 type ViewMode = 'agenda' | 'pipeline'
-type GrowthMood = 'quiet' | 'moving' | 'bloom'
 
 function localDateKey(date: Date) {
   const year = date.getFullYear()
@@ -166,14 +160,6 @@ export default function CalendarioPage() {
     0
   )
   const focusItems = [...overdue, ...todayItems, ...readyNotScheduled].slice(0, 4)
-  const growthMood: GrowthMood =
-    overdue.length > 0
-      ? 'quiet'
-      : todayItems.length === 0 && weekCount <= 2
-        ? 'quiet'
-        : inMotion.length >= 4 || weekCount >= 7
-          ? 'bloom'
-          : 'moving'
 
   const itemsForDay = (day: Date) =>
     items.filter((item) => item.scheduled_date === localDateKey(day))
@@ -243,73 +229,66 @@ export default function CalendarioPage() {
   return (
     <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-9 lg:max-w-5xl">
-        <header className="mb-5">
-          <div className="flex min-h-[7.25rem] items-start justify-between gap-4 overflow-hidden">
-            <div>
-              <p className="grow-page-kicker">
-                GROW Piano
-              </p>
-              <h1 className="grow-page-title mt-1">
-                Piano<span className="text-grow-yellow">.</span>
-              </h1>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-grow-muted">
-                Non un calendario. Il prossimo lavoro da chiudere.
-              </p>
-            </div>
-            <div className="relative -mr-1 flex w-[6.25rem] shrink-0 flex-col items-end">
-              <GrowthMark mood={growthMood} />
-              <button
-                type="button"
-                onClick={() => openModal()}
-                className="-mt-1 mr-1 rounded-full bg-grow-yellow px-4 py-3 text-[10px] font-black uppercase text-grow-text shadow-[0_10px_24px_rgba(255,229,0,0.28)] active:scale-[0.98]"
-              >
-                Nuovo
-              </button>
-            </div>
+        <header className="mb-6">
+          <div className="flex items-end justify-between gap-4">
+            <h1 className="grow-page-title">
+              Piano<span className="text-grow-yellow">.</span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => openModal()}
+              aria-label="Nuovo blocco"
+              className="grow-press grow-object flex h-11 w-11 items-center justify-center rounded-full bg-grow-text text-grow-black"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-4 overflow-hidden rounded-[1.35rem] border border-grow-border bg-grow-card">
-            <Metric label="oggi" value={todayItems.length} active />
-            <Metric label="ritardo" value={overdue.length} warn={overdue.length > 0} />
+          <div className="mt-6 grid grid-cols-4 gap-2">
+            <Metric label="oggi" value={todayItems.length} />
+            <Metric label="in ritardo" value={overdue.length} warn={overdue.length > 0} />
             <Metric label="settimana" value={weekCount} />
             <Metric label="da piazzare" value={unscheduled.length} />
           </div>
         </header>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+        <div className="scrollbar-hide -mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1">
           {CLIENTS.map((client) => (
             <button
               key={client}
               type="button"
               onClick={() => setActiveClient(client)}
               className={[
-                'shrink-0 rounded-full px-3 py-2 text-[10px] font-black',
+                'grow-press flex min-h-11 shrink-0 items-center rounded-full text-sm font-semibold',
+                client === 'Tutti' ? 'px-4' : 'gap-2 pl-1.5 pr-4',
                 activeClient === client
-                  ? 'bg-grow-text text-grow-yellow'
-                  : 'border border-grow-border bg-grow-card text-grow-muted',
+                  ? 'grow-object bg-grow-text text-grow-black'
+                  : 'grow-surface text-grow-muted',
               ].join(' ')}
             >
               {client === 'Tutti' ? (
                 'Tutti'
               ) : (
-                <span className="flex items-center gap-1.5">
-                  <span className={`h-1.5 w-1.5 rounded-full ${CLIENT_COLORS[client] || 'bg-grow-muted'}`} />
+                <>
+                  <ClientLogo client={client} size={32} />
                   {client}
-                </span>
+                </>
               )}
             </button>
           ))}
         </div>
 
-        <div className="mb-5 grid grid-cols-2 rounded-full border border-grow-border bg-grow-card p-1">
+        <div className="grow-surface mb-6 grid grid-cols-2 rounded-full p-1">
           {(['agenda', 'pipeline'] as const).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setView(item)}
               className={[
-                'rounded-full py-2 text-[10px] font-black uppercase',
-                view === item ? 'bg-grow-text text-grow-yellow' : 'text-grow-muted',
+                'grow-press min-h-11 rounded-full text-sm font-semibold',
+                view === item ? 'grow-object bg-grow-text text-grow-black' : 'text-grow-muted',
               ].join(' ')}
             >
               {item === 'agenda' ? 'Oggi e prossimi' : 'Pipeline'}
@@ -320,16 +299,16 @@ export default function CalendarioPage() {
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-24 animate-pulse rounded-[1.35rem] bg-grow-soft" />
+              <div key={index} className="h-24 animate-pulse rounded-[1.4rem] bg-grow-card" />
             ))}
           </div>
         ) : view === 'agenda' ? (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <FocusPanel items={focusItems} todayKey={todayKey} onChangeStatus={changeStatus} />
 
             <section>
               <SectionTitle title="Ritmo settimana" meta={`${weekCount} item`} />
-              <div className="grid grid-cols-7 gap-1.5">
+              <div className="grid grid-cols-7 gap-1">
                 {weekDays.map((day, index) => {
                   const key = localDateKey(day)
                   const dayItems = itemsForDay(day)
@@ -340,28 +319,20 @@ export default function CalendarioPage() {
                       type="button"
                       onClick={() => openModal(key)}
                       className={[
-                        'min-h-24 rounded-[1rem] border p-2 text-left transition active:scale-[0.98]',
-                        isToday
-                          ? 'border-grow-yellow bg-grow-yellow text-grow-text'
-                          : 'border-grow-border bg-grow-card',
+                        'grow-press grid min-h-[92px] grid-rows-[auto_auto_1fr] justify-items-start gap-[5px] rounded-2xl px-2 pb-2.5 pt-[9px] text-left',
+                        isToday ? 'grow-object bg-grow-yellow text-grow-black' : 'grow-surface',
                       ].join(' ')}
                     >
-                      <span className="block text-[8px] font-black uppercase text-current/55">
+                      <span className={['text-[11px] font-semibold', isToday ? 'text-grow-black/70' : 'text-grow-muted'].join(' ')}>
                         {DAY_LABELS[index]}
                       </span>
-                      <span className="mt-1 block text-lg font-black leading-none">
-                        {day.getDate()}
-                      </span>
-                      <span className="mt-3 block text-[10px] font-black">
-                        {dayItems.length}
-                      </span>
-                      <span className="mt-1 flex gap-0.5">
-                        {dayItems.slice(0, 4).map((item) => (
-                          <span
-                            key={item.id}
-                            className={`h-1.5 flex-1 rounded-full ${CLIENT_COLORS[item.client] || 'bg-grow-muted'}`}
-                          />
+                      <span className="flex h-1.5 gap-[3px]" aria-label={`${dayItems.length} consegne`}>
+                        {dayItems.slice(0, 3).map((item) => (
+                          <span key={item.id} className={['h-1.5 w-1.5 rounded-full', isToday ? 'bg-grow-black' : 'bg-grow-text/80'].join(' ')} />
                         ))}
+                      </span>
+                      <span className="self-end text-[22px] font-extrabold leading-none tracking-[-0.03em]">
+                        {day.getDate()}
                       </span>
                     </button>
                   )
@@ -408,15 +379,12 @@ export default function CalendarioPage() {
             />
           </div>
         ) : (
-          <div className="space-y-6">
-            <section className="rounded-[1.5rem] bg-grow-text p-4 text-white">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-grow-yellow">
-                Stato produzione
-              </p>
-              <h2 className="grow-section-title mt-2">
+          <div className="space-y-8">
+            <section>
+              <h2 className="font-display text-[36px] leading-[0.95]">
                 {inMotion.length} cose aperte.
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-white/60">
+              <p className="mt-3 max-w-[40ch] text-[13px] leading-snug text-grow-muted">
                 La pipeline serve solo a decidere cosa avanza. Se resta qui troppo, è rumore.
               </p>
             </section>
@@ -451,24 +419,25 @@ export default function CalendarioPage() {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-[60] flex items-end bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-end bg-black/60 backdrop-blur-sm lg:items-center lg:justify-center"
           onClick={() => setShowModal(false)}
         >
           <div
-            className="w-full rounded-t-[2rem] bg-grow-card p-5 pb-10 shadow-[0_-20px_60px_rgba(15,15,16,0.24)]"
+            className="grow-surface w-full rounded-t-[2rem] p-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] lg:max-w-lg lg:rounded-[2rem]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-grow-muted">
+                <p className="text-[13px] text-grow-muted">
                   Nuovo blocco
                 </p>
-                <h2 className="font-display text-[1.75rem] uppercase leading-none">Cosa va prodotto?</h2>
+                <h2 className="mt-1 font-display text-[28px] leading-none">Cosa va prodotto?</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-grow-soft text-grow-muted"
+                aria-label="Chiudi"
+                className="grow-press flex h-11 w-11 items-center justify-center rounded-full bg-grow-soft text-xl text-grow-text"
               >
                 ×
               </button>
@@ -479,14 +448,15 @@ export default function CalendarioPage() {
                 value={form.title}
                 onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="Titolo o consegna"
-                className="w-full rounded-2xl border border-grow-border bg-grow-soft px-4 py-3 text-sm font-semibold outline-none focus:border-grow-yellow"
+                aria-label="Titolo o consegna"
+                className="h-12 w-full rounded-2xl border border-transparent bg-grow-soft px-4 text-[15px] text-grow-text outline-none focus:border-grow-yellow font-semibold"
                 autoFocus
               />
               <div className="grid grid-cols-2 gap-2">
                 <select
                   value={form.client}
                   onChange={(event) => setForm((current) => ({ ...current, client: event.target.value }))}
-                  className="rounded-2xl border border-grow-border bg-grow-soft px-3 py-3 text-sm outline-none"
+                  className="h-12 w-full rounded-2xl border border-transparent bg-grow-soft px-4 text-[15px] text-grow-text outline-none focus:border-grow-yellow"
                 >
                   <option value="">Cliente</option>
                   {CLIENTS.slice(1).map((client) => (
@@ -496,7 +466,7 @@ export default function CalendarioPage() {
                 <select
                   value={form.content_type}
                   onChange={(event) => setForm((current) => ({ ...current, content_type: event.target.value }))}
-                  className="rounded-2xl border border-grow-border bg-grow-soft px-3 py-3 text-sm outline-none"
+                  className="h-12 w-full rounded-2xl border border-transparent bg-grow-soft px-4 text-[15px] text-grow-text outline-none focus:border-grow-yellow"
                 >
                   {CONTENT_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
@@ -508,12 +478,12 @@ export default function CalendarioPage() {
                   type="date"
                   value={form.scheduled_date}
                   onChange={(event) => setForm((current) => ({ ...current, scheduled_date: event.target.value }))}
-                  className="rounded-2xl border border-grow-border bg-grow-soft px-3 py-3 text-sm outline-none"
+                  className="h-12 w-full rounded-2xl border border-transparent bg-grow-soft px-4 text-[15px] text-grow-text outline-none focus:border-grow-yellow"
                 />
                 <select
                   value={form.status}
                   onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                  className="rounded-2xl border border-grow-border bg-grow-soft px-3 py-3 text-sm outline-none"
+                  className="h-12 w-full rounded-2xl border border-transparent bg-grow-soft px-4 text-[15px] text-grow-text outline-none focus:border-grow-yellow"
                 >
                   {STATUSES.map((status) => (
                     <option key={status} value={status}>{STATUS_LABELS[status]}</option>
@@ -523,19 +493,20 @@ export default function CalendarioPage() {
               <textarea
                 value={form.notes}
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                placeholder="Prossima azione, vincoli, reference mancanti..."
+                placeholder="Prossima azione, vincoli, reference mancanti…"
                 rows={3}
-                className="w-full resize-none rounded-2xl border border-grow-border bg-grow-soft px-4 py-3 text-sm outline-none focus:border-grow-yellow"
+                aria-label="Prossima azione"
+                className="w-full resize-none rounded-2xl border border-transparent bg-grow-soft px-4 py-3 text-[15px] leading-snug text-grow-text outline-none focus:border-grow-yellow"
               />
             </div>
 
-            {error && <p className="mt-3 text-xs font-bold text-red-500">{error}</p>}
+            {error && <p className="mt-3 text-[13px] font-semibold text-grow-fix">{error}</p>}
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="rounded-full border border-grow-border py-3 text-sm font-black text-grow-muted"
+                className="grow-press grow-surface min-h-12 rounded-full text-[15px] font-semibold text-grow-text"
               >
                 Annulla
               </button>
@@ -543,7 +514,7 @@ export default function CalendarioPage() {
                 type="button"
                 onClick={() => void addItem()}
                 disabled={!form.client || !form.title}
-                className="rounded-full bg-grow-yellow py-3 text-sm font-black text-grow-text disabled:opacity-40"
+                className="grow-press grow-object min-h-12 rounded-full bg-grow-yellow text-[15px] font-bold text-grow-black disabled:opacity-40"
               >
                 Salva
               </button>
@@ -557,75 +528,53 @@ export default function CalendarioPage() {
   )
 }
 
-function Metric({
-  label,
-  value,
-  active,
-  warn,
-}: {
-  label: string
-  value: number
-  active?: boolean
-  warn?: boolean
-}) {
+function Metric({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   return (
-    <div className={['border-r border-grow-border px-2 py-3 text-center last:border-r-0', active ? 'bg-grow-yellow' : ''].join(' ')}>
-      <p className={['text-xl font-black leading-none', warn ? 'text-red-500' : 'text-grow-text'].join(' ')}>
-        {value}
-      </p>
-      <p className="mt-1 text-[8px] font-black uppercase tracking-wide text-grow-muted">
-        {label}
-      </p>
+    <div
+      className={[
+        'flex min-h-[84px] flex-col justify-between gap-2 rounded-[1.1rem] p-3',
+        warn ? 'grow-object bg-grow-fix text-grow-black' : 'grow-surface',
+      ].join(' ')}
+    >
+      <p className={['text-xs font-semibold leading-tight', warn ? 'text-grow-black/70' : 'text-grow-muted'].join(' ')}>{label}</p>
+      <p className="font-display text-[28px] leading-none">{value}</p>
     </div>
   )
 }
 
-function GrowthMark({ mood }: { mood: GrowthMood }) {
-  const mark: Record<GrowthMood, { src: string; label: string; className: string }> = {
-    quiet: {
-      src: '/icon-1.svg',
-      label: 'Seme GROW',
-      className: 'w-[4.6rem]',
-    },
-    moving: {
-      src: '/icon-3.svg',
-      label: 'Germoglio GROW',
-      className: 'w-[5.15rem] translate-x-0.5 translate-y-1',
-    },
-    bloom: {
-      src: '/icon-5.svg',
-      label: 'Fiore GROW',
-      className: 'w-[5.45rem] -translate-y-0.5',
-    },
+function ClientLogo({ client, size = 44 }: { client: string; size?: number }) {
+  const logo = CLIENT_LOGOS[client]
+  const style = { width: size, height: size, borderRadius: Math.round(size * 0.27) }
+  if (!logo) {
+    return (
+      <span style={style} className="flex shrink-0 items-center justify-center bg-grow-soft text-[13px] font-extrabold tracking-[-0.03em] text-grow-text shadow-e1">
+        {client.slice(0, 2).toUpperCase()}
+      </span>
+    )
   }
-  const current = mark[mood]
-
   return (
-    <div className="relative flex h-[5.65rem] w-[6.25rem] items-center justify-center overflow-visible">
+    <span
+      style={{ ...style, background: logo.bg }}
+      className="flex shrink-0 overflow-hidden shadow-[inset_0_0_0_1px_rgba(255,255,255,.1),inset_0_1px_0_rgba(255,255,255,.18),0_1px_2px_rgba(0,0,0,.5)]"
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={current.src}
-        alt={current.label}
-        className={`${current.className} relative z-10 max-w-none object-contain`}
-      />
-    </div>
+      <img src={logo.src} alt={client} className="h-full w-full" />
+    </span>
   )
 }
 
 function SectionTitle({ title, meta }: { title: string; meta?: string }) {
   return (
-    <div className="mb-2 flex items-end justify-between">
-      <h2 className="text-[13px] font-black uppercase tracking-tight text-grow-text">
-        {title}
-      </h2>
-      {meta && <span className="text-[10px] font-black text-grow-muted">{meta}</span>}
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <h2 className="grow-section-title">{title}</h2>
+      {meta && <span className="text-[13px] tabular-nums text-grow-muted">{meta}</span>}
     </div>
   )
 }
 
 function EmptyLine({ text }: { text: string }) {
   return (
-    <div className="rounded-[1.25rem] border border-dashed border-grow-border bg-grow-card px-4 py-5 text-sm font-semibold text-grow-muted">
+    <div className="grow-surface rounded-[1.4rem] px-4 py-4 text-[15px] text-grow-muted">
       {text}
     </div>
   )
@@ -640,50 +589,42 @@ function FocusPanel({
   todayKey: string
   onChangeStatus: (id: string, status: string) => void
 }) {
-  return (
-    <section className="rounded-[1.7rem] bg-grow-text p-4 text-white shadow-[0_18px_50px_rgba(15,15,16,0.16)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-grow-yellow">
-            Focus operativo
-          </p>
-          <h2 className="grow-section-title mt-2">
-            Prima chiudi questo.
-          </h2>
-        </div>
-        <span className="rounded-full bg-grow-yellow px-3 py-1 text-[9px] font-black uppercase text-grow-text">
-          Oggi
-        </span>
-      </div>
-
-      {items.length === 0 ? (
-        <p className="mt-4 rounded-[1.2rem] bg-white/8 px-4 py-4 text-sm font-semibold text-white/65">
-          Nessun incendio. Scegli una cosa da far avanzare e mettila in produzione.
+  const tilt = useTilt<HTMLElement>(5)
+  if (items.length === 0) {
+    return (
+      <section className="grow-surface rounded-[1.75rem] p-5">
+        <p className="text-[13px] font-semibold text-grow-muted">Oggi</p>
+        <h2 className="mt-4 font-display text-4xl leading-[0.95]">Nessun incendio.</h2>
+        <p className="mt-3 text-[15px] leading-snug text-grow-muted">
+          Scegli una cosa da far avanzare e mettila in produzione.
         </p>
-      ) : (
-        <div className="mt-4 space-y-2">
-          {items.map((item) => (
-            <div key={item.id} className="rounded-[1.2rem] bg-white px-3 py-3 text-grow-text">
-              <div className="flex items-start gap-3">
-                <span className={`mt-1 h-8 w-1 shrink-0 rounded-full ${CLIENT_COLORS[item.client] || 'bg-grow-yellow'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-black leading-tight">{item.title}</p>
-                  <p className="mt-1 text-[10px] font-black uppercase text-grow-muted">
-                    {item.client} - {distanceLabel(item.scheduled_date, todayKey)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onChangeStatus(item.id, item.status === 'pronto' ? 'pubblicato' : 'pronto')}
-                  className="shrink-0 rounded-full bg-grow-yellow px-3 py-2 text-[9px] font-black uppercase text-grow-text"
-                >
-                  Avanza
-                </button>
-              </div>
+      </section>
+    )
+  }
+  return (
+    <section {...tilt} className="grow-block grow-tilt rounded-[1.75rem] p-5">
+      <p className="text-[13px] font-semibold text-grow-black/70">Oggi</p>
+      <h2 className="grow-z1 mt-4 font-display text-[36px] leading-[0.95]">Prima chiudi questo.</h2>
+      <div className="grow-z2 mt-5 overflow-hidden rounded-[1.1rem] bg-grow-black/[0.08]">
+        {items.map((item) => (
+          <div key={item.id} className="flex items-center gap-3 p-3 [&+&]:shadow-[inset_0_1px_0_rgba(13,12,11,.12)]">
+            <ClientLogo client={item.client} size={36} />
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-2 text-[15px] font-bold leading-tight">{item.title}</p>
+              <p className="mt-0.5 text-[13px] text-grow-black/70">
+                {NEXT_ACTIONS[item.status] || 'Decidi avanzamento'} · {distanceLabel(item.scheduled_date, todayKey)}
+              </p>
             </div>
-          ))}
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => onChangeStatus(item.id, item.status === 'pronto' ? 'pubblicato' : 'pronto')}
+              className="grow-press min-h-11 shrink-0 rounded-full bg-grow-black px-4 text-sm font-bold text-grow-text shadow-[inset_0_1px_0_rgba(255,255,255,.14),var(--e1)]"
+            >
+              Avanza
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
@@ -758,33 +699,33 @@ function PlanCard({
   return (
     <article
       className={[
-        'overflow-hidden rounded-[1.35rem] border bg-grow-card',
-        danger ? 'border-red-300' : 'border-grow-border',
+        'grow-surface overflow-hidden rounded-[1.4rem]',
+        danger ? 'outline outline-1 -outline-offset-1 outline-grow-fix/60' : '',
       ].join(' ')}
     >
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-start gap-3 px-4 py-3 text-left active:scale-[0.99]"
+        className="grow-press flex w-full items-center gap-3 p-3 text-left"
       >
-        <span className={`mt-1 h-10 w-1 shrink-0 rounded-full ${CLIENT_COLORS[item.client] || 'bg-grow-yellow'}`} />
+        <ClientLogo client={item.client} />
         <span className="min-w-0 flex-1">
-          <span className="line-clamp-2 text-[15px] font-black leading-tight text-grow-text">
+          <span className="line-clamp-2 text-[17px] font-bold leading-tight text-grow-text">
             {item.title}
           </span>
-          <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase text-grow-muted">
-            <span className={CLIENT_TEXT[item.client] || 'text-grow-muted'}>{item.client}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] text-grow-muted">
+            <span>{item.client}</span>
             {item.content_type && <span>{item.content_type}</span>}
             <span>{shortDate(item.scheduled_date)}</span>
           </span>
-          <span className="mt-2 block text-xs font-semibold text-grow-muted">
+          <span className="mt-1 block text-[13px] text-grow-muted">
             Prossima azione: {NEXT_ACTIONS[item.status] || 'Decidi avanzamento'}
           </span>
         </span>
         <span
           className={[
-            'shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase',
-            danger ? 'bg-red-500 text-white' : 'bg-grow-soft text-grow-muted',
+            'shrink-0 rounded-full px-2.5 py-1 text-xs font-bold',
+            danger ? 'bg-grow-fix text-grow-black' : 'bg-grow-soft text-grow-text',
           ].join(' ')}
         >
           {distanceLabel(item.scheduled_date, todayKey)}
@@ -792,25 +733,25 @@ function PlanCard({
       </button>
 
       {open && (
-        <div className="border-t border-grow-border bg-grow-soft px-4 py-3">
+        <div className="border-t border-grow-border px-4 py-4">
           <div className="mb-3 flex gap-1">
             {STATUSES.map((status, index) => (
               <span
                 key={status}
                 className={[
                   'h-1.5 flex-1 rounded-full',
-                  index <= statusIndex ? 'bg-grow-yellow' : 'bg-grow-border',
+                  index <= statusIndex ? 'bg-grow-yellow' : 'bg-grow-soft',
                 ].join(' ')}
               />
             ))}
           </div>
           {item.notes && (
-            <p className="mb-3 rounded-[1rem] bg-grow-card px-3 py-2 text-xs leading-relaxed text-grow-muted">
+            <p className="mb-3 rounded-[1rem] bg-grow-soft px-3 py-2 text-[13px] leading-relaxed text-grow-text/85">
               {item.notes}
             </p>
           )}
-          <div className="mb-3 rounded-[1rem] bg-grow-card px-3 py-3">
-            <p className="mb-2 text-[9px] font-black uppercase tracking-wide text-grow-muted">
+          <div className="mb-3">
+            <p className="mb-2 text-[13px] text-grow-muted">
               Piazza nel piano
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -820,10 +761,10 @@ function PlanCard({
                   type="button"
                   onClick={() => onUpdate(item.id, { scheduled_date: date.value })}
                   className={[
-                    'rounded-full px-3 py-1.5 text-[9px] font-black uppercase',
+                    'grow-press min-h-11 rounded-full px-4 text-sm font-semibold',
                     item.scheduled_date === date.value
-                      ? 'bg-grow-yellow text-grow-text'
-                      : 'border border-grow-border text-grow-muted',
+                      ? 'grow-object bg-grow-text text-grow-black'
+                      : 'bg-grow-soft text-grow-text',
                   ].join(' ')}
                 >
                   {date.label}
@@ -833,7 +774,7 @@ function PlanCard({
                 <button
                   type="button"
                   onClick={() => onUpdate(item.id, { scheduled_date: null })}
-                  className="rounded-full border border-grow-border px-3 py-1.5 text-[9px] font-black uppercase text-grow-muted"
+                  className="grow-press min-h-11 rounded-full bg-grow-soft px-4 text-sm font-semibold text-grow-muted"
                 >
                   Togli data
                 </button>
@@ -845,7 +786,7 @@ function PlanCard({
               <button
                 type="button"
                 onClick={() => onChangeStatus(item.id, nextStatus)}
-                className="rounded-full bg-grow-yellow px-3 py-2 text-[9px] font-black uppercase text-grow-text"
+                className="grow-press grow-object min-h-11 rounded-full bg-grow-yellow px-4 text-sm font-bold text-grow-black"
               >
                 Avanza a {STATUS_LABELS[nextStatus]}
               </button>
@@ -853,7 +794,7 @@ function PlanCard({
             <button
               type="button"
               onClick={() => onRemove(item.id)}
-              className="rounded-full border border-red-200 px-3 py-2 text-[9px] font-black uppercase text-red-500"
+              className="grow-press min-h-11 rounded-full px-4 text-sm font-semibold text-grow-fix"
             >
               Elimina
             </button>

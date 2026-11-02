@@ -57,28 +57,22 @@ function LoginInner() {
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[#F7F4EE] px-6 text-[#0F0F10]">
+    <main className="min-h-[100dvh] bg-grow-bg px-6 text-grow-text">
       <div className="mx-auto flex min-h-[100dvh] max-w-sm flex-col justify-center">
         <div className="mb-12 flex items-end justify-between">
-          <p className="font-display text-5xl uppercase leading-none">
-            GROW<span className="text-[#FFE500]">.</span>
+          <p className="font-display text-5xl leading-none">
+            GROW<span className="text-grow-yellow">.</span>
           </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/icon-1.svg"
-            alt="Seme GROW"
-            className="w-[4.6rem] object-contain"
-          />
         </div>
 
         <form onSubmit={handleSubmit}>
-          <h1 className="font-display text-[2.25rem] uppercase leading-none">Inserisci PIN</h1>
-          <p className="mt-2 text-sm leading-relaxed text-black/55">
+          <h1 className="font-display text-[36px] leading-none">Inserisci PIN</h1>
+          <p className="mt-3 text-[15px] leading-snug text-grow-muted">
             Accesso rapido alla tua app personale. Niente più codici via mail.
           </p>
 
           <label
-            className="mt-8 block text-[11px] font-black uppercase tracking-widest text-black/40"
+            className="mt-8 block text-[13px] font-semibold text-grow-muted"
             htmlFor="pin"
           >
             PIN numerico
@@ -95,12 +89,12 @@ function LoginInner() {
             autoFocus
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-            className="mt-2 w-full rounded-2xl border border-black/12 bg-white px-4 py-4 text-center text-2xl font-black tracking-[0.35em] outline-none transition-colors focus:border-[#FFE500]"
+            className="grow-surface mt-2 w-full rounded-2xl border border-transparent px-4 py-4 text-center text-2xl font-bold tracking-[0.4em] text-grow-text outline-none focus:border-grow-yellow"
             placeholder="••••••"
           />
 
           {message && (
-            <p className="mt-3 rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-bold text-red-600">
+            <p className="mt-3 rounded-2xl bg-grow-fix/10 px-4 py-3 text-sm font-semibold text-grow-fix">
               {message}
             </p>
           )}
@@ -108,13 +102,13 @@ function LoginInner() {
           <button
             type="submit"
             disabled={status === 'loading' || pin.length < 4}
-            className="mt-4 w-full rounded-2xl bg-[#FFE500] py-3.5 text-sm font-black disabled:opacity-40"
+            className="grow-press grow-object mt-4 min-h-12 w-full rounded-full bg-grow-yellow text-[15px] font-bold text-grow-black disabled:opacity-40"
           >
             {status === 'loading' ? 'Accesso…' : 'Entra'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs leading-relaxed text-black/35">
+        <p className="mt-6 text-center text-xs leading-relaxed text-grow-muted">
           Il PIN resta collegato al tuo account Supabase, quindi Inbox, Archivio e Calendario continuano a usare gli stessi dati.
         </p>
       </div>
@@ -126,8 +120,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-[100dvh] items-center justify-center bg-[#F7F4EE]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0F0F10]/20 border-t-[#0F0F10]" />
+        <main className="flex min-h-[100dvh] items-center justify-center bg-grow-bg">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-grow-text/20 border-t-grow-text" />
         </main>
       }
     >

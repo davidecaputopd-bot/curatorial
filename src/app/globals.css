@@ -1,27 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Palco: a warm black stage, GROW's paper becomes the light of the text.
+   Colour is state, one meaning each: now (yellow), ok, done, time, fix. */
 :root {
-  --font-display: 'Bebas Neue', 'Arial Black', sans-serif;
-  --font-mono: 'DM Mono', 'Courier New', monospace;
-  --font-body: 'DM Sans', 'Helvetica Neue', system-ui, sans-serif;
+  color-scheme: dark;
+  --stage: 13 12 11;
+  --surface: 24 23 21;
+  --surface-2: 35 33 30;
+  --line: 46 43 39;
+  --ring: 110 106 98;        /* empty controls: 3.3:1 on surface */
+  --paper: 243 240 232;
+  --muted: 163 158 148;
+  --butter: 43 40 16;        /* quiet notice background */
+  --now: 255 229 0;
+  --now-strong: 255 214 0;
+  --ink: 13 12 11;
+  --ok: 107 214 154;
+  --done: 180 155 242;
+  --time: 116 198 242;
+  --fix: 255 132 80;
+
+  --font-body: var(--font-schibsted), 'Helvetica Neue', Arial, system-ui, sans-serif;
+  --font-display: var(--font-body);
+  --font-mono: var(--font-body);
+
+  /* depth: one light from above, layered black shadows */
+  --e1: 0 0 0 1px rgba(0,0,0,.45), 0 1px 1px rgba(0,0,0,.35), 0 2px 4px -1px rgba(0,0,0,.35);
+  --e2: 0 0 0 1px rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.3), 0 4px 8px -2px rgba(0,0,0,.45), 0 12px 24px -8px rgba(0,0,0,.55);
+  --e3: 0 0 0 1px rgba(0,0,0,.5), 0 2px 2px rgba(0,0,0,.3), 0 8px 16px -4px rgba(0,0,0,.5), 0 24px 48px -12px rgba(0,0,0,.7);
+  --lip: inset 0 1px 0 rgba(255,255,255,.07);
+  --lip-c: inset 0 1px 0 rgba(255,255,255,.55);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 60%);
+  --sheen-c: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 55%, rgba(0,0,0,.05));
+  /* damped spring, ~4% overshoot */
+  --spring: linear(0, 0.106 4.2%, 0.324 8.3%, 0.554 12.5%, 0.746 16.7%, 0.884 20.8%, 0.971 25%, 1.017 29.2%, 1.036 33.3%, 1.038 37.5%, 1.032 41.7%, 1.023 45.8%, 1.014 50%, 1.008 54.2%, 1.003 58.3%, 1 62.5%, 0.999 70.8%, 1 87.5%, 1);
 }
 
 body {
-  background-color: #F7F4EE;
-  color: #111111;
+  background-color: rgb(var(--stage));
+  color: rgb(var(--paper));
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-.font-display { font-family: var(--font-display); }
-.font-mono { font-family: var(--font-mono); }
+.font-display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em; }
+.font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 button,
 input,
@@ -36,49 +65,74 @@ a {
 }
 
 ::selection {
-  background: #FFE500;
-  color: #0F0F10;
+  background: rgb(var(--now));
+  color: rgb(var(--ink));
 }
 
 .grow-page-kicker {
-  color: #5F5A52;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
+  color: rgb(var(--muted));
+  font-size: 0.8125rem;
   font-weight: 500;
-  letter-spacing: 0.16em;
-  line-height: 1.3;
-  text-transform: uppercase;
+  line-height: 1.35;
 }
 
 .grow-page-title {
   font-family: var(--font-display);
-  font-size: clamp(3rem, 12vw, 3.5rem);
-  font-weight: 400;
-  letter-spacing: 0.005em;
-  line-height: 0.86;
-  text-transform: uppercase;
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.9;
+  text-box: trim-both cap alphabetic;
 }
 
 .grow-section-title {
   font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 400;
-  letter-spacing: 0.005em;
-  line-height: 0.95;
-  text-transform: uppercase;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
 :where(a, button, input, textarea, select):focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid rgb(var(--now));
   outline-offset: 3px;
 }
 
 @media (min-width: 1024px) {
-  .grow-page-title { font-size: 3.75rem; }
+  .grow-page-title { font-size: 3.5rem; }
 }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+@layer components {
+  /* dark surfaces: barely lifted, light from above */
+  .grow-surface { background-color: rgb(var(--surface)); background-image: var(--sheen); box-shadow: var(--lip), var(--e1); }
+  /* the one coloured block per screen */
+  .grow-block { background-color: rgb(var(--now)); background-image: var(--sheen-c); color: rgb(var(--ink)); box-shadow: var(--lip-c), var(--e3); }
+  /* convex coloured or paper objects: buttons, tiles */
+  .grow-object { background-image: var(--sheen-c); box-shadow: var(--lip-c), var(--e2); }
+  /* pressable: moves toward the surface and springs back */
+  .grow-press { transition-property: transform, box-shadow, background-color, color; transition-duration: .5s, .25s, .2s, .2s; transition-timing-function: var(--spring), cubic-bezier(.22, 1, .36, 1), ease, ease; }
+  .grow-press:active { transform: translateY(1px) scale(.98); transition-duration: .08s; }
+  /* empty round check: a socket */
+  .grow-socket { box-shadow: inset 0 0 0 2px rgb(var(--ring)), inset 0 2px 4px rgba(0,0,0,.35); }
+  /* images and posters keep an edge on black */
+  .grow-edge { box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+  /* tilt toward the finger, driven by useTilt */
+  .grow-tilt { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transform-style: preserve-3d; transition: transform .7s var(--spring); position: relative; }
+  .grow-tilt[data-tilting] { transition: transform .12s linear; }
+  .grow-tilt::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle at var(--gx, 50%) var(--gy, 0%), rgba(255,255,255,.45), rgba(255,255,255,0) 45%); opacity: var(--ga, 0); mix-blend-mode: soft-light; transition: opacity .4s cubic-bezier(.22, 1, .36, 1); }
+  .grow-z1 { transform: translateZ(18px); }
+  .grow-z2 { transform: translateZ(26px); }
+  .grow-z3 { transform: translateZ(46px); }
+}
+
+@keyframes grow-in { from { opacity: 0; transform: translateY(-10px) scale(.98); } }
+.grow-in { animation: grow-in .6s var(--spring) both; }
+
+@keyframes grow-draw { from { stroke-dashoffset: 24; } }
+.grow-draw polyline { stroke-dasharray: 24; animation: grow-draw .32s cubic-bezier(.22, 1, .36, 1); }
 
 @keyframes ds-pulse {
   0%, 100% { opacity: 0.3; transform: translateY(0); }
@@ -90,4 +144,13 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-pulse-dot { animation: none; opacity: 0.7; }
+  .grow-press, .grow-tilt { transition-duration: .01ms !important; }
+  .grow-press:active { transform: none; }
+  .grow-tilt { transform: none !important; }
+  .grow-tilt::after { display: none; }
+  .grow-in, .grow-draw polyline { animation: none; }
 }
+
+/* a bare number with light behind it, instead of a badge */
+.grow-glow { color: rgb(var(--now)); text-shadow: 0 0 10px rgba(255,229,0,.6), 0 0 22px rgba(255,229,0,.35); }
+.grow-glow-on { color: rgb(var(--ink)); text-shadow: 0 0 8px rgba(255,214,0,.95), 0 0 18px rgba(255,214,0,.6); }

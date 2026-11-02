@@ -22,17 +22,14 @@ export default function DesktopNav() {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-[100dvh] w-[280px] border-r border-black/10 bg-[#F7F4EE]/96 px-5 py-6 text-[#0F0F10] backdrop-blur-xl lg:flex lg:flex-col">
-      <Link href="/" className="mb-9 block px-2">
-        <p className="font-display text-5xl uppercase leading-none tracking-normal">
-          GROW<span className="text-[#FFE500]">.</span>
-        </p>
-        <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.17em] text-black/40">
-          Secondo cervello personale
+    <aside className="grow-surface fixed left-0 top-0 z-40 hidden h-[100dvh] w-[280px] px-4 py-7 lg:flex lg:flex-col">
+      <Link href="/" className="mb-8 block px-3">
+        <p className="font-display text-[2.5rem] leading-[0.9]">
+          GROW<span className="text-grow-yellow">.</span>
         </p>
       </Link>
 
-      <nav className="space-y-1.5" aria-label="Navigazione principale">
+      <nav className="space-y-1" aria-label="Navigazione principale">
         {items.map((item) => {
           const active =
             item.href === '/'
@@ -46,18 +43,18 @@ export default function DesktopNav() {
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={[
-                'flex min-h-[60px] items-center gap-3 rounded-[1.15rem] px-3.5 py-2.5 transition-all',
+                'grow-press flex min-h-[60px] items-center gap-3 rounded-[1.15rem] px-3.5 py-2.5',
                 active
-                  ? 'bg-[#0F0F10] text-[#FFE500] shadow-[0_16px_38px_rgba(15,15,16,0.12)]'
-                  : 'text-[#0F0F10]/55 hover:bg-black/5 hover:text-[#0F0F10]',
+                  ? 'grow-object bg-grow-yellow text-grow-black'
+                  : 'text-grow-muted hover:bg-grow-soft hover:text-grow-text',
               ].join(' ')}
             >
               <Icon size={21} weight={active ? 'fill' : 'regular'} />
               <span className="min-w-0">
-                <span className="block text-[12px] font-bold uppercase tracking-[0.02em]">
+                <span className={active ? 'block text-[15px] font-bold' : 'block text-[15px] font-bold text-grow-text'}>
                   {item.label}
                 </span>
-                <span className={active ? 'mt-0.5 block text-[10px] text-white/50' : 'mt-0.5 block text-[10px] text-black/35'}>
+                <span className={active ? 'mt-0.5 block text-xs text-grow-black/70' : 'mt-0.5 block text-xs'}>
                   {item.desc}
                 </span>
               </span>
@@ -65,7 +62,6 @@ export default function DesktopNav() {
           )
         })}
       </nav>
-
     </aside>
   )
 }

@@ -45,7 +45,7 @@ export default function ContentCard({ item, onSkip }: Props) {
 
   if (item.type === 'video') {
     return (
-      <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-4"
+      <div className="bg-grow-card rounded-2xl overflow-hidden shadow-sm mb-4"
         style={{ borderLeft: `3px solid ${color}` }}>
         <div className="relative">
           <img
@@ -62,7 +62,7 @@ export default function ContentCard({ item, onSkip }: Props) {
               <span className="text-white text-2xl ml-1">▶</span>
             </div>
           </div>
-          <span className="absolute top-3 left-3 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded-full text-white"
+          <span className="absolute top-3 left-3 text-xs font-mono px-2 py-1 rounded-full text-white"
             style={{ backgroundColor: color }}>
             VIDEO
           </span>
@@ -91,12 +91,12 @@ export default function ContentCard({ item, onSkip }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-4"
+    <div className="bg-grow-card rounded-2xl overflow-hidden shadow-sm mb-4"
       style={{ borderLeft: `3px solid ${color}` }}>
       <img src={image} alt={item.title} className="w-full h-52 object-cover" />
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-mono uppercase tracking-wider"
+          <span className="text-xs font-mono"
             style={{ color }}>
             {item.category}
           </span>

@@ -190,7 +190,7 @@ function SocialTile({
         />
       ) : (
         <div className="absolute inset-0 flex flex-col justify-between bg-[linear-gradient(155deg,#34312B_0%,#171717_56%,#080808_100%)] p-3 text-white">
-          <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-grow-yellow">
+          <span className="font-mono text-[11px] text-grow-yellow">
             {sourceLabel(item.source)}
           </span>
           <p className="line-clamp-5 text-[11px] font-bold leading-snug">
@@ -200,17 +200,17 @@ function SocialTile({
       )}
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/70" />
-      <div className="pointer-events-none absolute left-2 top-2 flex h-7 items-center gap-1 rounded-full bg-black/55 px-2 font-mono text-[7px] uppercase tracking-[0.12em] text-white backdrop-blur-sm">
+      <div className="pointer-events-none absolute left-2 top-2 flex h-7 items-center gap-1 rounded-full bg-black/55 px-2 font-mono text-[11px] text-white backdrop-blur-sm">
         {isTikTokUrl(item.url) && <Play size={9} weight="fill" />}
         {sourceLabel(item.source)}
       </div>
       {item.intelligence?.understood && (
         <span
-          className="pointer-events-none absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-black/30 bg-grow-yellow"
+          className="pointer-events-none absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-grow-border bg-grow-yellow"
           title="Compreso da GROW"
         />
       )}
-      <p className="pointer-events-none absolute inset-x-0 bottom-0 line-clamp-2 p-2.5 text-[10px] font-bold leading-snug text-white drop-shadow-sm">
+      <p className="pointer-events-none absolute inset-x-0 bottom-0 line-clamp-2 p-2.5 text-xs font-bold leading-snug text-white drop-shadow-sm">
         {title}
       </p>
     </button>
@@ -285,7 +285,7 @@ function FeedMedia({
           aria-label={playing ? `Metti in pausa ${title}` : `Riproduci ${title}`}
         >
           {!playing && (
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-grow-yellow text-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-grow-yellow text-grow-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
               <Play size={25} weight="fill" className="ml-1" />
             </span>
           )}
@@ -314,7 +314,7 @@ function FeedMedia({
         allow="autoplay; encrypted-media; picture-in-picture"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
-        className="relative z-10 h-full w-full border-0 bg-white"
+        className="relative z-10 h-full w-full border-0 bg-grow-card"
       />
     )
   }
@@ -358,7 +358,7 @@ function FeedMedia({
         <button
           type="button"
           onClick={onTogglePlayback}
-          className="absolute left-1/2 top-1/2 z-20 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-grow-yellow text-black shadow-[0_18px_50px_rgba(0,0,0,0.35)] transition active:scale-95"
+          className="absolute left-1/2 top-1/2 z-20 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-grow-yellow text-grow-black shadow-[0_18px_50px_rgba(0,0,0,0.35)] transition active:scale-95"
           aria-label={`Riproduci ${title}`}
         >
           <Play size={25} weight="fill" className="ml-1" />
@@ -510,10 +510,10 @@ function SocialFeed({
                 <X size={20} weight="bold" />
               </button>
               <div className="rounded-full bg-black/45 px-3 py-2 text-center backdrop-blur-md">
-                <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-grow-yellow">
+                <p className="font-mono text-[11px] text-grow-yellow">
                   Archivio social
                 </p>
-                <p className="mt-0.5 font-mono text-[8px] text-white/55">
+                <p className="mt-0.5 font-mono text-[11px] text-white/55">
                   {index + 1} / {total}
                 </p>
               </div>
@@ -523,10 +523,10 @@ function SocialFeed({
             <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-0 right-0 z-30 px-4 pr-20">
               <div className="max-w-lg">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-grow-yellow px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-black">
+                  <span className="rounded-full bg-grow-yellow px-2.5 py-1 font-mono text-[11px] text-grow-black">
                     {sourceLabel(item.source)}
                   </span>
-                  <span className="font-mono text-[9px] text-white/45">
+                  <span className="font-mono text-[11px] text-white/45">
                     {timeAgo(item.created_at)}
                   </span>
                 </div>
@@ -549,10 +549,10 @@ function SocialFeed({
                         disabled={itemFeedback?.status === 'sending'}
                         onClick={() => onFeedback(item, option.signal)}
                         className={[
-                          'min-h-11 shrink-0 rounded-full px-3.5 font-mono text-[8px] uppercase tracking-[0.1em] backdrop-blur-md transition disabled:opacity-50',
+                          'grow-press min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold backdrop-blur-md disabled:opacity-50',
                           selected && itemFeedback.status === 'saved'
-                            ? 'bg-grow-yellow text-black'
-                            : 'border border-white/15 bg-black/45 text-white/80',
+                            ? 'grow-object bg-grow-yellow text-grow-black'
+                            : 'bg-white/15 text-white',
                         ].join(' ')}
                       >
                         {selected && itemFeedback.status === 'sending'
@@ -572,7 +572,7 @@ function SocialFeed({
                 <button
                   type="button"
                   onClick={() => setPausedId(null)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-grow-yellow text-black shadow-lg"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-grow-yellow text-grow-black shadow-lg"
                   aria-label="Riproduci"
                 >
                   <Play size={18} weight="fill" />
@@ -585,7 +585,7 @@ function SocialFeed({
                 aria-label="Copia link"
               >
                 {copiedId === item.id ? (
-                  <span className="font-mono text-[8px] uppercase text-grow-yellow">OK</span>
+                  <span className="font-mono text-[11px] text-grow-yellow">OK</span>
                 ) : (
                   <Copy size={18} />
                 )}
@@ -624,7 +624,7 @@ function SocialFeed({
             </div>
 
             {index === startIndex && (
-              <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-2 font-mono text-[8px] uppercase tracking-[0.12em] text-white/65 backdrop-blur-md">
+              <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/45 px-3 py-2 font-mono text-[11px] text-white/65 backdrop-blur-md">
                 Scorri · tocca per pausa
               </div>
             )}
@@ -798,34 +798,34 @@ export default function SocialArchive() {
 
   return (
     <>
-      <section className="rounded-[1.5rem] border border-black/10 bg-[#FFFDF8] p-4">
+      <section className="grow-surface rounded-[1.4rem] p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="grow-page-kicker">Profilo GROW</p>
-            <h2 className="font-display mt-1 text-[2rem] uppercase leading-none">
+            <h2 className="font-display mt-1 text-[28px] leading-none">
               Il tuo gusto<span className="text-grow-yellow">.</span>
             </h2>
-            <p className="mt-2 max-w-sm text-[11px] leading-relaxed text-grow-muted">
+            <p className="mt-2 max-w-sm text-[13px] leading-snug text-grow-muted">
               Rivedi ciò che hai scelto. Le tue reazioni aiutano GROW a capire cosa vale la pena riportarti.
             </p>
           </div>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0F0F10] text-grow-yellow">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full grow-object bg-grow-text text-grow-black">
             <Brain size={22} weight="fill" />
           </div>
         </div>
-        <div className="mt-4 border-t border-black/10 pt-4">
+        <div className="mt-4 border-t border-grow-border pt-4">
           <div className="grid min-w-0 grid-cols-3 gap-2 text-center">
             <div>
-              <p className="text-lg font-black leading-none">{total}</p>
-              <p className="mt-1 font-mono text-[8px] uppercase tracking-wide text-grow-muted">Salvati</p>
+              <p className="text-lg font-bold leading-none">{total}</p>
+              <p className="mt-1 font-mono text-[11px] text-grow-muted">Salvati</p>
             </div>
             <div>
-              <p className="text-lg font-black leading-none">{summary.understoodPercentage}%</p>
-              <p className="mt-1 font-mono text-[8px] uppercase tracking-wide text-grow-muted">Letti</p>
+              <p className="text-lg font-bold leading-none">{summary.understoodPercentage}%</p>
+              <p className="mt-1 font-mono text-[11px] text-grow-muted">Letti</p>
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-black leading-none">{summary.topCraft}</p>
-              <p className="mt-1.5 font-mono text-[8px] uppercase tracking-wide text-grow-muted">Tratto</p>
+              <p className="truncate text-xs font-bold leading-none">{summary.topCraft}</p>
+              <p className="mt-1.5 font-mono text-[11px] text-grow-muted">Tratto</p>
             </div>
           </div>
         </div>
@@ -836,7 +836,7 @@ export default function SocialArchive() {
           type="button"
           disabled={visibleItems.length === 0}
           onClick={() => setViewerIndex(0)}
-          className="flex min-h-12 items-center justify-between rounded-full bg-[#0F0F10] px-4 text-[10px] font-black uppercase tracking-[0.12em] text-white disabled:opacity-40"
+          className="grow-press grow-surface flex min-h-12 items-center justify-between rounded-full px-4 text-sm font-semibold text-grow-text disabled:opacity-40"
         >
           <span className="flex items-center gap-2">
             <Play size={14} weight="fill" className="text-grow-yellow" />
@@ -846,7 +846,7 @@ export default function SocialArchive() {
         </button>
         <Link
           href="/impostazioni/cattura"
-          className="flex min-h-12 items-center rounded-full border border-black/10 bg-[#FFFDF8] px-4 text-[10px] font-bold uppercase text-black"
+          className="grow-press grow-surface flex min-h-12 items-center rounded-full px-4 text-sm font-semibold text-grow-text"
         >
           Importa
         </Link>
@@ -867,7 +867,7 @@ export default function SocialArchive() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Cerca nei salvati social..."
             type="search"
-            className="min-h-12 w-full rounded-2xl border border-black/10 bg-[#FFFDF8] py-3 pl-11 pr-4 text-sm outline-none focus:border-black/30"
+            className="grow-surface min-h-12 w-full rounded-full border border-transparent py-3 pl-11 pr-4 text-[15px] outline-none placeholder:text-grow-muted focus:border-grow-yellow"
           />
         </div>
         <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -882,10 +882,10 @@ export default function SocialArchive() {
                 setRoleFilter(option.key)
               }}
               className={[
-                'min-h-11 shrink-0 rounded-full px-3 text-[9px] font-bold uppercase tracking-wide',
+                'grow-press min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold',
                 roleFilter === option.key
-                  ? 'bg-[#0F0F10] text-grow-yellow'
-                  : 'border border-black/10 bg-white text-grow-muted',
+                  ? 'grow-object bg-grow-text text-grow-black'
+                  : 'grow-surface text-grow-muted',
               ].join(' ')}
             >
               {option.label}
@@ -898,10 +898,10 @@ export default function SocialArchive() {
       </div>
 
       <div className="mb-2 mt-5 flex items-center justify-between px-0.5">
-        <p className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-grow-muted">
+        <p className="flex items-center gap-1.5 font-mono text-[11px] text-grow-muted">
           <GridFour size={13} weight="fill" /> Profilo visivo
         </p>
-        <p className="font-mono text-[9px] text-grow-muted">
+        <p className="font-mono text-[11px] text-grow-muted">
           {visibleItems.length} visibili
         </p>
       </div>
@@ -909,16 +909,16 @@ export default function SocialArchive() {
       {loading ? (
         <div className="grid grid-cols-3 gap-[2px] overflow-hidden rounded-[1.15rem]">
           {Array.from({ length: 15 }, (_, index) => (
-            <div key={index} className="aspect-[3/4] animate-pulse bg-black/10" />
+            <div key={index} className="aspect-[3/4] animate-pulse bg-white/10" />
           ))}
         </div>
       ) : error && items.length === 0 ? (
-        <div className="rounded-[1.5rem] border border-black/10 bg-white px-6 py-12 text-center">
+        <div className="grow-surface rounded-[1.4rem] px-6 py-8">
           <p className="text-sm font-bold">Non riesco a caricare l’Archivio social.</p>
           <p className="mt-2 text-xs text-grow-muted">{error}</p>
         </div>
       ) : visibleItems.length === 0 ? (
-        <div className="rounded-[1.5rem] border border-black/10 bg-white px-6 py-12 text-center">
+        <div className="grow-surface rounded-[1.4rem] px-6 py-8">
           <p className="text-sm font-bold">
             {items.length ? 'Nessun salvato trovato.' : 'Nessun salvato social ancora.'}
           </p>
@@ -928,7 +928,7 @@ export default function SocialArchive() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-[2px] overflow-hidden rounded-[1.15rem] bg-black/5">
+          <div className="grid grid-cols-3 gap-[2px] overflow-hidden rounded-[1.15rem] bg-white/5">
             {visibleItems.map((item, index) => (
               <SocialTile
                 key={item.id}
@@ -943,7 +943,7 @@ export default function SocialArchive() {
               type="button"
               disabled={loadingMore}
               onClick={() => void loadMore()}
-              className="mt-4 min-h-12 w-full rounded-full border border-black/10 bg-white text-[10px] font-black uppercase tracking-wide disabled:opacity-50"
+              className="mt-4 min-h-12 w-full rounded-full grow-surface text-xs font-bold disabled:opacity-50"
             >
               {loadingMore ? 'Carico…' : 'Mostra altri salvati'}
             </button>

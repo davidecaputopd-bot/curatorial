@@ -5,7 +5,6 @@ import {
   ArrowDown,
   Copy,
   Image as ImageIcon,
-  NotePencil,
   X,
 } from '@phosphor-icons/react'
 import BottomNav from '@/components/BottomNav'
@@ -127,14 +126,14 @@ function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="flex items-center gap-3 rounded-[0.9rem] bg-[#0F0F10] p-3 text-white"
+            className="flex items-center gap-3 rounded-[0.9rem] bg-grow-soft p-3 text-white"
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-grow-yellow">
               <ArrowDown size={17} weight="bold" />
             </span>
             <span>
-              <span className="block text-xs font-black">Anteprima TikTok</span>
-              <span className="mt-0.5 block text-[10px] text-white/50">
+              <span className="block text-xs font-bold">Anteprima TikTok</span>
+              <span className="mt-0.5 block text-xs text-white/50">
                 Apri la nota per vedere il video
               </span>
             </span>
@@ -151,7 +150,7 @@ function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => event.stopPropagation()}
-        className="mt-2 block overflow-hidden rounded-[0.9rem] border border-black/10 bg-white transition-opacity active:opacity-70"
+        className="mt-2 block overflow-hidden rounded-[0.9rem] bg-grow-soft transition-opacity active:opacity-70"
       >
         {preview.image && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -166,16 +165,16 @@ function OGCard({ item, expanded }: { item: Item; expanded: boolean }) {
           />
         )}
         <div className="px-3 py-2">
-          <p className="font-mono text-[8px] uppercase tracking-[0.13em] text-grow-muted">
+          <p className="text-xs text-grow-muted">
             {new URL(url).hostname.replace('www.', '')}
           </p>
           {preview.title && (
-            <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-tight text-grow-text">
+            <p className="mt-1 line-clamp-2 text-[13px] font-bold leading-tight text-grow-text">
               {preview.title}
             </p>
           )}
           {preview.description && (
-            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-grow-muted">
+            <p className="mt-1 line-clamp-2 text-xs leading-snug text-grow-muted">
               {preview.description}
             </p>
           )}
@@ -357,22 +356,14 @@ export default function InboxPage() {
   return (
     <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
       <div className="mx-auto max-w-lg px-4 pt-10 lg:max-w-4xl lg:px-8">
-        <header className="mb-7 flex items-start justify-between gap-4">
-          <div>
-            <p className="grow-page-kicker">
-              GROW Inbox
-            </p>
-            <h1 className="grow-page-title mt-1">
-              Inbox<span className="text-grow-yellow">.</span>
-            </h1>
-            <p className="mt-3 text-sm text-grow-muted">
-              Cattura adesso. GROW classifica, senza inventare progetti.
-            </p>
-          </div>
+        <header className="mb-6 flex items-end justify-between gap-4">
+          <h1 className="grow-page-title">
+            Inbox<span className="text-grow-yellow">.</span>
+          </h1>
         </header>
 
         <section
-          className="mb-6 space-y-3 rounded-[1.5rem] border border-black/10 bg-white p-4"
+          className="grow-block mb-8 space-y-2 rounded-[1.75rem] p-4"
           aria-label="Nuova nota"
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
@@ -401,20 +392,15 @@ export default function InboxPage() {
                 void uploadScreenshot(file)
               }
             }}
-            placeholder="Idea, link, nota o incolla uno screenshot..."
+            placeholder="Idea, link, nota o incolla uno screenshot…"
+            aria-label="Nuova nota"
             rows={4}
-            className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-grow-text outline-none placeholder:text-grow-muted/70"
+            className="w-full resize-none bg-transparent px-1 pt-1 text-[19px] font-medium leading-snug text-grow-black outline-none placeholder:text-grow-black/[0.62]"
           />
 
-          {detectedUrl && (
-            <span className="inline-flex rounded-full bg-grow-soft px-2.5 py-1 font-mono text-[8px] uppercase tracking-wide text-grow-muted">
-              Link · preparo l’anteprima
-            </span>
-          )}
-
-          <div className="flex items-center gap-2 border-t border-black/8 pt-3">
-            <p className="min-w-0 flex-1 font-mono text-[8px] uppercase tracking-[0.1em] text-grow-muted">
-              Nota · link · screenshot
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 px-1 text-xs font-semibold text-grow-black/[0.65]">
+              {detectedUrl ? 'Link · preparo l’anteprima' : 'Nota, link o screenshot'}
             </p>
             <input
               ref={fileInputRef}
@@ -431,38 +417,36 @@ export default function InboxPage() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-grow-soft text-grow-text disabled:opacity-40"
+              className="grow-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[14px] bg-grow-black/[0.08] px-3.5 text-sm font-bold text-grow-black shadow-[inset_0_0_0_1px_rgba(13,12,11,.12)] disabled:opacity-40"
               aria-label="Carica immagine"
             >
               {uploading ? (
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-grow-text border-t-transparent" />
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-grow-black border-t-transparent" />
               ) : (
-                <ImageIcon size={18} />
+                <ImageIcon size={16} />
               )}
+              Foto
             </button>
             <button
               type="button"
               onClick={() => void save()}
               disabled={!text.trim() || saving}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0F0F10] text-grow-yellow disabled:opacity-35"
+              className="grow-press inline-flex h-11 shrink-0 items-center rounded-[14px] bg-grow-black px-[18px] text-sm font-bold text-grow-text shadow-[inset_0_1px_0_rgba(255,255,255,.14),var(--e2)] disabled:bg-grow-black/[0.08] disabled:text-grow-black/50 disabled:shadow-[inset_0_0_0_1px_rgba(13,12,11,.12)]"
               aria-label="Salva nota"
             >
-              {saving ? (
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-grow-yellow border-t-transparent" />
-              ) : (
-                <ArrowDown size={18} weight="bold" />
-              )}
+              {saving ? 'Salvo…' : 'Salva'}
             </button>
           </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="px-1 text-[13px] font-semibold text-grow-black">{error}</p>}
         </section>
 
-        <div className="mb-4">
+        {items.length > 0 && <div className="mb-4">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Cerca nel taccuino..."
-            className="min-h-12 w-full rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none focus:border-grow-yellow"
+            placeholder="Cerca nel taccuino…"
+            aria-label="Cerca nel taccuino"
+            className="grow-surface min-h-12 w-full rounded-full border border-transparent px-5 text-[15px] text-grow-text outline-none placeholder:text-grow-muted focus:border-grow-yellow"
           />
           <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
             {[
@@ -476,44 +460,46 @@ export default function InboxPage() {
                 option.key === 'all'
                   ? total
                   : typedItems.filter((item) => item.note_type === option.key).length
+              // I tipi senza note restano nascosti, a meno che non siano il filtro attivo.
+              if (option.key !== 'all' && count === 0 && filter !== option.key) return null
               return (
                 <button
                   key={option.key}
                   type="button"
                   onClick={() => setFilter(option.key)}
                   className={[
-                    'min-h-11 shrink-0 rounded-full px-3 font-mono text-[8px] uppercase tracking-wide',
+                    'grow-press flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold',
                     filter === option.key
-                      ? 'bg-[#0F0F10] text-grow-yellow'
-                      : 'border border-black/10 bg-white text-grow-muted',
+                      ? 'grow-object bg-grow-text text-grow-black'
+                      : 'grow-surface text-grow-muted',
                   ].join(' ')}
                 >
-                  {option.label} · {count}
+                  {option.label}
+                  <span className="text-xs font-medium tabular-nums">{count}</span>
                 </button>
               )
             })}
           </div>
-        </div>
+        </div>}
 
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((index) => (
-              <div key={index} className="h-24 animate-pulse rounded-[1.2rem] bg-white" />
+              <div key={index} className="h-24 animate-pulse rounded-[1.2rem] bg-grow-card" />
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="rounded-[1.5rem] border border-black/10 bg-white px-6 py-16 text-center">
-            <NotePencil size={28} className="mx-auto text-grow-muted" />
-            <p className="mt-4 text-sm font-semibold text-grow-text">
-              {items.length ? 'Nessuna nota trovata.' : 'Nessuna nota ancora.'}
-            </p>
-            <p className="mt-1 text-xs text-grow-muted">
-              {items.length ? 'Prova un altro filtro.' : 'Scrivi la prima senza preoccuparti di ordinarla.'}
+          <div className="grow-surface rounded-[1.4rem] px-6 py-8">
+            <h2 className="font-display text-[22px] leading-tight">
+              {items.length ? 'Nessuna nota trovata' : 'Il taccuino è vuoto'}
+            </h2>
+            <p className="mt-2 max-w-[30ch] text-[15px] text-grow-muted">
+              {items.length ? 'Prova un altro filtro o un’altra parola.' : 'Cattura adesso. GROW classifica, senza inventare progetti.'}
             </p>
           </div>
         ) : (
           <>
-            <div className="divide-y divide-black/10 overflow-hidden rounded-[1.5rem] border border-black/10 bg-white">
+            <div className="grow-surface divide-y divide-grow-border overflow-hidden rounded-[1.4rem]">
               {filteredItems.map((item) => (
                 <article key={item.id} className="px-4 py-4">
                   <div className="flex items-start gap-3">
@@ -542,7 +528,7 @@ export default function InboxPage() {
                         onClick={() => setExpanded(expanded === item.id ? null : item.id)}
                         className="w-full text-left"
                       >
-                        <p className={`text-sm leading-relaxed text-grow-text ${expanded === item.id ? '' : 'line-clamp-2'}`}>
+                        <p className={`text-[15px] leading-relaxed text-grow-text ${expanded === item.id ? '' : 'line-clamp-2'}`}>
                           {item.content
                             ? parseLinks(item.content)
                             : item.url
@@ -554,10 +540,10 @@ export default function InboxPage() {
                       <OGCard item={item} expanded={expanded === item.id} />
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-grow-soft px-2 py-1 font-mono text-[8px] uppercase tracking-wide text-grow-muted">
+                        <span className="text-xs font-bold text-grow-text">
                           {INBOX_NOTE_LABELS[item.note_type]}
                         </span>
-                        <span className="font-mono text-[8px] text-grow-muted">
+                        <span className="text-xs text-grow-muted">
                           {timeAgo(item.created_at)}
                         </span>
                       </div>
@@ -567,7 +553,7 @@ export default function InboxPage() {
                           <button
                             type="button"
                             onClick={() => void copy(item)}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-grow-border px-3 text-[9px] font-black uppercase text-grow-muted"
+                            className="grow-press inline-flex min-h-11 items-center gap-1.5 rounded-full bg-grow-soft px-4 text-[13px] font-semibold text-grow-text"
                           >
                             <Copy size={14} /> {copied === item.id ? 'Copiato' : 'Copia'}
                           </button>
@@ -578,7 +564,7 @@ export default function InboxPage() {
                     <button
                       type="button"
                       onClick={() => void remove(item.id)}
-                      className="-mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-grow-muted transition-colors hover:bg-red-500/10 hover:text-red-500"
+                      className="-mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-grow-muted transition-colors hover:bg-grow-fix/10 hover:text-grow-fix"
                       aria-label="Elimina nota"
                     >
                       <X size={16} />
@@ -593,7 +579,7 @@ export default function InboxPage() {
                 type="button"
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
-                className="mt-4 min-h-12 w-full rounded-full border border-black/10 bg-white text-[10px] font-black uppercase tracking-wide disabled:opacity-50"
+                className="mt-4 min-h-12 w-full rounded-full grow-surface text-xs font-bold disabled:opacity-50"
               >
                 {loadingMore ? 'Carico…' : 'Carica altre note'}
               </button>

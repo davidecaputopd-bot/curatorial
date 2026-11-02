@@ -194,21 +194,18 @@ export default function ImportSavedPage() {
 
   return (
     <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
-      <div className="mx-auto max-w-lg px-4 pt-10 lg:px-8">
+      <div className="mx-auto max-w-lg px-5 pt-10 lg:px-8">
         <header className="mb-8">
           <Link
             href="/impostazioni/cattura"
-            className="text-[10px] font-black uppercase tracking-[0.16em] text-grow-muted"
+            className="-ml-1 inline-flex min-h-11 items-center text-[15px] font-semibold text-grow-muted"
           >
             ← Salva in GROW
           </Link>
-          <p className="grow-page-kicker mt-5">
-            Recupera il passato
-          </p>
-          <h1 className="grow-page-title mt-2">
+          <h1 className="grow-page-title mt-4">
             Importa i salvati<span className="text-grow-yellow">.</span>
           </h1>
-          <p className="mt-4 text-sm leading-relaxed text-grow-muted">
+          <p className="mt-4 text-[15px] leading-snug text-grow-muted">
             Carica i file esportati dai tuoi account. L’analisi avviene nel
             browser; a GROW arrivano soltanto i link trovati.
           </p>
@@ -238,12 +235,12 @@ export default function ImportSavedPage() {
               void readFiles(event.dataTransfer.files)
             }
           }}
-          className="flex min-h-48 w-full flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-black/20 bg-white px-6 text-center transition active:scale-[0.99]"
+          className="grow-press flex min-h-48 w-full flex-col items-center justify-center rounded-[1.4rem] border-2 border-dashed border-grow-ring px-6 text-center"
         >
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-grow-yellow">
+          <span className="grow-object flex h-14 w-14 items-center justify-center rounded-full bg-grow-yellow text-grow-black">
             <FileArrowUp size={25} weight="bold" />
           </span>
-          <span className="mt-4 text-base font-black">
+          <span className="mt-4 text-base font-bold">
             {parsing ? 'Sto leggendo i file…' : 'Scegli i file esportati'}
           </span>
           <span className="mt-1 text-xs text-grow-muted">
@@ -252,22 +249,22 @@ export default function ImportSavedPage() {
         </button>
 
         {items.length > 0 && (
-          <section className="mt-4 rounded-[1.5rem] bg-[#0F0F10] p-5 text-white">
-            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">
+          <section className="grow-surface mt-4 rounded-[1.4rem] p-5">
+            <p className="text-[13px] text-grow-muted">
               Trovati in {fileNames.length} file
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-white/7 p-4">
+              <div className="rounded-2xl bg-grow-soft p-4">
                 <InstagramLogo size={22} weight="bold" />
-                <p className="mt-4 text-3xl font-black">{counts.instagram}</p>
-                <p className="text-[10px] font-bold uppercase text-white/45">
+                <p className="mt-4 text-3xl font-bold">{counts.instagram}</p>
+                <p className="text-xs font-bold text-grow-muted">
                   Instagram
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/7 p-4">
+              <div className="rounded-2xl bg-grow-soft p-4">
                 <TiktokLogo size={22} weight="bold" />
-                <p className="mt-4 text-3xl font-black">{counts.tiktok}</p>
-                <p className="text-[10px] font-bold uppercase text-white/45">
+                <p className="mt-4 text-3xl font-bold">{counts.tiktok}</p>
+                <p className="text-xs font-bold text-grow-muted">
                   TikTok
                 </p>
               </div>
@@ -276,7 +273,7 @@ export default function ImportSavedPage() {
               type="button"
               disabled={importing || Boolean(result)}
               onClick={() => void importItems()}
-              className="mt-4 min-h-12 w-full rounded-full bg-grow-yellow px-5 text-sm font-black text-black disabled:opacity-55"
+              className="grow-press grow-object mt-4 min-h-12 w-full rounded-full bg-grow-yellow px-5 text-[15px] font-bold text-grow-black disabled:opacity-55"
             >
               {importing
                 ? `Importazione ${processed} / ${items.length}…`
@@ -288,10 +285,10 @@ export default function ImportSavedPage() {
         )}
 
         {result && (
-          <section className="mt-4 flex gap-3 rounded-[1.35rem] border border-black/10 bg-[#FFF7BE] p-4">
+          <section className="mt-4 flex gap-3 rounded-[1.4rem] bg-grow-butter p-4">
             <CheckCircle size={24} weight="fill" className="shrink-0" />
             <div>
-              <p className="text-sm font-black">
+              <p className="text-sm font-bold">
                 {result.imported} nuovi contenuti in Inbox.
               </p>
               <p className="mt-1 text-xs text-grow-muted">
@@ -299,7 +296,7 @@ export default function ImportSavedPage() {
               </p>
               <Link
                 href="/inbox"
-                className="mt-3 inline-block text-[10px] font-black uppercase"
+                className="mt-3 inline-block text-xs font-bold"
               >
                 Apri Inbox →
               </Link>
@@ -308,7 +305,7 @@ export default function ImportSavedPage() {
         )}
 
         {error && (
-          <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs leading-relaxed text-red-700">
+          <p className="mt-4 rounded-2xl bg-grow-fix/10 p-4 text-[13px] leading-relaxed text-grow-fix">
             {error}
           </p>
         )}

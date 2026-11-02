@@ -26,17 +26,17 @@ function CopyButton({
     <button
       type="button"
       onClick={() => void copy()}
-      className="flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white px-4 py-3 text-left transition active:scale-[0.98]"
+      className="grow-press grow-surface flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left"
     >
       <span className="min-w-0">
-        <span className="block text-[9px] font-black uppercase tracking-[0.16em] text-grow-muted">
+        <span className="block text-[13px] text-grow-muted">
           {label}
         </span>
-        <span className="mt-1 block truncate font-mono text-[11px] text-grow-text">
+        <span className="mt-0.5 block truncate text-sm font-semibold text-grow-text">
           {value}
         </span>
       </span>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-grow-soft">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-grow-soft">
         {copied ? <Check size={17} weight="bold" /> : <Copy size={17} />}
       </span>
     </button>
@@ -69,35 +69,32 @@ export default function CaptureSetupPage() {
 
   return (
     <main className="min-h-[100dvh] bg-grow-bg pb-28 text-grow-text lg:pb-12">
-      <div className="mx-auto max-w-lg px-4 pt-10 lg:px-8">
+      <div className="mx-auto max-w-lg px-5 pt-10 lg:px-8">
         <header className="mb-8">
           <Link
             href="/inbox"
-            className="text-[10px] font-black uppercase tracking-[0.16em] text-grow-muted"
+            className="-ml-1 inline-flex min-h-11 items-center text-[15px] font-semibold text-grow-muted"
           >
             ← Inbox
           </Link>
           <div className="mt-5 flex items-end justify-between gap-5">
             <div>
-              <p className="grow-page-kicker">
-                Ingresso universale
-              </p>
-              <h1 className="grow-page-title mt-2">
+              <h1 className="grow-page-title">
                 Salva in GROW<span className="text-grow-yellow">.</span>
               </h1>
             </div>
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-grow-yellow">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-grow-soft text-grow-yellow">
               <ShareNetwork size={25} weight="bold" />
             </span>
           </div>
-          <p className="mt-4 max-w-sm text-sm leading-relaxed text-grow-muted">
+          <p className="mt-4 max-w-sm text-[15px] leading-snug text-grow-muted">
             Invia link da Instagram, TikTok, Safari e Foto senza aprire GROW e
             senza scegliere una cartella.
           </p>
         </header>
 
-        <section className="rounded-[1.5rem] bg-[#0F0F10] p-5 text-white">
-          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">
+        <section className="grow-surface rounded-[1.4rem] p-5">
+          <p className="text-[13px] text-grow-muted">
             Comando rapido iPhone
           </p>
           <h2 className="grow-section-title mt-2">
@@ -113,10 +110,10 @@ export default function CaptureSetupPage() {
               'Aggiungi l’header Authorization con valore “Bearer ” seguito dal token.',
             ].map((step, index) => (
               <li key={step} className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-grow-yellow text-xs font-black text-black">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-grow-soft text-sm font-extrabold text-grow-text">
                   {index + 1}
                 </span>
-                <p className="pt-1 text-sm leading-relaxed text-white/76">
+                <p className="pt-1 text-[15px] leading-snug text-grow-text/90">
                   {step}
                 </p>
               </li>
@@ -127,11 +124,11 @@ export default function CaptureSetupPage() {
         <section className="mt-4 space-y-3">
           <CopyButton label="URL richiesta" value={CAPTURE_URL} />
           {loading ? (
-            <div className="h-[70px] animate-pulse rounded-2xl bg-grow-soft" />
+            <div className="h-[70px] animate-pulse rounded-2xl bg-grow-card" />
           ) : token ? (
             <CopyButton label="Token personale" value={token} />
           ) : (
-            <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="rounded-2xl grow-surface p-4">
               <p className="text-sm font-bold">Collegamento non ancora attivo.</p>
               <p className="mt-1 text-xs leading-relaxed text-grow-muted">
                 {error ||
@@ -141,10 +138,10 @@ export default function CaptureSetupPage() {
           )}
         </section>
 
-        <section className="mt-6 flex gap-3 rounded-[1.35rem] border border-black/10 bg-[#FFF7BE] p-4">
+        <section className="mt-6 flex gap-3 rounded-[1.4rem] bg-grow-butter p-4">
           <ShieldCheck size={22} weight="bold" className="shrink-0" />
           <div>
-            <p className="text-sm font-black">Accesso limitato</p>
+            <p className="text-sm font-bold">Accesso limitato</p>
             <p className="mt-1 text-xs leading-relaxed text-grow-muted">
               Il token può soltanto aggiungere elementi alla tua Inbox. Non può
               leggere Archivio, chat o calendario. Scade dopo 180 giorni e può
@@ -155,7 +152,7 @@ export default function CaptureSetupPage() {
 
         <Link
           href="/impostazioni/importa"
-          className="mt-4 flex min-h-14 items-center justify-between rounded-[1.25rem] border border-black/10 bg-white px-4 py-3 text-sm font-black transition active:scale-[0.98]"
+          className="grow-press grow-surface mt-4 flex min-h-14 items-center justify-between rounded-[1.4rem] px-4 py-3 text-[15px] font-semibold"
         >
           <span>Importa i vecchi salvati Instagram e TikTok</span>
           <span>→</span>

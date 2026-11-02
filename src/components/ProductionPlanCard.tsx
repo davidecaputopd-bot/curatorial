@@ -102,20 +102,20 @@ export function ProductionPlanCard({
   }
 
   return (
-    <article className="mt-3 overflow-hidden rounded-[1.5rem] bg-[#0F0F10] p-4 text-white shadow-xl">
+    <article className="mt-3 overflow-hidden rounded-[1.5rem] bg-grow-soft p-4 text-white shadow-xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="inline-flex rounded-full bg-grow-yellow px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-black">
+          <p className="inline-flex rounded-full bg-grow-yellow px-3 py-1.5 text-[11px] font-bold text-grow-black">
             Motore consigliato · {plan.recommended_engine}
           </p>
-          <h3 className="mt-3 text-xl font-black uppercase leading-none tracking-tight">
+          <h3 className="mt-3 text-xl font-bold leading-none tracking-tight">
             {plan.title}
           </h3>
           <p className="mt-2 text-xs leading-relaxed text-white/50">
             {plan.project} · {plan.asset_type} · {plan.production_mode}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1.5 text-[9px] font-black uppercase tracking-[0.1em]">
+        <div className="flex flex-col items-end gap-1.5 text-[11px] font-bold">
           <span className="rounded-full border border-white/15 px-3 py-1.5 text-white/75">
             {executionLabel(plan)}
           </span>
@@ -127,14 +127,14 @@ export function ProductionPlanCard({
 
       {plan.alternatives.length > 0 && (
         <div className="mt-4">
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/35">
+          <p className="text-[11px] font-bold text-white/35">
             Alternative
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {plan.alternatives.map((engine) => (
               <span
                 key={engine}
-                className="rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold text-white/65"
+                className="rounded-full bg-white/[0.07] px-3 py-1.5 text-xs font-bold text-white/65"
               >
                 {engine}
               </span>
@@ -144,7 +144,7 @@ export function ProductionPlanCard({
       )}
 
       <div className="mt-5">
-        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/35">
+        <p className="text-[11px] font-bold text-white/35">
           Percorso produttivo
         </p>
         <ol className="mt-2 space-y-2">
@@ -153,7 +153,7 @@ export function ProductionPlanCard({
               key={step}
               className="flex gap-3 rounded-xl bg-white/[0.06] p-3 text-xs leading-relaxed text-white/70"
             >
-              <span className="font-black text-grow-yellow">
+              <span className="font-bold text-grow-yellow">
                 {String(index + 1).padStart(2, '0')}
               </span>
               <span>{step}</span>
@@ -163,7 +163,7 @@ export function ProductionPlanCard({
       </div>
 
       <details className="mt-3 rounded-xl border border-white/10 px-3 py-2.5">
-        <summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.12em] text-white/60">
+        <summary className="cursor-pointer text-xs font-bold text-white/60">
           Checklist qualità · {plan.checklist.length}
         </summary>
         <ul className="mt-3 space-y-2 text-xs leading-relaxed text-white/55">
@@ -178,7 +178,7 @@ export function ProductionPlanCard({
 
       {plan.risk_notes.length > 0 && (
         <details className="mt-2 rounded-xl border border-white/10 px-3 py-2.5">
-          <summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.12em] text-white/60">
+          <summary className="cursor-pointer text-xs font-bold text-white/60">
             Rischi da controllare · {plan.risk_notes.length}
           </summary>
           <ul className="mt-3 space-y-2 text-xs leading-relaxed text-white/55">
@@ -193,7 +193,7 @@ export function ProductionPlanCard({
         <button
           type="button"
           onClick={openStudio}
-          className="rounded-full bg-grow-yellow px-4 py-3 text-[10px] font-black uppercase tracking-tight text-black"
+          className="rounded-full bg-grow-yellow px-4 py-3 text-xs font-bold tracking-tight text-grow-black"
         >
           Compila prompt
         </button>
@@ -201,21 +201,21 @@ export function ProductionPlanCard({
           type="button"
           onClick={createJob}
           disabled={creatingJob}
-          className="rounded-full border border-white/15 px-4 py-3 text-[10px] font-black uppercase tracking-tight text-white disabled:opacity-40"
+          className="rounded-full border border-white/15 px-4 py-3 text-xs font-bold tracking-tight text-white disabled:opacity-40"
         >
           {creatingJob ? 'Creazione…' : 'Crea job'}
         </button>
         <button
           type="button"
           onClick={() => router.push('/archivio')}
-          className="rounded-full border border-white/15 px-4 py-3 text-[10px] font-black uppercase tracking-tight text-white/65"
+          className="rounded-full border border-white/15 px-4 py-3 text-xs font-bold tracking-tight text-white/65"
         >
           {reference ? 'Cambia reference' : 'Usa reference'}
         </button>
         <button
           type="button"
           onClick={openStudio}
-          className="rounded-full border border-white/15 px-4 py-3 text-[10px] font-black uppercase tracking-tight text-white/65"
+          className="rounded-full border border-white/15 px-4 py-3 text-xs font-bold tracking-tight text-white/65"
         >
           Apri Studio
         </button>

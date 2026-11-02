@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'GROW',
     start_url: '/serie',
     display: 'standalone',
-    background_color: '#F7F4EE',
-    theme_color: '#0F0F10',
+    background_color: '#0D0C0B',
+    theme_color: '#0D0C0B',
     icons: [{ src: '/icon-1.svg', sizes: 'any', type: 'image/svg+xml' }],
   }
 }

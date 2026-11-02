@@ -2,189 +2,155 @@
 name: GROW
 description: L'archivio creativo e il piano operativo personale di un art director freelance.
 colors:
-  paper: "#F7F4EE"
-  ink: "#111111"
-  ink-deep: "#0F0F10"
-  muted: "#5F5A52"
-  card: "#FFFFFF"
-  soft: "#F1EDE5"
-  border: "#DED8CC"
-  highlighter: "#FFE500"
-  highlighter-deep: "#FFD600"
+  stage: "#0D0C0B"
+  surface: "#181715"
+  surface-2: "#23211E"
+  line: "#2E2B27"
+  ring: "#6E6A62"
+  paper: "#F3F0E8"
+  muted: "#A39E94"
+  butter: "#2B2810"
+  now: "#FFE500"
+  now-strong: "#FFD600"
+  ink: "#0D0C0B"
+  ok: "#6BD69A"
+  done: "#B49BF2"
+  time: "#74C6F2"
+  fix: "#FF8450"
 typography:
-  display:
-    fontFamily: "Bebas Neue, Arial Black, sans-serif"
-    fontSize: "clamp(1.75rem, 5vw, 2.375rem)"
-    fontWeight: 400
+  page-title:
+    fontFamily: "Schibsted Grotesk, Helvetica Neue, Arial, sans-serif"
+    fontSize: "2.75rem"
+    fontWeight: 800
     lineHeight: 0.9
-    letterSpacing: "-0.02em"
+    letterSpacing: "-0.035em"
+  block-title:
+    fontFamily: "Schibsted Grotesk"
+    fontSize: "2.25rem"
+    fontWeight: 800
+    lineHeight: 0.95
+    letterSpacing: "-0.035em"
+  section-title:
+    fontFamily: "Schibsted Grotesk"
+    fontSize: "1.375rem"
+    fontWeight: 800
+    lineHeight: 1.05
+    letterSpacing: "-0.03em"
   title:
-    fontFamily: "DM Sans, Helvetica Neue, system-ui, sans-serif"
-    fontSize: "1.125rem"
+    fontFamily: "Schibsted Grotesk"
+    fontSize: "1.0625rem"
     fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: "normal"
+    lineHeight: 1.2
   body:
-    fontFamily: "DM Sans, Helvetica Neue, system-ui, sans-serif"
-    fontSize: "0.875rem"
+    fontFamily: "Schibsted Grotesk"
+    fontSize: "0.9375rem"
     fontWeight: 400
-    lineHeight: 1.6
-    letterSpacing: "normal"
-  label:
-    fontFamily: "DM Mono, Courier New, monospace"
-    fontSize: "0.625rem"
-    fontWeight: 500
-    lineHeight: 1.3
-    letterSpacing: "0.15em"
+    lineHeight: 1.45
+  small:
+    fontFamily: "Schibsted Grotesk"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: 1.35
 rounded:
-  sm: "12px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
+  control: "14px"
+  tile: "18px"
+  card: "22px"
+  block: "28px"
+  sheet: "32px"
   full: "9999px"
 spacing:
-  xs: "8px"
-  sm: "12px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
-components:
-  button-primary:
-    backgroundColor: "{colors.highlighter}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.full}"
-    padding: "14px 24px"
-  button-primary-hover:
-    backgroundColor: "{colors.highlighter-deep}"
-  button-dark:
-    backgroundColor: "{colors.ink-deep}"
-    textColor: "{colors.highlighter}"
-    rounded: "{rounded.full}"
-    padding: "8px 16px"
-  card:
-    backgroundColor: "{colors.card}"
-    rounded: "{rounded.lg}"
-    padding: "16px"
-  input:
-    backgroundColor: "{colors.soft}"
-    rounded: "{rounded.md}"
-    padding: "14px 16px"
+  scale: "4px"
+  gutter: "20px"
+  between-groups: "32px"
+  title-to-content: "12px"
+  siblings: "8px"
 ---
 
 # Design System: GROW
 
 ## 1. Overview
 
-**Creative North Star: "Lo Studio Quaderno"**
+**Creative North Star: "Palco"**
 
-GROW si comporta come il taccuino fisico di uno studio creativo indipendente: pagine color crema, inchiostro nero netto, un solo evidenziatore giallo usato con intenzione. Non è un'app consumer che cerca di intrattenere, e non è una dashboard SaaS che cerca di vendersi — è lo strumento di lavoro quotidiano di un singolo art director, costruito per ridurre l'attrito tra "ho visto qualcosa" e "l'ho usato in un brief". Ogni schermata privilegia l'azione immediata sul dettaglio nascosto: stato e prossimo passo si leggono a colpo d'occhio, mai dietro un tap in più.
+Il nero è il palcoscenico, la carta crema di GROW diventa la luce del testo, il colore pieno è la struttura. Ogni schermata ha un solo blocco protagonista, sempre giallo, perché è la cosa da fare adesso: il prossimo episodio in Serie, lo spazio di cattura in Inbox, "Prima chiudi questo" in Piano. Tutto il resto sta un passo indietro, su superfici scure appena sollevate.
 
-Il sistema rifiuta esplicitamente l'estetica da SaaS generico — niente card grid identiche e ripetute all'infinito, niente palette "SaaS-cream" scontata e priva di carattere, niente eyebrow uppercase sopra ogni sezione, niente badge colorati a pioggia senza gerarchia. GROW non deve sembrare un template di dashboard B2B: deve sembrare costruito su misura per un solo workflow, con la fiducia tipografica di un brief di design, non i riempitivi rassicuranti di un onboarding consumer.
-
-**Key Characteristics:**
-- Tipografia da titolo di rivista (Bebas Neue) accanto a corpo testo umano (DM Sans) e didascalie tecniche (DM Mono)
-- Superfici quasi piatte: bordo sottile invece di ombra, eccetto sugli elementi flottanti
-- Giallo come firma riconoscibile, non come tappezzeria — presente ma mai dominante sulla superficie totale
-- Pillole arrotondate per azioni e stato, rettangoli morbidi (24px+) per i contenitori
-- Colore per identità funzionale (cliente, stato pipeline) separato e distinguibile dal colore di brand
+GROW deve sembrare un oggetto, non una dashboard. Gli elementi premibili hanno peso: luce dall'alto, ombra sotto, una molla quando li lasci. Niente blob, aloni decorativi, pillole a pioggia o etichette maiuscole sopra ogni sezione.
 
 ## 2. Colors
 
-Palette ristretta e tinteggiata calda: un solo accento elettrico sopra una base di carta e inchiostro.
+### Palco e carta
+- **Palco** (#0D0C0B): sfondo di ogni schermata. Nero caldo, non neutro.
+- **Superficie** (#181715) e **Superficie 2** (#23211E): liste, card, campi, controlli a riposo.
+- **Linea** (#2E2B27): divisori sottili dentro le liste.
+- **Anello** (#6E6A62): contorno dei controlli vuoti (check, interruttori). 3,3:1 sulla superficie.
+- **Carta** (#F3F0E8): testo principale e pulsanti chiari. 17:1 sul palco.
+- **Tenue** (#A39E94): testo secondario. 7,3:1 sul palco, 6,7:1 sulla superficie.
 
-### Primary
-- **Evidenziatore** (#FFE500): l'accento di brand. Usato su CTA primarie, badge di stato attivo, indicatori "non letto", la barra attiva nella navigazione, il floating action button. È il colore che dice "agisci qui".
-- **Evidenziatore Profondo** (#FFD600): stato hover/press dell'evidenziatore — stessa famiglia, leggermente più saturo verso l'oro.
-
-### Neutral
-- **Carta** (#F7F4EE): sfondo di base di ogni schermata. Crema caldo, non bianco puro — la "pagina" del quaderno.
-- **Inchiostro** (#111111): testo primario su sfondo carta.
-- **Inchiostro Profondo** (#0F0F10): superfici scure intenzionali — barra di navigazione, badge "Lavora in AI", bottoni secondari ad alto contrasto.
-- **Tenue** (#5F5A52): testo secondario, etichette, metadati. Un grigio caldo, mai un grigio freddo o desaturato a zero — resta nella famiglia cromatica della carta.
-- **Scheda** (#FFFFFF): sfondo delle card sopra la carta, per separazione minima di superficie.
-- **Morbido** (#F1EDE5): sfondo di input, select, aree interattive secondarie — un passo più scuro della carta, un passo più chiaro del bordo.
-- **Bordo** (#DED8CC): unico colore di bordo nel sistema. Sottile, mai una linea netta in contrasto forte.
+### Il colore è uno stato
+Ogni colore dice sempre la stessa cosa, in tutte le sezioni.
+- **Adesso** (#FFE500): la cosa da fare, la voce attiva della navigazione, lo stato "in corso". È il giallo di sempre di GROW.
+- **Al passo, pronto** (#6BD69A).
+- **Completato, pubblicato** (#B49BF2).
+- **Futuro** (#74C6F2): in arrivo, date, tempo.
+- **Da sistemare** (#FF8450): ritardo, posizione mancante, elimina.
 
 ### Named Rules
-**La Regola della Rarità.** L'evidenziatore giallo occupa il 10–25% di qualunque schermata, mai di più. Compare su un'azione primaria, un badge di stato, un indicatore — non come sfondo di sezione diffuso. La sua riconoscibilità dipende dal fatto che non è ovunque.
+**Un giallo per schermata.** Il giallo pieno sta su un solo blocco per schermata più la voce attiva della navigazione. Altrove il giallo compare al massimo come contorno o come numero luminoso.
 
-**La Regola del Colore Funzionale.** I colori usati per distinguere clienti o stati nella pipeline (ambra, smeraldo, viola, blu, rosa) sono identità funzionali, non estensioni della palette di brand. Non competono mai con il giallo per importanza visiva — restano piccoli (barre laterali da 4px, pallini da 8px), mai superfici piene.
+**Inchiostro sul colore.** Sui blocchi colorati il testo è sempre inchiostro (#0D0C0B): ogni combinazione supera 8:1.
+
+**I clienti hanno il logo, non un colore.** In Piano ogni cliente è il suo logo nel suo riquadro (`public/clients/`), sul fondo per cui è disegnato. Chi non ha un logo ha il monogramma. Tipi di nota e categorie sono testo.
 
 ## 3. Typography
 
-**Display Font:** Bebas Neue (con fallback Arial Black, sans-serif)
-**Body Font:** DM Sans (con fallback Helvetica Neue, system-ui, sans-serif)
-**Label/Mono Font:** DM Mono (con fallback Courier New, monospace)
+**Schibsted Grotesk** per tutto, da 400 a 900, caricato con `next/font` nel layout principale. Nessun monospazio: codici episodio, orari e conteggi usano le cifre tabellari del carattere stesso (`tabular-nums`). I numeri grandi da soli usano le cifre proporzionali.
 
-**Character:** Bebas Neue porta la voce da titolo editoriale — condensato, maiuscolo, deciso, usato con parsimonia sui titoli di pagina. DM Sans è il cavallo da lavoro per ogni testo umano: leggibile, neutro, senza personalità che distrae. DM Mono firma ogni etichetta tecnica e metadato con un tocco da terminale/quaderno tecnico, mai decorativo.
+- **Titolo pagina** (800, 44px, interlinea 0,9, -0,035em): "Serie.", "Inbox.", "Piano.". La riga è tagliata sulla maiuscola (`text-box-trim`), così lo spazio sopra è uguale a quello ai lati.
+- **Titolo del blocco** (800, 36px, 0,95).
+- **Titolo di gruppo** (800, 22px, 1,05).
+- **Nome** (700, 17px, 1,2): serie, lavori, note.
+- **Testo** (400, 15px, 1,45).
+- **Piccolo** (400, 13px, 1,35): metadati, codici, date.
 
-### Hierarchy
-- **Display** (400, clamp(1.75rem, 5vw, 2.375rem), line-height 0.9, Bebas Neue, uppercase): titoli di pagina ("Calendario.", "Inbox.", "Archivio."). Il punto finale giallo è una firma ricorrente del sistema.
-- **Title** (700, 1.125rem, line-height 1.25, DM Sans): titoli di card, nomi di contenuti, intestazioni di sezione dentro una pagina.
-- **Body** (400, 0.875rem, line-height 1.6, DM Sans): testo conversazionale, descrizioni, messaggi chat. Max ~70 caratteri per riga nei container di testo lungo.
-- **Label** (500, 0.625rem, line-height 1.3, letter-spacing 0.15em, DM Mono, uppercase): etichette di sezione, metadati, timestamp, badge di stato. Sempre tutto maiuscolo, sempre tracciato largo.
+**La Regola del Punto Giallo** resta: ogni titolo di pagina finisce con un punto giallo.
 
-### Named Rules
-**La Regola del Punto Giallo.** Ogni titolo Display termina con un punto reso nell'evidenziatore (`<span className="text-grow-yellow">.</span>`). È la firma tipografica del sistema — non va omessa né sostituita con altri segni.
+## 4. Spacing
 
-## 4. Elevation
+Griglia da 4. Margine laterale 20px. 32px tra un gruppo e l'altro, 12px tra il titolo di un gruppo e il suo contenuto, 8px tra elementi fratelli. I raggi sono concentrici: un elemento interno ha raggio uguale a quello esterno meno il padding.
 
-GROW è piatto per default. Le card vivono sulla carta con un bordo sottile (1px, colore Bordo) invece di un'ombra — la separazione di superficie è data dal colore (Scheda su Carta), non dalla profondità simulata. L'ombra appare solo per segnalare galleggiamento reale: elementi che stanno sopra il flusso normale del contenuto (barra di navigazione flottante, floating action button, modali, sheet).
+## 5. Elevation and depth
 
-### Shadow Vocabulary
-- **Galleggiante Diffusa** (`box-shadow: 0 -2px 40px rgba(15,15,16,0.08), 0 18px 50px rgba(15,15,16,0.12)`): la barra di navigazione inferiore. Ombra ampia e morbida che la stacca dal contenuto sottostante senza un bordo netto.
-- **Galleggiante Accento** (`box-shadow: 0 8px 24px rgba(255,229,0,0.4)`): riservata al floating action button — l'unica ombra colorata del sistema, tinta dell'evidenziatore stesso invece che neutra.
-- **Modale** (`backdrop-blur con overlay rgba(0,0,0,0.5)`): sheet e modali si aprono dal basso con sfondo sfocato dietro, mai un'ombra propria — la profondità è data dal blur del livello sottostante.
+Una sola luce, dall'alto. Utilità in `globals.css`:
+- `.grow-surface`: superficie scura appena sollevata (sfumatura quasi invisibile, filo di luce sul bordo alto, ombra stretta).
+- `.grow-block`: il blocco giallo protagonista, con ombra profonda.
+- `.grow-object`: pulsanti e riquadri colorati o chiari, convessi.
+- `.grow-socket`: il check vuoto, un incavo.
+- `.grow-press`: premendo l'oggetto scende di 1px e si rimpicciolisce a 0,98; al rilascio torna con una molla smorzata (circa 4% di rimbalzo, `--spring`).
+- `.grow-tilt` con `useTilt`: il blocco protagonista si inclina in prospettiva verso il dito (max 7°), con un riflesso che segue il punto toccato e il poster su un piano più vicino. Solo su elementi premibili.
 
-### Named Rules
-**La Regola del Bordo, non Ombra.** Le card a riposo usano sempre un bordo sottile, mai un'ombra. L'ombra è riservata esclusivamente a ciò che galleggia sopra il flusso normale (nav, FAB, modali) — è un segnale di stato, non una texture decorativa applicata di default.
+Con "riduci movimento" restano solo i cambi di stato: niente molla, niente inclinazione, niente animazioni d'ingresso.
 
-## 5. Components
+## 6. Components
 
-### Buttons
-- **Shape:** pillola piena (rounded-full, raggio 9999px) per ogni azione, primaria o secondaria.
-- **Primary:** sfondo Evidenziatore (#FFE500), testo Inchiostro, padding 14px 24px, font-weight 700-900 uppercase tracciato stretto.
-- **Hover / Focus:** sfondo passa a Evidenziatore Profondo (#FFD600); nessuna animazione di scala, solo cambio colore immediato (≤200ms).
-- **Dark/Secondary:** sfondo Inchiostro Profondo (#0F0F10), testo Evidenziatore — usato per azioni di handoff secondarie ("Lavora in AI →"), mai per l'azione primaria della schermata.
-- **Ghost:** bordo Bordo (1px), testo Tenue, sfondo trasparente — per filtri e toggle non selezionati.
+- **Navigazione**: barra flottante scura in basso su mobile, barra laterale su desktop. Voce attiva gialla.
+- **Linguette**: controllo a segmenti su superficie scura, con il cursore chiaro che scivola. Il conteggio di "Da vedere" è un numero giallo con un bagliore, senza riquadro.
+- **Check**: tondo, 48px, incavo vuoto con anello a 3,3:1; giallo e convesso quando è segnato, con la spunta che si disegna.
+- **Liste**: un'unica superficie con divisori sottili, non card una sopra l'altra.
+- **Like**: il fiore di GROW (`SaveHeart`). Non si cambia.
+- **Schede dal basso**: superficie scura, angoli da 32px, sfondo sfocato dietro.
+- **Stati vuoti**: titolo da 22px e una frase che dice cosa fare, allineati a sinistra.
 
-### Chips / Badge di stato
-- **Style:** pillola piccola (px-2 py-0.5), testo 9-10px DM Mono o DM Sans bold uppercase.
-- **Stato pipeline:** colore di sfondo trasparente al 15% sul colore semantico (blu=in produzione, verde=pronto, giallo=pubblicato, rosso=da riciclare, grigio=idea) con bordo coordinato. Mai un riempimento pieno e saturo — il chip deve restare leggero sopra la carta.
-- **Identità cliente:** barra verticale di 4-8px nel colore assegnato al cliente (ambra, smeraldo, viola, blu, rosa), mai un riempimento di card intero.
-
-### Cards / Containers
-- **Corner Style:** raggio grande, 24px (rounded-[1.5rem]) per card di contenuto, 32px (rounded-[2rem]) per sheet e modali full-width.
-- **Background:** Scheda (#FFFFFF) o Carta leggermente scura (Morbido #F1EDE5) per aree interattive annidate.
-- **Shadow Strategy:** nessuna a riposo — vedi sezione Elevation. Solo bordo 1px colore Bordo.
-- **Internal Padding:** 16px standard, 24px per composer e form principali.
-
-### Inputs / Fields
-- **Style:** sfondo Morbido (#F1EDE5), bordo 1px Bordo, raggio 16px (rounded-2xl) per campi singoli, 24px per textarea multi-riga.
-- **Focus:** il bordo passa a Evidenziatore (#FFE500), nessun glow esterno — il cambio colore è il segnale.
-- **Codice OTP:** caso speciale — testo centrato, 24px, font-weight 900, letter-spacing 0.4em, per leggibilità immediata di un codice numerico.
-
-### Navigation
-- **BottomNav:** barra flottante arrotondata (rounded-[1.8rem]) ancorata in basso, sfondo Carta semi-trasparente con `backdrop-blur-xl`, 5 voci massimo con icona + etichetta. Voce attiva: pillola Inchiostro Profondo con icona/testo Evidenziatore. Voce inattiva: icona/testo Tenue al 40% di opacità.
-- **Tab interni (es. Settimana/Pipeline):** stesso pattern della BottomNav in scala ridotta — pillola scura per la voce attiva dentro un contenitore Scheda.
-
-### Floating Action Button
-- **Style:** cerchio pieno Evidenziatore, 52-56px, icona Inchiostro centrata, ombra Galleggiante Accento (vedi Elevation). Ancorato in basso a destra, sopra la BottomNav.
-
-## 6. Do's and Don'ts
+## 7. Do's and Don'ts
 
 ### Do:
-- **Do** usare il punto giallo (`.`) a chiusura di ogni titolo Display — è la firma tipografica ricorrente del sistema.
-- **Do** mantenere l'evidenziatore (#FFE500) tra il 10% e il 25% di superficie per schermata: presente come firma, mai come tappezzeria di sfondo.
-- **Do** usare bordo sottile (1px, #DED8CC) come trattamento di default per ogni card a riposo; riservare l'ombra solo a elementi flottanti (nav, FAB, modali).
-- **Do** distinguere sempre il colore funzionale (identità cliente, stato pipeline) dal colore di brand: barre sottili o chip piccoli, mai riempimenti pieni che competono con il giallo.
-- **Do** chiudere ogni interazione di scrittura (inbox, chat, calendario) nel minor numero di tap possibile — la cattura senza attrito è un principio strategico, non solo visivo.
+- **Do** dare a ogni schermata un solo blocco giallo, la cosa da fare adesso.
+- **Do** usare i colori di stato sempre con lo stesso significato.
+- **Do** tenere i tocchi a 44px o più.
+- **Do** usare `.grow-press` su tutto ciò che si preme.
 
 ### Don't:
-- **Don't** costruire griglie di card identiche e ripetute all'infinito — è il pattern SaaS generico che il prodotto rifiuta esplicitamente.
-- **Don't** usare una palette "SaaS-cream" anonima: il crema di GROW (#F7F4EE) è scelto e tinteggiato, non un default neutro senza carattere.
-- **Don't** aggiungere eyebrow uppercase sopra ogni sezione per riflesso — un'etichetta DM Mono ha senso solo quando introduce davvero un gruppo di contenuti distinto, non come decorazione automatica.
-- **Don't** spargere badge colorati senza gerarchia: ogni colore funzionale deve avere un solo ruolo chiaro (cliente o stato, mai entrambi nello stesso elemento).
-- **Don't** applicare ombre a card a riposo — la profondità in GROW è un segnale raro (galleggiamento), non una texture di default su ogni superficie.
-- **Don't** scrivere microcopy rassicurante da assistente premuroso ("sono qui per aiutarti", "non esitare a chiedere") — il tono è quello di un collega senior diretto, non di un onboarding consumer.
-- **Don't** scendere sotto 4.5:1 di contrasto per il testo Tenue (#5F5A52) su sfondo Carta (#F7F4EE) — area di rischio nota nel sistema, verificare sempre prima di spedire.
+- **Don't** reintrodurre il seme (icon-1…5) come segno grafico.
+- **Don't** usare il lime acido, i gradienti viola-blu, i blob o gli aloni decorativi.
+- **Don't** colorare i clienti: hanno il logo.
+- **Don't** mettere etichette maiuscole spaziate sopra le sezioni.
+- **Don't** far inclinare elementi che non si premono.

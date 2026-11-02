@@ -1,7 +1,7 @@
 'use client'
 
 // Elementi ricorrenti della sezione Serie, nello stile di TV Time:
-// poster verticali, codice episodio "S01 | E02", check rotondo, barra di avanzamento.
+// poster verticali, codice episodio "S1 · E2", check rotondo, barra di avanzamento.
 
 export type TvShow = {
   id: number
@@ -33,15 +33,15 @@ export type TvShow = {
 }
 
 export const episodeCode = (season: number, number: number) =>
-  `S${String(season).padStart(2, '0')} | E${String(number).padStart(2, '0')}`
+  `S${season} · E${number}`
 
 export function Poster({ src, title, className = '' }: { src: string | null; title: string; className?: string }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={title} loading="lazy" className={`object-cover ${className}`} />
+    <img src={src} alt={title} loading="lazy" className={`object-cover outline outline-1 -outline-offset-1 outline-white/10 ${className}`} />
   ) : (
-    <div className={`flex items-center justify-center bg-grow-black p-2 text-center ${className}`}>
-      <span className="text-lg leading-none text-grow-yellow font-[family-name:var(--font-tv-display)] font-normal uppercase tracking-[0.01em]">{title}</span>
+    <div className={`grow-surface flex items-end p-2 ${className}`}>
+      <span className="font-display text-sm leading-[0.95] text-grow-text">{title}</span>
     </div>
   )
 }
@@ -61,17 +61,17 @@ export function progressState(show: TvShow) {
 }
 
 const TONES: Record<string, string> = {
-  done: 'bg-[#7C3AED]',
-  uptodate: 'bg-[#22C55E]',
+  done: 'bg-grow-done',
+  uptodate: 'bg-grow-ok',
   progress: 'bg-grow-yellow',
-  new: 'bg-black/15',
-  unknown: 'bg-black/15',
+  new: 'bg-grow-border',
+  unknown: 'bg-grow-border',
 }
 
 export function ProgressBar({ show, className = '' }: { show: TvShow; className?: string }) {
   const state = progressState(show)
   return (
-    <div className={`h-1.5 w-full bg-black/10 ${className}`}>
+    <div className={`h-1.5 w-full bg-grow-soft ${className}`}>
       <div className={`h-full ${TONES[state.tone]}`} style={{ width: `${Math.round(state.ratio * 100)}%` }} />
     </div>
   )
@@ -96,10 +96,10 @@ export function CheckButton({
       aria-label={label}
       aria-pressed={checked}
       className={[
-        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 active:scale-90 motion-reduce:active:scale-100',
+        'grow-press flex h-12 w-12 shrink-0 items-center justify-center rounded-full',
         checked
-          ? 'border-grow-yellow bg-grow-yellow text-grow-black'
-          : 'border-grow-black/40 text-grow-black/55 hover:border-grow-black hover:text-grow-black',
+          ? 'grow-object grow-draw scale-105 bg-grow-yellow text-grow-black'
+          : 'grow-socket text-grow-muted hover:text-grow-text',
         busy ? 'opacity-50' : '',
       ].join(' ')}
     >
