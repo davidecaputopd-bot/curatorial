@@ -124,3 +124,71 @@ export function airLabel(airstamp: string) {
 export function airTime(airstamp: string) {
   return new Date(airstamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
 }
+
+export function longDate(airstamp: string) {
+  return new Date(airstamp).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+export function monthYear(airstamp: string) {
+  return new Date(airstamp).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+}
+
+// Da quanto tempo, a parole: "3 mesi", "1 anno e 2 mesi".
+export function sinceLabel(airstamp: string, now = Date.now()) {
+  const months = Math.max(Math.floor((now - new Date(airstamp).getTime()) / (30.44 * 86_400_000)), 0)
+  if (months < 1) return 'meno di un mese'
+  const years = Math.floor(months / 12)
+  const rest = months % 12
+  const y = years === 1 ? '1 anno' : `${years} anni`
+  const m = rest === 1 ? '1 mese' : `${rest} mesi`
+  return years === 0 ? m : rest === 0 ? y : `${y} e ${m}`
+}
+
+export type ReturnFacts = {
+  status: string | null
+  next: { season: number; number: number; airstamp: string } | null
+  last_aired: string | null
+  tba_season: number | null
+}
+
+export type ReturnKind = 'airing' | 'dated' | 'announced' | 'waiting' | 'uncertain' | 'development' | 'ended'
+
+// Quando torna una serie, dagli stati di TVmaze e dagli episodi già noti.
+// Running senza date vuol dire che per TVmaze non è stata chiusa: la diamo "in lavorazione".
+export function returnState(facts: ReturnFacts, now = Date.now()): { kind: ReturnKind; label: string; detail: string | null } {
+  const stopped = facts.last_aired ? `Ferma da ${sinceLabel(facts.last_aired, now)}` : null
+  if (facts.status === 'Ended') {
+    return { kind: 'ended', label: 'Conclusa', detail: facts.last_aired ? `Ultima puntata ${monthYear(facts.last_aired)}` : null }
+  }
+  if (facts.next) {
+    const recent = facts.last_aired && now - new Date(facts.last_aired).getTime() < 21 * 86_400_000
+    if (recent && facts.next.number !== 1) {
+      return { kind: 'airing', label: 'In onda', detail: `Prossima puntata ${airLabel(facts.next.airstamp).toLowerCase()}` }
+    }
+    return {
+      kind: 'dated',
+      label: `${facts.next.number === 1 ? 'Torna' : 'Riprende'} il ${longDate(facts.next.airstamp)}`,
+      detail: [`Stagione ${facts.next.season}`, stopped].filter(Boolean).join(' · '),
+    }
+  }
+  if (facts.tba_season) {
+    return { kind: 'announced', label: `Stagione ${facts.tba_season} annunciata`, detail: ['Senza data', stopped].filter(Boolean).join(' · ') }
+  }
+  if (facts.status === 'To Be Determined') {
+    return { kind: 'uncertain', label: 'Futuro incerto', detail: stopped || 'Rinnovo non deciso' }
+  }
+  if (facts.status === 'In Development') {
+    return { kind: 'development', label: 'In sviluppo', detail: 'Non ancora uscita' }
+  }
+  return { kind: 'waiting', label: 'In lavorazione', detail: stopped || 'Nessuna data annunciata' }
+}
+
+export const RETURN_TONE: Record<ReturnKind, string> = {
+  airing: 'bg-grow-ok',
+  dated: 'bg-grow-time',
+  announced: 'bg-grow-time',
+  waiting: 'bg-grow-yellow',
+  uncertain: 'bg-grow-fix',
+  development: 'bg-grow-ring',
+  ended: 'bg-grow-done',
+}

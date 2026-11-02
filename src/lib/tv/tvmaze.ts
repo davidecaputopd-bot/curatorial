@@ -47,3 +47,36 @@ export async function getEpisodes(id: number) {
 export function searchShows(query: string) {
   return get<{ show: TvmazeShow }[]>(`/search/shows?q=${encodeURIComponent(query)}`)
 }
+
+export type TvmazeSeason = {
+  number: number
+  episodeOrder: number | null
+  premiereDate: string | null
+  endDate: string | null
+}
+
+export type TvmazeShowFull = TvmazeShow & {
+  ended?: string | null
+  genres?: string[]
+  summary?: string | null
+  _embedded?: { seasons?: TvmazeSeason[]; episodes?: TvmazeEpisode[] }
+}
+
+// Scheda completa con stagioni ed episodi in una sola richiesta, per l'anteprima.
+export const getShowFull = (id: number) =>
+  get<TvmazeShowFull>(`/shows/${id}?embed[]=seasons&embed[]=episodes`)
+
+// Stagioni di una serie, in cache 12 ore: servono solo a sapere se ne è stata annunciata una nuova.
+export async function getSeasons(id: number) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(`${API}/shows/${id}/seasons`, { next: { revalidate: 43_200 } })
+    if (response.status === 404) return []
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
+      continue
+    }
+    if (!response.ok) return []
+    return (await response.json()) as TvmazeSeason[]
+  }
+  return []
+}

@@ -8,9 +8,14 @@ import {
   airTime,
   CheckButton,
   episodeCode,
+  longDate,
   Poster,
   ProgressBar,
   progressState,
+  RETURN_TONE,
+  returnState,
+  type ReturnFacts,
+  type ReturnKind,
   type TvShow,
 } from '@/components/tv/TvBits'
 import { currentPushSubscription, disablePush, enablePush, pushSupported } from '@/lib/tv/push-client'
@@ -25,6 +30,17 @@ type Upcoming = {
   airstamp: string
   tv_shows: { title: string; poster: string | null; network: string | null }
 }
+
+type Ritorno = ReturnFacts & { id: number; title: string; poster: string | null; network: string | null }
+
+// Ordine dei gruppi in "Quando tornano": prima ciò che ha una data.
+const RETURN_GROUPS: { kind: ReturnKind; title: string }[] = [
+  { kind: 'dated', title: 'Con una data' },
+  { kind: 'announced', title: 'Annunciate, senza data' },
+  { kind: 'waiting', title: 'In lavorazione' },
+  { kind: 'uncertain', title: 'Futuro incerto' },
+  { kind: 'development', title: 'In sviluppo' },
+]
 
 type SearchResult = {
   tvmaze_id: number
@@ -84,6 +100,7 @@ export default function SeriePage() {
   const [push, setPush] = useState<'on' | 'off' | 'unsupported'>('off')
   const [pushError, setPushError] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [ritorni, setRitorni] = useState<Ritorno[] | null>(null)
 
   const load = useCallback(async () => {
     const response = await fetch('/api/tv')
@@ -107,6 +124,7 @@ export default function SeriePage() {
       if (data.synced === 0) break
     }
     setSyncing(null)
+    setRitorni(null)
     await load()
   }, [load])
 
@@ -124,6 +142,14 @@ export default function SeriePage() {
     })
     return () => window.cancelAnimationFrame(frame)
   }, [load, sync])
+
+  useEffect(() => {
+    if (tab !== 'arrivo' || ritorni) return
+    void fetch('/api/tv/ritorni')
+      .then((response) => response.json())
+      .then((data) => setRitorni(data.items || []))
+      .catch(() => setRitorni([]))
+  }, [tab, ritorni])
 
   const [now] = useState(() => Date.now())
   const followed = useMemo(() => shows.filter((show) => show.followed), [shows])
@@ -222,6 +248,24 @@ export default function SeriePage() {
     }
     return groups
   }, [upcoming, now])
+
+  // Serie ferme o in pausa: quelle in onda stanno già nell'elenco per giorno.
+  const returnGroups = useMemo(() => {
+    const horizon = now + 30 * 86_400_000
+    const states = (ritorni || [])
+      .filter((item) => !item.next || new Date(item.next.airstamp).getTime() > horizon)
+      .map((item) => ({ item, state: returnState(item, now) }))
+    return RETURN_GROUPS.map((group) => ({
+      ...group,
+      items: states
+        .filter(({ state }) => state.kind === group.kind)
+        .sort((a, b) =>
+          group.kind === 'dated'
+            ? String(a.item.next?.airstamp).localeCompare(String(b.item.next?.airstamp))
+            : String(b.item.last_aired || '').localeCompare(String(a.item.last_aired || ''))
+        ),
+    })).filter((group) => group.items.length > 0)
+  }, [ritorni, now])
 
   const [next, ...rest] = toWatch
   const tabIndex = TABS.findIndex((item) => item.id === tab)
@@ -441,8 +485,12 @@ export default function SeriePage() {
               )}
             </div>
           ) : tab === 'arrivo' ? (
-            upcomingByDay.length === 0 ? (
-              <Empty title="Niente in uscita" text="Nessun episodio delle tue serie nei prossimi 30 giorni." />
+            upcomingByDay.length === 0 && returnGroups.length === 0 ? (
+              ritorni === null ? (
+                <p className="pt-6 text-[15px] text-grow-muted">Carico le uscite…</p>
+              ) : (
+                <Empty title="Niente in uscita" text="Nessun episodio nei prossimi 30 giorni e nessuna serie in attesa di tornare." />
+              )
             ) : (
               <div className="space-y-8 pt-2">
                 {upcomingByDay.map((group) => (
@@ -477,6 +525,36 @@ export default function SeriePage() {
                     </ul>
                   </section>
                 ))}
+                {returnGroups.length > 0 && (
+                  <div className="space-y-8 pt-4">
+                    <div>
+                      <h2 className="grow-section-title">Quando tornano.</h2>
+                      <p className="mt-2 text-[13px] text-grow-muted">Le serie che segui senza puntate nei prossimi 30 giorni. Dati di TVmaze, aggiornati ogni giorno.</p>
+                    </div>
+                    {returnGroups.map((group) => (
+                      <section key={group.kind}>
+                        <SectionHead title={group.title} meta={group.items.length === 1 ? '1 serie' : `${group.items.length} serie`} />
+                        <ul className="grow-surface divide-y divide-grow-border overflow-hidden rounded-[1.4rem]">
+                          {group.items.map(({ item, state }) => (
+                            <li key={item.id}>
+                              <Link href={`/serie/${item.id}`} className="flex items-center gap-3 p-3">
+                                <Poster src={item.poster} title={item.title} className="h-[72px] w-12 shrink-0 rounded-lg" />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-[17px] font-bold leading-tight">{item.title}</span>
+                                  <span className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold">
+                                    <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${RETURN_TONE[state.kind]}`} />
+                                    <span className="truncate">{group.kind === 'dated' && item.next ? longDate(item.next.airstamp) : state.label}</span>
+                                  </span>
+                                  {state.detail && <span className="mt-0.5 block truncate text-[13px] text-grow-muted">{state.detail}</span>}
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           ) : (
@@ -669,12 +747,28 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
   const [added, setAdded] = useState<Map<number, number>>(new Map())
   const [error, setError] = useState('')
   const [searched, setSearched] = useState('')
+  const [preview, setPreview] = useState<SearchResult | null>(null)
+  // Altezza visibile sopra la tastiera: su Android il foglio non ci finisce sotto.
+  const [viewport, setViewport] = useState<number | null>(null)
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (preview) setPreview(null)
+      else onClose()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, preview])
+
+  useEffect(() => {
+    const visual = window.visualViewport
+    if (!visual) return
+    const update = () => setViewport(visual.height)
+    update()
+    visual.addEventListener('resize', update)
+    return () => visual.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => {
     const q = query.trim()
@@ -714,73 +808,188 @@ function SearchSheet({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
     setAdding(null)
   }
 
+  const action = (item: SearchResult, wide = false) =>
+    showId(item) ? (
+      <Link
+        href={`/serie/${showId(item)}${added.has(item.tvmaze_id) ? '?imposta=1' : ''}`}
+        className={`grow-press grow-object flex min-h-11 shrink-0 items-center justify-center rounded-full bg-grow-yellow px-4 text-sm font-bold text-grow-black ${wide ? 'h-12 w-full text-base' : ''}`}
+      >
+        {added.has(item.tvmaze_id) ? 'A che punto sei' : 'Apri'}
+      </Link>
+    ) : (
+      <button
+        type="button"
+        disabled={adding === item.tvmaze_id}
+        onClick={() => void add(item)}
+        className={`grow-press grow-object min-h-11 shrink-0 rounded-full bg-grow-yellow px-4 text-sm font-bold text-grow-black disabled:opacity-60 ${wide ? 'h-12 w-full text-base' : ''}`}
+      >
+        {adding === item.tvmaze_id ? 'Aggiungo…' : 'Segui'}
+      </button>
+    )
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-end bg-black/60 backdrop-blur-sm lg:items-center lg:justify-center" onClick={onClose}>
+    <div className="fixed inset-x-0 top-0 z-[60] bg-black/60 backdrop-blur-sm lg:inset-0 lg:flex lg:items-center lg:justify-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Aggiungi una serie"
-        className="grow-surface max-h-[85dvh] w-full overflow-y-auto overscroll-contain rounded-t-[2rem] p-5 pb-[max(2rem,env(safe-area-inset-bottom))] lg:max-w-lg lg:rounded-[2rem]"
+        aria-label={preview ? preview.title : 'Cerca una serie'}
+        style={viewport ? ({ '--vvh': `${viewport}px` } as React.CSSProperties) : undefined}
+        className="flex h-[var(--vvh,100dvh)] w-full flex-col bg-grow-bg lg:h-auto lg:max-h-[85dvh] lg:max-w-lg lg:overflow-hidden lg:rounded-[2rem] lg:shadow-e3"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center gap-2">
-          <input
-            autoFocus
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            type="search"
-            enterKeyHint="search"
-            aria-label="Cerca una serie"
-            placeholder="Cerca una serie…"
-            className="h-12 flex-1 rounded-full border border-transparent bg-grow-soft px-5 text-base font-semibold text-grow-text outline-none placeholder:text-grow-muted focus:border-grow-yellow"
-          />
-          <button type="button" onClick={onClose} className="min-h-11 px-3 text-sm font-semibold text-grow-muted">
-            Chiudi
-          </button>
-        </div>
-        {error && <p className="mt-3 rounded-2xl bg-grow-butter px-4 py-3 text-sm">{error}</p>}
-        {query.trim().length < 2 && (
-          <p className="py-8 text-center text-[15px] text-grow-muted">Scrivi il titolo: le puntate arrivano da TVmaze.</p>
-        )}
-        {visible.length === 0 && searched === query.trim() && searched.length >= 2 && (
-          <p className="py-8 text-center text-[15px] text-grow-muted">Nessuna serie trovata per “{searched}”.</p>
-        )}
-        <ul className="mt-3 divide-y divide-grow-border">
-          {visible.map((item) => (
-            <li key={item.tvmaze_id} className="flex items-center gap-3 py-3">
-              <Poster src={item.poster} title={item.title} className="h-[66px] w-11 shrink-0 rounded-lg" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[17px] font-bold">{item.title}</span>
-                <span className="block text-[13px] text-grow-muted">
-                  {[item.year, item.network, item.status === 'Ended' ? 'Conclusa' : item.status === 'Running' ? 'In onda' : item.status]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </span>
-              {showId(item) ? (
-                <span className="flex shrink-0 flex-col items-end gap-1">
-                  <Link
-                    href={`/serie/${showId(item)}${added.has(item.tvmaze_id) ? '?imposta=1' : ''}`}
-                    className="grow-press grow-object flex min-h-11 items-center rounded-full bg-grow-yellow px-4 text-sm font-bold text-grow-black"
-                  >
-                    {added.has(item.tvmaze_id) ? 'A che punto sei' : 'Apri'}
-                  </Link>
-                  <span className="text-xs text-grow-muted">Seguita</span>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={adding === item.tvmaze_id}
-                  onClick={() => void add(item)}
-                  className="grow-press grow-object min-h-11 shrink-0 rounded-full bg-grow-yellow px-4 text-sm font-bold text-grow-black disabled:opacity-60"
-                >
-                  {adding === item.tvmaze_id ? 'Aggiungo…' : 'Segui'}
-                </button>
+        {preview ? (
+          <ShowPreview item={preview} onBack={() => setPreview(null)} action={(wide) => action(preview, wide)} />
+        ) : (
+          <>
+            <div className="flex shrink-0 items-center gap-2 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] lg:pt-5">
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                type="search"
+                enterKeyHint="search"
+                aria-label="Cerca una serie"
+                placeholder="Cerca una serie…"
+                className="h-12 min-w-0 flex-1 rounded-full border border-transparent bg-grow-soft px-5 text-base font-semibold text-grow-text outline-none placeholder:text-grow-muted focus:border-grow-yellow"
+              />
+              <button type="button" onClick={onClose} className="min-h-11 px-3 text-sm font-semibold text-grow-muted">
+                Chiudi
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+              {error && <p className="mt-1 rounded-2xl bg-grow-butter px-4 py-3 text-sm">{error}</p>}
+              {query.trim().length < 2 && (
+                <p className="py-8 text-[15px] text-grow-muted">Scrivi il titolo. Tocca una serie per vedere stagioni e quando torna, senza aggiungerla.</p>
               )}
-            </li>
-          ))}
-        </ul>
+              {visible.length === 0 && searched === query.trim() && searched.length >= 2 && (
+                <p className="py-8 text-[15px] text-grow-muted">Nessuna serie trovata per “{searched}”.</p>
+              )}
+              <ul className="divide-y divide-grow-border">
+                {visible.map((item) => (
+                  <li key={item.tvmaze_id} className="flex items-center gap-3 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setPreview(item)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <Poster src={item.poster} title={item.title} className="h-[66px] w-11 shrink-0 rounded-lg" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[17px] font-bold">{item.title}</span>
+                        <span className="block truncate text-[13px] text-grow-muted">
+                          {[item.year, item.network, STATUS_LABEL[item.status || ''] || item.status].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                    </button>
+                    {action(item)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
       </div>
     </div>
+  )
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  Ended: 'Conclusa',
+  Running: 'In produzione',
+  'To Be Determined': 'Futuro incerto',
+  'In Development': 'In sviluppo',
+}
+
+type Preview = ReturnFacts & {
+  title: string
+  poster: string | null
+  network: string | null
+  premiered: string | null
+  genres: string[]
+  summary: string | null
+  seasons: { number: number; episodes: number; aired: number; premiere: string | null; end: string | null }[]
+}
+
+function ShowPreview({ item, onBack, action }: { item: SearchResult; onBack: () => void; action: (wide: boolean) => React.ReactNode }) {
+  const [data, setData] = useState<Preview | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    void fetch(`/api/tv/preview?id=${item.tvmaze_id}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((json) => alive && setData(json))
+      .catch(() => alive && setFailed(true))
+    return () => {
+      alive = false
+    }
+  }, [item.tvmaze_id])
+
+  const state = data ? returnState(data) : null
+  const year = (date: string | null) => date?.slice(0, 4)
+
+  return (
+    <>
+      <div className="flex shrink-0 items-center px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] lg:pt-4">
+        <button type="button" onClick={onBack} className="flex min-h-11 items-center gap-1 px-2 text-sm font-semibold text-grow-muted">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+          Risultati
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6">
+        <div className="flex gap-4">
+          <Poster src={data?.poster || item.poster} title={item.title} className="h-[150px] w-[100px] shrink-0 rounded-[14px]" />
+          <div className="min-w-0 flex-1 pt-1">
+            <h2 className="grow-section-title text-balance">{item.title}</h2>
+            <p className="mt-2 text-[13px] text-grow-muted">
+              {[year(data?.premiered || null) || item.year, data?.network || item.network].filter(Boolean).join(' · ')}
+            </p>
+            {data && data.genres.length > 0 && <p className="mt-0.5 text-[13px] text-grow-muted">{data.genres.slice(0, 3).join(', ')}</p>}
+          </div>
+        </div>
+
+        {failed && <p className="mt-6 text-[15px] text-grow-muted">TVmaze non risponde. Riprova tra poco.</p>}
+        {!data && !failed && <p className="mt-6 text-[15px] text-grow-muted">Carico la scheda…</p>}
+
+        {data && state && (
+          <>
+            <div className="grow-surface mt-6 rounded-[18px] p-4">
+              <p className="flex items-center gap-2 text-[17px] font-bold">
+                <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${RETURN_TONE[state.kind]}`} />
+                {state.label}
+              </p>
+              {state.detail && <p className="mt-1 pl-[18px] text-[13px] text-grow-muted">{state.detail}</p>}
+            </div>
+
+            {data.seasons.length > 0 && (
+              <section className="mt-8">
+                <SectionHead title="Stagioni" meta={`${data.seasons.filter((season) => season.aired > 0).length} uscite`} />
+                <ul className="grow-surface divide-y divide-grow-border overflow-hidden rounded-[18px]">
+                  {data.seasons.map((season) => (
+                    <li key={season.number} className="flex items-baseline justify-between gap-3 px-4 py-3">
+                      <span className="text-[15px] font-bold">Stagione {season.number}</span>
+                      <span className="text-right text-[13px] tabular-nums text-grow-muted">
+                        {season.aired === 0
+                          ? season.premiere
+                            ? `dal ${longDate(season.premiere)}`
+                            : 'annunciata'
+                          : [
+                              season.aired < season.episodes ? `${season.aired} di ${season.episodes} episodi` : `${season.episodes} episodi`,
+                              year(season.premiere),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {data.summary && <p className="mt-8 text-pretty text-[15px] leading-relaxed text-grow-muted">{data.summary}</p>}
+          </>
+        )}
+      </div>
+      <div className="shrink-0 border-t border-grow-border px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{action(true)}</div>
+    </>
   )
 }

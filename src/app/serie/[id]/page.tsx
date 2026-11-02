@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
-import { CheckButton, episodeCode, Poster, ProgressBar, progressState, type TvShow } from '@/components/tv/TvBits'
+import { CheckButton, episodeCode, Poster, ProgressBar, progressState, RETURN_TONE, returnState, type TvShow } from '@/components/tv/TvBits'
 
 type Episode = { id: number; season: number; number: number; name: string | null; airstamp: string | null; runtime: number | null }
 type Watch = { season: number; episode: number; watched_at: string | null; source: string }
@@ -124,6 +124,15 @@ function SerieDetail() {
   }
 
   const state = progressState(show)
+  const upcoming = episodes
+    .filter((episode) => episode.airstamp && new Date(episode.airstamp).getTime() > now)
+    .sort((a, b) => String(a.airstamp).localeCompare(String(b.airstamp)))[0]
+  const comeback = returnState({
+    status: show.show_status,
+    next: upcoming ? { season: upcoming.season, number: upcoming.number, airstamp: upcoming.airstamp as string } : null,
+    last_aired: aired.at(-1)?.airstamp ?? null,
+    tba_season: episodes.find((episode) => !episode.airstamp)?.season ?? null,
+  }, now)
   const watchedCount = Math.max(show.aired_count - show.unwatched_count, 0)
   const pickEpisodes = episodes.filter((episode) => episode.season === pick.season)
 
@@ -144,11 +153,12 @@ function SerieDetail() {
               <Poster src={show.poster} title={show.title} className="h-[168px] w-28 shrink-0 rounded-xl shadow-[0_20px_30px_-12px_rgba(0,0,0,.7)]" />
               <div className="min-w-0">
                 <h1 className="font-display text-[32px] leading-[0.95] [text-wrap:balance]">{show.title}</h1>
-                <p className="mt-2 text-[13px] text-grow-muted">
-                  {[show.network, show.show_status === 'Ended' ? 'Conclusa' : show.show_status === 'Running' ? 'In onda' : null]
-                    .filter(Boolean)
-                    .join(' · ')}
+                {show.network && <p className="mt-2 text-[13px] text-grow-muted">{show.network}</p>}
+                <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold">
+                  <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${RETURN_TONE[comeback.kind]}`} />
+                  {comeback.label}
                 </p>
+                {comeback.detail && <p className="mt-0.5 text-[13px] text-grow-muted">{comeback.detail}</p>}
                 <p className="mt-2 text-[15px] font-bold text-grow-yellow">{state.label}</p>
               </div>
             </div>
