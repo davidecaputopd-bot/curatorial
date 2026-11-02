@@ -35,23 +35,3 @@ export async function getAuthenticatedSupabase() {
 
   return { supabase, user: isGrowOwner(user) ? user : null }
 }
-
-// Serie è multiutente: basta avere un profilo (tv_profiles), non essere il proprietario.
-// Il proprietario passa sempre, anche senza riga di profilo.
-export async function getTvSupabase() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return { supabase, user: null }
-  if (isGrowOwner(user)) return { supabase, user }
-
-  const { data: profile } = await supabase
-    .from('tv_profiles')
-    .select('id')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  return { supabase, user: profile ? user : null }
-}

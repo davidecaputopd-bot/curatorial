@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getTvSupabase } from '@/lib/supabase/server'
+import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { getShowFull } from '@/lib/tv/tvmaze'
 
 // Anteprima di una serie da TVmaze, senza aggiungerla: stagioni, stato e ritorno.
 export async function GET(request: Request) {
-  const { supabase, user } = await getTvSupabase()
+  const { supabase, user } = await getAuthenticatedSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const id = Number(new URL(request.url).searchParams.get('id'))

@@ -1,8 +1,9 @@
 'use client'
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { ACCENTS, appName, DEFAULT_ACCENT, type AccentId } from '@/lib/accents'
 
 type Mode = 'accedi' | 'invito'
 
@@ -16,12 +17,18 @@ function EntraInner() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
+  const [accent, setAccent] = useState<AccentId>(DEFAULT_ACCENT)
   const [status, setStatus] = useState<'idle' | 'loading'>('idle')
   const [message, setMessage] = useState('')
 
+  // Il colore scelto si vede subito: è l'accent di tutta l'app.
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent
+  }, [accent])
+
   const requestedNext = searchParams.get('next')
   const next =
-    requestedNext?.startsWith('/serie') && !requestedNext.startsWith('//') ? requestedNext : '/serie'
+    requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/'
 
   async function signIn() {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
@@ -47,7 +54,7 @@ function EntraInner() {
     const response = await fetch('/api/account/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ display_name: name, email, password, code }),
+      body: JSON.stringify({ display_name: name, email, password, code, accent }),
     })
     const data = await response.json().catch(() => ({}))
 
@@ -61,14 +68,14 @@ function EntraInner() {
   }
 
   const field =
-    'grow-surface mt-2 w-full rounded-2xl border border-transparent px-4 py-3.5 text-[16px] text-grow-text outline-none focus:border-grow-yellow'
+    'grow-surface mt-2 w-full rounded-2xl border border-transparent px-4 py-3.5 text-[16px] text-grow-text outline-none focus:border-grow-accent'
   const label = 'mt-5 block text-[13px] font-semibold text-grow-muted'
 
   return (
     <main className="min-h-[100dvh] bg-grow-bg px-6 text-grow-text">
       <div className="mx-auto flex min-h-[100dvh] max-w-sm flex-col justify-center py-12">
         <p className="font-display text-5xl leading-none">
-          Serie<span className="text-grow-yellow">.</span>
+          Time<span className="text-grow-accent">.</span>
         </p>
 
         <div className="grow-surface mt-10 grid grid-cols-2 rounded-full p-1">
@@ -97,7 +104,7 @@ function EntraInner() {
           <p className="mt-3 text-[15px] leading-snug text-grow-muted">
             {mode === 'accedi'
               ? 'Le tue serie, il punto in cui sei, le prossime puntate.'
-              : 'Serve il codice che ti ha dato Davide. Senza codice non si entra.'}
+              : `Serve il codice che ti ha dato Davide. L\u2019app si chiamer\u00e0 ${appName(name)}.`}
           </p>
 
           {mode === 'invito' && (
@@ -113,6 +120,24 @@ function EntraInner() {
                 onChange={(event) => setName(event.target.value)}
                 className={field}
               />
+
+              <p className="mt-6 text-[13px] font-semibold text-grow-muted">Il tuo colore</p>
+              <div className="mt-2 flex gap-2">
+                {ACCENTS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setAccent(option.id)}
+                    aria-label={option.label}
+                    aria-pressed={accent === option.id}
+                    className={[
+                      'grow-press h-11 flex-1 rounded-2xl border-2 transition-colors',
+                      accent === option.id ? 'border-grow-text' : 'border-transparent',
+                    ].join(' ')}
+                    style={{ backgroundColor: option.swatch }}
+                  />
+                ))}
+              </div>
 
               <label className={label} htmlFor="codice">
                 Codice di invito
@@ -169,7 +194,7 @@ function EntraInner() {
           <button
             type="submit"
             disabled={status === 'loading'}
-            className="grow-press grow-object mt-6 min-h-12 w-full rounded-full bg-grow-yellow text-[15px] font-bold text-grow-black disabled:opacity-40"
+            className="grow-press grow-object mt-6 min-h-12 w-full rounded-full bg-grow-accent text-[15px] font-bold text-grow-black disabled:opacity-40"
           >
             {status === 'loading' ? 'Un attimo…' : mode === 'accedi' ? 'Entra' : 'Crea account'}
           </button>

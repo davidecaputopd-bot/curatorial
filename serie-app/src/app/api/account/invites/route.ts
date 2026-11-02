@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedSupabase } from '@/lib/supabase/server'
+import { getOwnerSupabase } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 
 // Senza vocali e senza caratteri ambigui: un codice si detta al telefono.
@@ -13,7 +13,7 @@ function newCode() {
 
 // Solo il proprietario crea e vede i codici di invito.
 export async function GET() {
-  const { user } = await getAuthenticatedSupabase()
+  const { user } = await getOwnerSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminSupabaseClient()
@@ -28,7 +28,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { user } = await getAuthenticatedSupabase()
+  const { user } = await getOwnerSupabase()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))

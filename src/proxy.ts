@@ -27,46 +27,25 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
   const owner = isGrowOwner(user) ? user : null
 
-  // Gli amici hanno un profilo (tv_profiles) e vedono solo Serie.
-  let member = Boolean(owner)
-  if (user && !owner) {
-    const { data: profile } = await supabase
-      .from('tv_profiles')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
-    member = Boolean(profile)
-  }
+  const isAuthRoute =
+    request.nextUrl.pathname === '/login' ||
+    request.nextUrl.pathname.startsWith('/auth/')
 
-  const path = request.nextUrl.pathname
-  const isOwnerLogin = path === '/login'
-  const isMemberLogin = path === '/entra'
-  const isAuthRoute = isOwnerLogin || isMemberLogin || path.startsWith('/auth/')
-  const isSerieRoute = path === '/serie' || path.startsWith('/serie/')
-
-  const redirect = (pathname: string, keepNext = false) => {
+  if (!owner && !isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = pathname
-    url.search = ''
-    if (keepNext) url.searchParams.set('next', path)
+    url.pathname = '/login'
+    url.searchParams.set('next', request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
-  // Senza accesso: Serie manda al suo login, il resto al login di GROW.
-  if (!owner && !member) {
-    if (isAuthRoute) return response
-    // Autenticato ma senza profilo: serve un invito.
-    if (user) return redirect('/entra')
-    return isSerieRoute ? redirect('/entra', true) : redirect('/login', true)
+  if (owner && request.nextUrl.pathname === '/login') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    url.search = ''
+    return NextResponse.redirect(url)
   }
 
-  if (owner) {
-    if (isOwnerLogin || isMemberLogin) return redirect('/')
-    return response
-  }
-
-  // Amico: solo Serie.
-  return isSerieRoute ? response : redirect('/serie')
+  return response
 }
 
 export const config = {

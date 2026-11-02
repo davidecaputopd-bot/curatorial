@@ -53,7 +53,7 @@ export default function InvitiPage() {
       <div className="mx-auto max-w-lg lg:max-w-3xl">
         <header className="px-5 pt-10 lg:px-8">
           <h1 className="grow-page-title">
-            Inviti<span className="text-grow-yellow">.</span>
+            Inviti<span className="text-grow-accent">.</span>
           </h1>
           <p className="mt-3 text-[15px] leading-snug text-grow-muted">
             Un codice vale un account. Chi lo usa entra solo in Serie, con la sua libreria.
@@ -66,13 +66,13 @@ export default function InvitiPage() {
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Per chi è (opzionale)"
-              className="grow-surface min-w-0 flex-1 rounded-2xl border border-transparent px-4 py-3.5 text-[16px] text-grow-text outline-none focus:border-grow-yellow"
+              className="grow-surface min-w-0 flex-1 rounded-2xl border border-transparent px-4 py-3.5 text-[16px] text-grow-text outline-none focus:border-grow-accent"
             />
             <button
               type="button"
               onClick={() => void create()}
               disabled={creating}
-              className="grow-press grow-object min-h-12 shrink-0 rounded-full bg-grow-yellow px-5 text-[14px] font-bold text-grow-black disabled:opacity-40"
+              className="grow-press grow-object min-h-12 shrink-0 rounded-full bg-grow-accent px-5 text-[14px] font-bold text-grow-black disabled:opacity-40"
             >
               {creating ? '…' : 'Crea codice'}
             </button>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { DEFAULT_ACCENT, isAccent } from '@/lib/accents'
 
 const normalizeCode = (value: unknown) =>
   String(value || '')
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
   const password = String(body.password || '')
   const displayName = String(body.display_name || '').trim()
   const code = normalizeCode(body.code)
+  const accent = isAccent(body.accent) ? body.accent : DEFAULT_ACCENT
 
   if (!email.includes('@')) return NextResponse.json({ error: 'Email non valida' }, { status: 400 })
   if (password.length < 8) return NextResponse.json({ error: 'La password deve avere almeno 8 caratteri' }, { status: 400 })
@@ -65,7 +67,7 @@ export async function POST(request: Request) {
 
   const { error: profileError } = await admin
     .from('tv_profiles')
-    .insert({ id: created.user.id, display_name: displayName, role: 'member' })
+    .insert({ id: created.user.id, display_name: displayName, role: 'member', accent })
 
   if (profileError) {
     await admin.from('tv_invites').update({ used_by: null, used_at: null }).eq('code', code)
