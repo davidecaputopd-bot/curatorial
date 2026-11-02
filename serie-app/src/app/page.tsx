@@ -358,14 +358,22 @@ export default function SeriePage() {
               ))}
             </div>
           ) : followed.length === 0 ? (
-            <Empty title="Nessuna serie" text="Importa l’archivio TV Time o aggiungi la prima serie.">
-              <button
-                type="button"
-                onClick={() => setSearchOpen(true)}
-                className="grow-press grow-object mt-4 min-h-12 rounded-full bg-grow-accent px-5 text-[15px] font-bold text-grow-black"
-              >
-                Aggiungi una serie
-              </button>
+            <Empty title="Nessuna serie" text="Scegli quelle che guardi: una griglia da toccare, poi mi dici a che punto sei.">
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href="/inizia"
+                  className="grow-press grow-object flex min-h-12 items-center rounded-full bg-grow-accent px-5 text-[15px] font-bold text-grow-black"
+                >
+                  Scegli le tue serie
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="grow-press grow-surface min-h-12 rounded-full px-5 text-[15px] font-bold text-grow-text"
+                >
+                  Cercane una
+                </button>
+              </div>
             </Empty>
           ) : tab === 'vedere' ? (
             <div className="space-y-8 pt-2">
