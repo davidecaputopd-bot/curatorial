@@ -30,14 +30,14 @@ function EntraInner() {
   const next =
     requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/'
 
-  async function signIn() {
+  async function signIn(destinazione = next) {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     if (error) {
       setMessage('Email o password non corretti.')
       setStatus('idle')
       return
     }
-    router.replace(next)
+    router.replace(destinazione)
     router.refresh()
   }
 
@@ -64,7 +64,8 @@ function EntraInner() {
       return
     }
 
-    await signIn()
+    // Account appena nato: si parte dalla scelta delle serie.
+    await signIn('/inizia')
   }
 
   const field =

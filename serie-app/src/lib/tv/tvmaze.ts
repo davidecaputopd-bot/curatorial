@@ -16,6 +16,8 @@ export type TvmazeShow = {
   name: string
   status: string | null
   premiered?: string | null
+  weight?: number
+  genres?: string[]
   image: { medium?: string; original?: string } | null
   network: { name: string } | null
   webChannel: { name: string } | null
@@ -80,3 +82,8 @@ export async function getSeasons(id: number) {
   }
   return []
 }
+
+// Indice completo di TVmaze: 250 serie per pagina, ordinate per id.
+// Serve a costruire il catalogo locale da cui si sceglie all'ingresso.
+// Oltre l'ultima pagina risponde 404, cioè null: è la condizione di fine.
+export const getIndexPage = (page: number) => get<TvmazeShow[]>(`/shows?page=${page}`)
