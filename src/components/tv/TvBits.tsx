@@ -30,6 +30,8 @@ export type TvShow = {
   unwatched_count: number
   watched_minutes: number
   upcoming_airstamp: string | null
+  return_season?: number | null
+  return_date?: string | null
 }
 
 export const episodeCode = (season: number, number: number) =>

@@ -7,8 +7,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-  const [show, episodes, watches] = await Promise.all([
+  const [show, comeback, episodes, watches] = await Promise.all([
     supabase.from('tv_show_overview').select('*').eq('id', id).eq('user_id', user.id).single(),
+    // Le colonne del ritorno non sono nella vista (s.* è fissato alla sua creazione).
+    supabase.from('tv_shows').select('return_season, return_date').eq('id', id).eq('user_id', user.id).maybeSingle(),
     supabase
       .from('tv_episodes')
       .select('id, season, number, name, airstamp, runtime, image')
@@ -25,5 +27,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   ])
 
   if (show.error) return NextResponse.json({ error: show.error.message }, { status: 404 })
-  return NextResponse.json({ show: show.data, episodes: episodes.data || [], watches: watches.data || [] })
+  return NextResponse.json({ show: { ...show.data, ...(comeback.data || {}) }, episodes: episodes.data || [], watches: watches.data || [] })
 }

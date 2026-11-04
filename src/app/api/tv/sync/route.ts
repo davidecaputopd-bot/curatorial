@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedSupabase } from '@/lib/supabase/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
-import { syncShows } from '@/lib/tv/sync'
+import { returnKey, syncShows } from '@/lib/tv/sync'
 import { sendPush } from '@/lib/tv/push'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 
@@ -99,5 +99,33 @@ export async function GET(request: Request) {
       .eq('user_id', first.user_id)
   }
 
-  return NextResponse.json({ synced: results.length, newShows: byShow.size, notified })
+  // Ritorni: avvisa quando una serie seguita riceve una stagione nuova o la sua data.
+  const { data: returning } = await supabase
+    .from('tv_shows')
+    .select('id, user_id, title, return_season, return_date, return_notified')
+    .eq('followed', true)
+    .eq('notify', true)
+    .not('return_season', 'is', null)
+  let returns = 0
+  for (const show of returning || []) {
+    const key = returnKey(show)
+    if (key === show.return_notified) continue
+    // Una data tolta non è una notizia: si aggiorna senza avvisare.
+    const isNews = Boolean(show.return_date) || show.return_notified?.split(':')[0] !== String(show.return_season)
+    if (isNews) {
+      const date = show.return_date
+        ? new Date(show.return_date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' })
+        : null
+      const { sent } = await sendPush(supabase, show.user_id, {
+        title: show.title,
+        body: date ? `La stagione ${show.return_season} arriva il ${date}` : `Annunciata la stagione ${show.return_season}`,
+        url: `/serie/${show.id}`,
+        tag: `tv-return-${show.id}`,
+      })
+      returns += sent
+    }
+    await supabase.from('tv_shows').update({ return_notified: key }).eq('id', show.id)
+  }
+
+  return NextResponse.json({ synced: results.length, newShows: byShow.size, notified, returns })
 }

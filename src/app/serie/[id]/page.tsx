@@ -129,9 +129,13 @@ function SerieDetail() {
     .sort((a, b) => String(a.airstamp).localeCompare(String(b.airstamp)))[0]
   const comeback = returnState({
     status: show.show_status,
-    next: upcoming ? { season: upcoming.season, number: upcoming.number, airstamp: upcoming.airstamp as string } : null,
+    next: upcoming
+      ? { season: upcoming.season, number: upcoming.number, airstamp: upcoming.airstamp as string }
+      : show.return_season && show.return_date
+        ? { season: show.return_season, number: 1, airstamp: show.return_date }
+        : null,
     last_aired: aired.at(-1)?.airstamp ?? null,
-    tba_season: episodes.find((episode) => !episode.airstamp)?.season ?? null,
+    tba_season: show.return_season && !show.return_date ? show.return_season : null,
   }, now)
   const watchedCount = Math.max(show.aired_count - show.unwatched_count, 0)
   const pickEpisodes = episodes.filter((episode) => episode.season === pick.season)
